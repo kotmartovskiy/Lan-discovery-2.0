@@ -202,6 +202,8 @@ def rollback(txn_dir, run_cmd, log=None):
         steps.append(text)
         _log(log, text)
 
+    _step("rollback: восстановление из %s" % txn_dir)
+
     try:
         with io.open(os.path.join(txn_dir, "manifest.json"),
                      encoding="utf-8") as f:
@@ -268,13 +270,17 @@ def _sh_quote(s):
     return "'%s'" % s.replace("'", "'\\''")
 
 
-def run(ops, run_cmd, backup_root=BACKUP_ROOT, verify=None, log=None):
+def run(ops, run_cmd, backup_root=None, verify=None, log=None):
     """preflight → backup → apply → verify (+rollback при ошибке).
 
-    Возвращает {"ok": True, "id", "dir", "steps", "state": "committed"};
-    при ошибке — SystemChangeError с .txn (state: preflight-failed /
-    backup-failed / rolled_back / rollback-failed).
+    backup_root=None → BACKUP_ROOT (читается в момент вызова — можно
+    подменять в тестах). Возвращает {"ok": True, "id", "dir", "steps",
+    "state": "committed"}; при ошибке — SystemChangeError с .txn
+    (state: preflight-failed / backup-failed / rolled_back /
+    rollback-failed).
     """
+    if backup_root is None:
+        backup_root = BACKUP_ROOT
     txn = {"id": time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6],
            "dir": None, "steps": [], "state": "new"}
 
@@ -320,6 +326,8 @@ def run(ops, run_cmd, backup_root=BACKUP_ROOT, verify=None, log=None):
     if failure is not None:
         rb = rollback(d, run_cmd, log=_step)
         txn["state"] = "rolled_back" if rb["ok"] else "rollback-failed"
+        _step("rollback: %s" % ("выполнен" if rb["ok"]
+                                else "ОШИБКИ: " + "; ".join(rb["errors"])))
         failure.txn = txn
         if not rb["ok"]:
             failure.args = (str(failure) + " | rollback: "
