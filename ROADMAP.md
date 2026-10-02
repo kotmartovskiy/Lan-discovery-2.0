@@ -25,7 +25,19 @@
 | **2.0-6** | Network Core (транзакционный) | `core/network.py`: объекты interfaces/addresses/routes/firewall/…; каркас Prepare→Apply→Verify→Commit/Rollback; UI-warning «This operation may disconnect the current session»; авто-rollback; первый перенос: sys-network-операции; DHCP/DNS/VPN/AP/bridge — по мере модулей-потребителей | **DONE (02.10.2026)** |
 | **2.0-7** | Storage Core | `core/storage.py`: корни `/srv/media|data|backup`, disks/partitions/mounts/SMART (lsblk/smartctl уже в TOOL_PROBES), shares/backup targets; `storage.path()` для модулей; миграция констант модулей (IPTV_DIR/MEDIA_DIR/PLAYLISTS_DIR и др.) | **DONE (02.10.2026)** |
 | **2.0-8** | Хвост спецификации | §15–37 получен 02.10.2026 → `docs/Спецификация-2.0.md` дополнен (§0–37 целиком) | **DONE (02.10.2026)** |
-| **2.0-9** | Architecture Audit (спека §37 Phase 0) | обход репо (core/loader/catalog/capabilities/roles/discovery/network/storage/installer/update/recovery/tests), dependency graph, `docs/2.0/ARCHITECTURE_AUDIT.md` (A–O) → план фаз по §33 | pending |
+| **2.0-9** | Architecture Audit (спека §37 Phase 0) | обход репо (core/loader/catalog/capabilities/roles/discovery/network/storage/installer/update/recovery/tests), dependency graph, `docs/2.0/ARCHITECTURE_AUDIT.md` (A–O) → план фаз по §33 | **DONE (02.10.2026)** |
+| **2.0-10** | Core independence (§19, §34) | `core/version` (APP_VERSION — единый источник), `core/db` (схема+миграции, владение данными), удалить инверсии `core→app/modules` (8 точек: `_cfg`, `APP_VERSION`, `get_db/DB`), compat-reexport из devices_routes | pending |
+| **2.0-11** | Device identity (§15) | device_id + ip_history + composite fingerprint; миграция devices PK через compat-адаптеры (§32), события не ломать | pending |
+| **2.0-12** | Events 2.0 (§16) | именованные события `device./network./storage./job./module./system.`, фасад `events.emit/subscribe`, dual-read совместимость, эмиттеры из jobs/module-manager | pending |
+| **2.0-13** | Automation (§17) | правила Event → Rule → Action, хранение, минимальный UI/API, компактный appliance engine (не HA-клон) | pending |
+| **2.0-14** | Config & Secrets (§20–21) | классы конфигов (core/module/role/state), `secrets.get/set/delete`, секреты отдельно от settings | pending |
+| **2.0-15** | Module contract v2 (§19, §24) | uniform module context (`register_routes(app, ctx)`), миграция модулей по одному, builtin-манифесты → v2 (version/capabilities) | pending |
+| **2.0-16** | System rollback (§26) | preflight→backup→apply→verify→rollback для apt/системных изменений (app-level rollback уже в update.sh) | pending |
+| **2.0-17** | Appliance smoke test (§27) | интеграционная цепочка install→…→failure→rollback (на стенде; важнее мелких UI-тестов) | pending |
+| **2.0-18** | Installer 2.0 (§25) | preflight + hardware detection + health check, ARM/x86_64/минимальные установки, без платы-специфики | pending |
+| **2.0-19** | UI 2.0 shell (§22–24) | Application Shell → Navigation → Module Page, разделы HOME…ADMIN, dashboard-ответы, единые диалоги/уведомления/иконки | pending |
+| **2.0-20** | Portability (§30) | Orange Pi, X96 Max, x86_64 — через capabilities, hardware-specific в Hardware Detection | pending |
+| **2.0-21** | Release (§33 Ph.10, §34) | v2.0.0 + guides + документация §29 (CORE_API/MODULES/CAPABILITIES/…) + demo + release notes | pending |
 
 Статус фазы — только `pending` / `**DONE (дд.мм.гггг)**`; изменения
 состава — с записью ниже (§3).
@@ -404,3 +416,29 @@
   samba-guest management уже в core/samba_guest (inventory строка 50).
   Cherry-pick `1aa568f` (docs AGENTS с 1.1) не нужен — AGENTS 2.0
   переписан в 2.0-0, правка описывает этот репозиторий снаружи.
+### 02.10.2026 — PHASE 2.0-8 (хвост спеки) + PHASE 2.0-9 (Architecture Audit) — **DONE**
+
+- **2.0-8:** от заказчика получен хвост спецификации §15–37 (device
+  identity, events, automation, hardware modules, API, config/secrets,
+  UI 2.0/appliance, API-UI separation, installer, update/rollback, smoke,
+  demo, documentation, portability, что не делать, compat, план фаз 0–10,
+  versioning, DoD, требования к работе, первый результат). Дописан в
+  docs/Спецификация-2.0.md (теперь §0–37 целиком, 1486 строк); закрыт
+  пустой раздел `## SDR` блоком SDR Gateway; архитектура §3.8
+  обновлена.
+- **2.0-9 (§37 Phase 0):** read-only аудит репозитория →
+  docs/2.0/ARCHITECTURE_AUDIT.md (A–O). Ключевые находки: AST-граф
+  (core→app ×5, core→modules ×3, modules→app ×9 — инверсии; modules→core
+  ×21 — норма); владение схемой БД в modules/devices_routes (devices.ip
+  PK — идентичность = IP, §15-разрыв); события только от discovery
+  (NEW/ONLINE/OFFLINE/MAC_CHANGED/IP_CHANGED) без namespace §16;
+  4 разных сигнатуры register_routes; 33 builtin-манифеста legacy (0 с
+  version); два UI-shell (base.html/base_app.html); 189 роутов; тесты
+  324 unit + 15 live; install/update/recovery — app-level rollback есть,
+  system-level нет (§26).
+- **Изменение состава:** таблица фаз дополнена строками 2.0-10…2.0-21 по
+  плану §O аудита (mapping §33 на текущий статус: закрыты Ph.0, Ph.2,
+  Ph.5, Ph.6, частично Ph.1/3/4; следующая — 2.0-10 Core independence,
+  она снимает инверсии и даёт core/db+core/version опорой для
+  identity/events/automation). Порядок и границы фаз фиксирует аудит;
+  каждая фаза — один контракт, тесты зелёные, аддитивность §32.
