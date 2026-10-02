@@ -21,7 +21,7 @@
 | **2.0-2** | Core skeleton + инвентаризация | `core/services.py` (status/start/stop/restart/enable/disable/logs/health), `core/process.py` (безопасный запуск команд), `core/config.py` (settings без зависимости от app); таблица-инвентаризация всех вызовов `subprocess`/`systemctl` (18/13 файлов) с планом переноса; контракты `core/network.py`/`core/storage.py` read-only; первый перенос (1–2 вызова) с тестом | **DONE (01.10.2026)** |
 | **2.0-3** | Jobs subsystem | `core/jobs.py`: manager + worker-треды, состояния queued/running/completed/failed/cancelled, поля id/type/status/progress/started_at/finished_at/logs/result/error/cancelable; sqlite-таблица `jobs` (retention как у events); `GET /api/jobs` + `POST /api/jobs/<id>/cancel`; UI-виджет активных jobs; миграция на jobs: module install/update, backup/restore БД, network scan | **DONE (02.10.2026)** |
 | **2.0-4** | Module manifest 2.0 + permissions + trust | схема v2 (capabilities/dependencies/conflicts/services/configuration/role_support + publisher/sha256/min_core_version/max_core_version) — back-compat v1; сетка прав (network/storage/services/process/camera/usb/gpio/serial) в манифесте и UI-запрос при установке; catalog: SHA-256 тарболла из index, trusted sources, core-compat check; без PKI/sandbox (спека §11–12) | **DONE (02.10.2026)** |
-| **2.0-5** | Roles 2.0 | `roles/<id>.json` манифесты (required_modules/optional_modules/capabilities/hardware_requirements/dependencies/conflicts/recommended_configuration/security_profile); загрузчик в `core/roles.py`, compat через `compute_status()`/capabilities; роли-примеры: Network Gateway, Home Server, Remote Site, Industrial Gateway, Network Diagnostic Box, Camera Gateway (SDR — ждём хвост спеки); apply/API не ломаем (ALWAYS_ON сохраняется) | pending |
+| **2.0-5** | Roles 2.0 | `roles/<id>.json` манифесты (required_modules/optional_modules/capabilities/hardware_requirements/dependencies/conflicts/recommended_configuration/security_profile); загрузчик в `core/roles.py`, compat через `compute_status()`/capabilities; роли-примеры: Network Gateway, Home Server, Remote Site, Industrial Gateway, Network Diagnostic Box, Camera Gateway (SDR — ждём хвост спеки); apply/API не ломаем (ALWAYS_ON сохраняется) | **DONE (02.10.2026)** |
 | **2.0-6** | Network Core (транзакционный) | `core/network.py`: объекты interfaces/addresses/routes/firewall/…; каркас Prepare→Apply→Verify→Commit/Rollback; UI-warning «This operation may disconnect the current session»; авто-rollback; первый перенос: sys-network-операции; DHCP/DNS/VPN/AP/bridge — по мере модулей-потребителей | pending |
 | **2.0-7** | Storage Core | `core/storage.py`: корни `/srv/media|data|backup`, disks/partitions/mounts/SMART (lsblk/smartctl уже в TOOL_PROBES), shares/backup targets; `storage.path()` для модулей; миграция констант модулей (IPTV_DIR/MEDIA_DIR/PLAYLISTS_DIR и др.) | pending |
 | **2.0-8** | Хвост спецификации | разделы после «## SDR» (§14+) от заказчика → дополнить `docs/Архитектура-2.0.md` и этот ROADMAP | ждём ТЗ |
@@ -231,3 +231,55 @@
   возвращался до записи в sqlite (read-after-wait видел `running`,
   поймано ретраем `test_job_persisted_to_sqlite`); persist теперь до
   события (`_run_one`, отмена queued).
+
+### 02.10.2026 — PHASE 2.0-5: Roles 2.0 — **DONE**
+
+- `roles/*.json` — 9 манифестов (спека §14): legacy-три профиля
+  1.1 (`default`/`media`/`network`) перенесены из кода PROFILES без
+  изменений списков + 6 ролей из спеки: network-gateway, home-server,
+  remote-site, industrial-gateway, network-diagnostic-box,
+  camera-gateway (SDR — ждём хвост спеки). Поля контракта
+  §14 присутствуют: required_modules/optional_modules/capabilities/
+  hardware_requirements/dependencies/conflicts/recommended_configuration/
+  security_profile.
+- `core/roles.py` переписан на загрузчик: `validate_role()` (id==имя
+  файла, типы полей, `"*"` только в required, conflicts ∩ ALWAYS_ON →
+  ошибка), `load_roles()` (кэш 5 с, невалидные роли не показываются),
+  `get_role`; PROFILES удалён (контракт роутов не менялся:
+  `roles_overview()`/`apply_role()`/`active_role()` — имена и JSON
+  ключи 1.1 сохранены, overview аддитивно расширен).
+- Готовность роли — `role_blockers(rid, ctx)`: архитектура,
+  hardware_requirements.{tools,storage}, capabilities `group.key`
+  (голые группы не проверяем — не гадаем), dependencies.apt через
+  `_missing_apt_packages`, dependencies.services через
+  `core.services.status` (unknown → не блокируем). Применение роли
+  с блокерами → `{ok: False, error}` (apply отказывает честно).
+- `_targets()`: ALWAYS_ON > conflicts > членство в роли — конфликтный
+  модуль выключается, но ALWAYS_ON неприкосновенен (валидация запрещает
+  conflicts∩ALWAYS_ON на уровне манифеста).
+- `roles_overview()` аддитивно: `required/optional/missing/
+  not_installed/conflicts/blockers/ready/security_profile/
+  recommended_configuration`, члены modules получают `role`
+  (required/optional/conflict/always); старые ключи (active, roles[],
+  modules[].id/name/always_on/status/enabled) не тронуты.
+  missing = id ролей, которых ещё нет в панели (честный контракт:
+  спека-роли ссылаются на будущие модули — apply их просто не трогает).
+- Честность контрактов: `security_profile` ("standard"/"hardened") —
+  бейдж в UI, enforcement нет; `recommended_configuration` — подсказка
+  в UI, автоматически не применяется; `optional_modules` у спека-ролей
+  пуст (спека не разделяет список на required/optional — весь список в
+  required, наполнение optional — по мере появления реальных модулей);
+  capabilities ролей: только явные (industrial-gateway →
+  hardware.rs485, network-gateway/diagnostic → network.ethernet),
+  hardware_requirements пусты (не выдумываем).
+- UI `/roles`: блокеры роли (кнопка Применить disabled + причины),
+  бейджи ready/security_profile, чипы модулей с роль-типом
+  (★ always, ✕ conflict, title required/optional), «нет в панели» и
+  «не установлены», «Рекомендуется: k=v»; сноска про PROFILES заменена
+  на roles/*.json.
+- Тесты `test_roles.py`: 12 → 19 (валидация ok/ошибки, load_roles
+  скипает невалидные, blockers по каждому типу + не-гадание unknown,
+  apply с блокерами отказывает, targets с conflicts, флаги role в
+  overview, контракт аддитивных ключей; legacy-тесты переведены с
+  PROFILES на load_roles). Локально: 276 passed (+2 pre-existing
+  Windows-фейла); CI — после push.

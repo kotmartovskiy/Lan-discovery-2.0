@@ -8,6 +8,22 @@
 ## [2.0.0] — не выпущена (в разработке)
 
 ### Добавлено
+- **Roles 2.0 (PHASE 2.0-5):** роли переехали из кода PROFILES в
+  манифесты `roles/<id>.json` (9 файлов: legacy default/media/network +
+  6 ролей спеки §14 — Network Gateway, Home Server, Remote Site,
+  Industrial Gateway, Network Diagnostic Box, Camera Gateway; SDR ждём);
+  поля §14: `required_modules/optional_modules/capabilities/
+  hardware_requirements/dependencies/conflicts/recommended_configuration/
+  security_profile`; `core/roles.py` — `validate_role`/`load_roles`
+  (невалидные роли не показываются), `role_blockers` (архитектура/железо/
+  capabilities `group.key`/apt/services — роль с блокерами не
+  применяется: `{ok:False, error}`), `_targets`: ALWAYS_ON > conflicts >
+  членство; `roles_overview()` аддитивно: required/optional/missing/
+  not_installed/conflicts/blockers/ready/security_profile/
+  recommended_configuration + `role` у каждого модуля; apply/API-контракты
+  1.1 не менялись (ALWAYS_ON сохранён); UI `/roles` — блокеры (кнопка
+  disabled), бейджи ready/security_profile, ✕-конфликты, «нет в панели»,
+  «Рекомендуется»; тесты 12 → 19.
 - **Module manifest 2.0 + permissions + trust (PHASE 2.0-4):**
   `core/manifest.py` — сетка прав из 12 ключей спеки §11
   (`network.read/configure`, `storage.read/write`, `services.read/control`,
