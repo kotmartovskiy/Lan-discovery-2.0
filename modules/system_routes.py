@@ -7,6 +7,7 @@ from core.hardware import (
     detect_platform, emmc_device, hdd_device, thermal_temp,
 )
 from core import samba_guest
+from core import jobs
 from core.config import SETTINGS_PATH
 from core import config as core_config, services as core_services, storage as core_storage
 
@@ -1025,6 +1026,30 @@ def db_backup_running():
 
 def db_restore_running():
     return service_state("db-restore.service") in ("active", "activating")
+
+
+def _db_backup_job(ctx):
+    """JOB (2.0-3): systemctl start backup-db.service с ожиданием.
+
+    Было: Popen без ожидания + JS-поллинг /api/backup-status. Семантика
+    для UI сохранена (backup-status читает юнит), плюс история/ошибки
+    в jobs. db-restore НЕ мигрирован: внутри — systemctl stop
+    lan-discovery убивает процесс-исполнитель задачи (см. ROADMAP §3).
+    """
+    from core import process
+    ctx.log("Запуск backup-db.service")
+    ctx.progress(10)
+    r = process.run(["systemctl", "start", "backup-db.service"], timeout=600)
+    out = ((r.stdout or "") + (r.stderr or "")).strip()
+    if out:
+        ctx.log(out[-500:])
+    if r.returncode != 0:
+        raise RuntimeError(
+            "backup-db.service завершилась с ошибкой (rc=%s)"
+            % r.returncode)
+    ctx.progress(100)
+    ctx.log("Backup БД завершён")
+    return {"unit": "backup-db.service", "returncode": 0}
 
 
 def emmc_restore_running():
@@ -2052,12 +2077,12 @@ def register_routes(app):
     @admin_required
     @login_required
     def system_db_backup():
-
-        subprocess.Popen(
-            ["systemctl", "start", "backup-db.service"]
+        jid = jobs.submit(
+            "db-backup",
+            _db_backup_job,
+            meta={"unit": "backup-db.service"},
         )
-
-        return jsonify({"ok": True})
+        return jsonify({"ok": True, "job": jid})
 
     @app.route("/system/db-restore", methods=["POST"])
     @admin_required

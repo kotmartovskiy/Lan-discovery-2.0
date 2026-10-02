@@ -371,6 +371,11 @@ from modules.devices_routes import (
 )
 register_devices_routes(app)
 
+# ==================== Jobs (PHASE 2.0-3) ====================
+
+from modules.jobs_routes import register_routes as register_jobs_routes
+register_jobs_routes(app, login_required, admin_required)
+
 # ==================== Weather ====================
 
 from modules.weather_routes import register_routes as register_weather_routes

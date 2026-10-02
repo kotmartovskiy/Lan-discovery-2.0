@@ -10,11 +10,12 @@ DB = "/opt/lan-discovery/devices.db"
 
 # Discovery engine (PHASE 6): движок вынесен в core/discovery.py.
 # Реэкспорт — обратная совместимость: app.py / system_routes импортируют
-# эти символы из devices_routes.
+# эти символы из devices_routes; reconcile нужен и job'е скана (2.0-3).
 from core.discovery import (  # noqa: F401
     get_hostname,
     get_scan_status,
     parse_scan,
+    reconcile,
     run_scan,
     scan_loop,
     start_scan_thread,
@@ -113,7 +114,8 @@ def _ensure_extra_tables(con):
 
     Точный DDL из боевой БД: панель их читает (weather_routes/app.py),
     пишет deploy/weather-update.py; без ensure восстановление на чистой
-    системе даёт неполную схему.
+    системе даёт неполную схему. Плюс jobs (2.0-3) — DDL живёт в
+    core/jobs.py (JOBS_DDL), здесь только вызов.
     """
     con.execute("""
         CREATE TABLE IF NOT EXISTS env_data (
@@ -228,6 +230,9 @@ def _ensure_extra_tables(con):
         "ON weather_observations(timestamp)"
     )
 
+    from core.jobs import ensure_jobs_table
+    ensure_jobs_table(con)
+
 
 def _retention_days():
     from app import _cfg
@@ -238,8 +243,9 @@ def init_db_schema(force=False):
     """Однократная инициализация/миграция схемы (P1-7, P5-25/26/27).
 
     - шаги MIGRATIONS применяются строго по PRAGMA user_version;
-    - _ensure_extra_tables — идемпотентный CREATE 8 «серверных» таблиц;
-    - retention events (events.retention_days) при старте.
+    - _ensure_extra_tables — идемпотентный CREATE 9 «серверных» таблиц;
+    - retention events/jobs (events.retention_days) при старте;
+    - jobs, оборванные рестартом, → failed (2.0-3).
     """
     global _init_done
     with _init_lock:
@@ -265,6 +271,13 @@ def init_db_schema(force=False):
                 cleanup_old_events(con, _retention_days())
             except Exception as e:
                 log.error(f"EVENTS RETENTION ERROR: {e}")
+
+            try:
+                from core.jobs import cleanup_old_jobs, recover_interrupted
+                recover_interrupted(con)
+                cleanup_old_jobs(con, _retention_days())
+            except Exception as e:
+                log.error(f"JOBS RETENTION ERROR: {e}")
 
             con.commit()
             _init_done = True
@@ -546,13 +559,14 @@ def register_routes(app):
     @app.route("/api/scan", methods=["POST"])
     @admin_required
     def api_scan():
-        """Ручное сканирование (P6-2): one-shot, не пишет settings.
+        """Ручное сканирование (P6-2; 2.0-3 — job, one-shot, без settings).
 
         Тело (JSON, опционально): {"subnet": "192.168.1.0/24",
         "ifaces": ["eth0"]}. Без параметров — текущая конфигурация.
+        Ответ: {"ok": true, "job": "<id>"} — статус и результат задачи:
+        GET /api/jobs/<id> (аддитивно к 1.1: devices/stats/subnet теперь
+        в job.result; ошибка nmap — статус job=failed).
         """
-        from core.discovery import reconcile
-
         data = request.get_json(silent=True) or {}
         subnet = (data.get("subnet") or "").strip() or None
         ifaces = data.get("ifaces")
@@ -567,31 +581,49 @@ def register_routes(app):
         if ifaces:
             ifaces = [i.strip() for i in ifaces]
 
-        out = run_scan(subnet=subnet, ifaces=ifaces)
-        if out is None:
-            return jsonify({
-                "ok": False,
-                "error": "сканирование недоступно (см. журнал)",
-            }), 503
-
-        current = parse_scan(out)
-        now = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-
-        con = get_db()
-        try:
-            stats = reconcile(con, current, now)
-            con.commit()
-        finally:
-            con.close()
-
-        return jsonify({
-            "ok": True,
-            "devices": len(current),
-            "stats": stats,
-            "subnet": subnet or _current_subnet(),
-        })
+        from core import jobs
+        jid = jobs.submit(
+            "network-scan",
+            lambda ctx: _scan_job(ctx, subnet, ifaces),
+            meta={"subnet": subnet or "авто"},
+        )
+        return jsonify({"ok": True, "job": jid})
 
 
 def _current_subnet():
     from app import _cfg
     return _cfg("network", "subnet", "192.168.3.0/24")
+
+
+def _scan_job(ctx, subnet, ifaces):
+    """JOB (2.0-3): ручной скан — nmap + reconcile в фоне.
+
+    cancelable не ставим: nmap-прогон изнутри не прервать (каждый ≤45s,
+    полный скан — несколько прогонов), честной отмены посреди нет.
+    """
+    ctx.log("Скан: запуск nmap (%s)" % (subnet or "текущая подсеть"))
+    ctx.progress(10)
+    out = run_scan(subnet=subnet, ifaces=ifaces)
+    if out is None:
+        raise RuntimeError(
+            "сканирование недоступно (nmap отсутствует "
+            "или все прогоны упали)"
+        )
+    ctx.progress(60)
+    current = parse_scan(out)
+    now = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+
+    con = get_db()
+    try:
+        stats = reconcile(con, current, now)
+        con.commit()
+    finally:
+        con.close()
+
+    ctx.progress(100)
+    ctx.log("Скан завершён: %d устройств" % len(current))
+    return {
+        "devices": len(current),
+        "stats": stats,
+        "subnet": subnet or _current_subnet(),
+    }

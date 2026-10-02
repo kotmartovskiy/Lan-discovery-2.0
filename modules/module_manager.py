@@ -17,6 +17,7 @@ import urllib.parse
 
 from flask import jsonify, redirect, render_template, request
 
+from core import jobs
 from core.module_catalog import (
     CatalogError,
     catalog_module_ids,
@@ -52,47 +53,102 @@ def _run(cmd, timeout=600):
         return False, str(e)
 
 
-def _install_manifest(m):
+def _install_manifest(m, ctx=None):
+    """Установка deps модуля. ctx (2.0-3, JobContext | None): лог шагов,
+    прогресс, cooperative-отмена между шагами (сам apt/pip не прерываем).
+    """
     deps = m.get("deps") or {}
     steps = []
     ok_all = True
 
+    def _step(text):
+        steps.append(text)
+        if ctx:
+            ctx.log(text)
+
     pkgs = deps.get("apt") or []
     if pkgs:
+        if ctx:
+            ctx.check_cancel()
+            ctx.progress(15)
         ok, out = _run(["apt-get", "install", "-y"] + pkgs)
-        steps.append("apt install " + " ".join(pkgs) + ": " + ("OK" if ok else "FAIL"))
+        _step("apt install " + " ".join(pkgs) + ": " + ("OK" if ok else "FAIL"))
         if not ok:
             ok_all = False
-            steps.append(out[-1500:])
+            _step(out[-1500:])
 
     pypkgs = deps.get("pip") or []
     if pypkgs:
+        if ctx:
+            ctx.check_cancel()
+            ctx.progress(50)
         ok, out = _run([sys.executable, "-m", "pip", "install"] + pypkgs)
-        steps.append("pip install " + " ".join(pypkgs) + ": " + ("OK" if ok else "FAIL"))
+        _step("pip install " + " ".join(pypkgs) + ": " + ("OK" if ok else "FAIL"))
         if not ok:
             ok_all = False
-            steps.append(out[-1500:])
+            _step(out[-1500:])
 
+    if deps.get("dirs"):
+        if ctx:
+            ctx.check_cancel()
+            ctx.progress(75)
     for d in deps.get("dirs") or []:
         try:
             os.makedirs(d, exist_ok=True)
-            steps.append("mkdir %s: OK" % d)
+            _step("mkdir %s: OK" % d)
         except Exception as e:
             ok_all = False
-            steps.append("mkdir %s: FAIL (%s)" % (d, e))
+            _step("mkdir %s: FAIL (%s)" % (d, e))
 
+    if deps.get("services"):
+        if ctx:
+            ctx.check_cancel()
+            ctx.progress(85)
     for svc in deps.get("services") or []:
         ok, out = _run(["systemctl", "enable", "--now", svc])
-        steps.append("service %s: " % svc + ("OK" if ok else "FAIL"))
+        _step("service %s: " % svc + ("OK" if ok else "FAIL"))
         if not ok:
             ok_all = False
-            steps.append(out[-1500:])
+            _step(out[-1500:])
+
+    if ctx:
+        ctx.progress(95)
 
     return {
         "ts": time.strftime("%d.%m.%Y %H:%M:%S"),
         "ok": ok_all,
         "log": steps,
     }
+
+
+def _module_install_job(ctx, m, installed_before):
+    """JOB (2.0-3): установка deps + фиксация состояния модуля в фоне."""
+    mid = m.get("id", "?")
+    ctx.log("Установка «%s»: старт" % mid)
+    ctx.progress(5)
+    result = _install_manifest(m, ctx=ctx)
+    record_install_result(mid, result)
+    if not installed_before:
+        set_module_status(mid, installed=True, enabled=True)
+    if not result.get("ok"):
+        raise RuntimeError("не все зависимости установились (см. лог)")
+    ctx.progress(100)
+    ctx.log("Установка «%s»: готово" % mid)
+    return {"module": mid, "ok": True}
+
+
+def _catalog_install_job(ctx, mid, update):
+    """JOB (2.0-3): установка/обновление из каталога (сеть + распаковка).
+
+    CatalogError из install_module → failed со текстом ошибки в job.
+    """
+    action = "обновление" if update else "установка"
+    ctx.log("Каталог: %s «%s»" % (action, mid))
+    ctx.progress(10)
+    install_module(mid, update=update)
+    ctx.progress(100)
+    ctx.log("Каталог: «%s» готово" % mid)
+    return {"module": mid, "update": bool(update)}
 
 
 def register_routes(app, login_required, admin_required, page_data):
@@ -156,20 +212,26 @@ def register_routes(app, login_required, admin_required, page_data):
     @app.route("/modules/<mid>/catalog/install", methods=["POST"])
     @admin_required
     def modules_catalog_install(mid):
-        try:
-            install_module(mid)
-            return redirect("/modules?ok=" + urllib.parse.quote("Модуль «%s» установлен" % mid))
-        except CatalogError as e:
-            return redirect("/modules?err=" + urllib.parse.quote(str(e)))
+        jid = jobs.submit(
+            "module-catalog-install",
+            lambda ctx: _catalog_install_job(ctx, mid, False),
+            meta={"module": mid},
+        )
+        return redirect("/modules?ok=" + urllib.parse.quote(
+            "Установка «%s» из каталога запущена (задача %s)"
+            % (mid, jid)))
 
     @app.route("/modules/<mid>/catalog/update", methods=["POST"])
     @admin_required
     def modules_catalog_update(mid):
-        try:
-            install_module(mid, update=True)
-            return redirect("/modules?ok=" + urllib.parse.quote("Модуль «%s» обновлён" % mid))
-        except CatalogError as e:
-            return redirect("/modules?err=" + urllib.parse.quote(str(e)))
+        jid = jobs.submit(
+            "module-catalog-update",
+            lambda ctx: _catalog_install_job(ctx, mid, True),
+            meta={"module": mid},
+        )
+        return redirect("/modules?ok=" + urllib.parse.quote(
+            "Обновление «%s» из каталога запущено (задача %s)"
+            % (mid, jid)))
 
     @app.route("/modules/<mid>/catalog/remove", methods=["POST"])
     @admin_required
@@ -198,11 +260,14 @@ def register_routes(app, login_required, admin_required, page_data):
         if not m:
             return ("Модуль не найден", 404)
         installed_before, _ = module_status(mid)
-        result = _install_manifest(m)
-        record_install_result(mid, result)
-        if not installed_before:
-            set_module_status(mid, installed=True, enabled=True)
-        return redirect("/modules")
+        jid = jobs.submit(
+            "module-install",
+            lambda ctx: _module_install_job(ctx, m, installed_before),
+            cancelable=True,
+            meta={"module": mid},
+        )
+        return redirect("/modules?ok=" + urllib.parse.quote(
+            "Установка «%s» запущена (задача %s)" % (mid, jid)))
 
     # --- Roles layer (STEP 9): конфиг-профили модулей + compat-check ---
 
