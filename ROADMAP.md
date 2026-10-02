@@ -1,4 +1,4 @@
-# ROADMAP.md — LAN Discovery 2.0 (Universal Modular Appliance Platform)
+﻿# ROADMAP.md — LAN Discovery 2.0 (Universal Modular Appliance Platform)
 
 **Старт:** 01.10.2026 (PHASE 2.0-0)
 **Входное ТЗ:** `docs/Спецификация-2.0.md`
@@ -374,3 +374,32 @@
   happy/error/timeout-kill/исключение, шкала процентов, watcher:
   cancel-выход без задержки, пропуск без total). Локально: 319 passed
   (+2 pre-existing Windows-фейла, 3 Linux-skip); CI — после push.
+
+### 02.10.2026 — Внефазная доводка Инвентаризации: переносы строк 47–56 — **DONE**
+
+- Работа между фазами (вне таблицы фаз): закрыты отложенные переносы
+  из docs/Инвентаризация-core-2.0.md, у которых уже есть потребители:
+  `app.py` — `_cmd` и `check_internet` делегируют в
+  `core.process.out/run` (единая точка для всех роутов, shell-авто как
+  в 1.1, UTF-8 с заменой вместо locale); `core_routes._cmd` →
+  `process.out` (timeout 5); `monitor._cmd` → `process.out`
+  (timeout 10); `core/module_loader` — dpkg-query batch → `process.run`;
+  `core/discovery` — nmap `run_scan` → `process.run`;
+  `core/samba_guest` — `smbcontrol`/`testparm` → `process.run`,
+  fallback `systemctl reload smbd` → `services.control("smbd", "reload")`
+  (в `ACTIONS` добавлен `reload` — единственный новый элемент контракта
+  services, расширение аддитивно); `network_routes._bt_cmd` (bluetoothctl
+  stdin) → `core_process.run(input=...)`.
+- Семантика не менялась: stdout.strip()/"" на ошибке (out), rc-проверки и
+  исключения (OSError/TimeoutExpired) — те же; `subprocess`-импорты из
+  мигрированных файлов удалены (кроме samba_guest — нужен класс
+  TimeoutExpired в `except`).
+- Тесты: `test_discovery` патчат `d.process.run` (5 мест) вместо
+  `d.subprocess.run`; без новых тестов — контракты не изменились.
+  Локально: 319 passed (2 pre-existing Windows-фейла, 3 Linux-skip).
+- Остались «отложено» (по мере потребителей/слоёв): inventory.py HTTP-скан,
+  media_routes (journalctl/curl, Popen-проигрыватели — вне core),
+  module_manager `_run`, system_routes статусы (→ core.services.logs);
+  samba-guest management уже в core/samba_guest (inventory строка 50).
+  Cherry-pick `1aa568f` (docs AGENTS с 1.1) не нужен — AGENTS 2.0
+  переписан в 2.0-0, правка описывает этот репозиторий снаружи.

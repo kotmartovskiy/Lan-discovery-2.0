@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 Формат: [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 версионирование — [SemVer](https://semver.org/lang/ru/). Версия панели —
@@ -8,6 +8,7 @@
 ## [2.0.0] — не выпущена (в разработке)
 
 ### Добавлено
+- **Переносы Инвентаризации (внефазно, 02.10.2026):** `app._cmd`/`check_internet`, `core_routes._cmd`, `monitor._cmd`, dpkg-query batch, nmap `run_scan`, samba `smbcontrol`/`testparm`/`systemctl reload` (в `ACTIONS` добавлен `reload`), bluetoothctl `_bt_cmd` — все на `core.process`/`core.services` без смены семантики; удалены мёртвые `subprocess`-импорты. Остальные строки Инвентаризации — по мере потребителей.
 - **Storage Core (PHASE 2.0-7):** `core/storage.py` — корни `ROOTS`
   (`/srv/media|/srv/data|/srv/backup`) + `path()` (posixpath, неизвестный
   корень → ValueError) как единственный источник путей; IPTV_DIR (app/
