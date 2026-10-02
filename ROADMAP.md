@@ -33,7 +33,7 @@
 | **2.0-14** | Config & Secrets (§20–21) | классы конфигов в docstring `core/config` + единый справочник путей (`SETTINGS_PATH`/`MODULES_STATE_PATH`/`ROLES_STATE_PATH`, потребители module_loader/roles/module_catalog); `core/secrets.py`: `get/set/delete/keys` (kv.json, Fernet at rest, 0600) + crypto перенесён из core_routes (compat-алиасы), токен каталога → secrets с fallback на settings; тесты | **DONE (02.10.2026)** |
 | **2.0-15** | Module contract v2 (§19, §24) | uniform module context (`register_routes(app, ctx)`), миграция модулей по одному, builtin-манифесты → v2 (version/capabilities) | **DONE (02.10.2026)** |
 | **2.0-16** | System rollback (§26) | preflight→backup→apply→verify→rollback для apt/системных изменений (app-level rollback уже в update.sh) | **DONE (02.10.2026)** |
-| **2.0-17** | Appliance smoke test (§27) | интеграционная цепочка install→…→failure→rollback (на стенде; важнее мелких UI-тестов) | pending |
+| **2.0-17** | Appliance smoke test (§27) | интеграционная цепочка install→…→failure→rollback (на стенде; важнее мелких UI-тестов) | **DONE (03.10.2026)** |
 | **2.0-18** | Installer 2.0 (§25) | preflight + hardware detection + health check, ARM/x86_64/минимальные установки, без платы-специфики | pending |
 | **2.0-19** | UI 2.0 shell (§22–24) | Application Shell → Navigation → Module Page, разделы HOME…ADMIN, dashboard-ответы, единые диалоги/уведомления/иконки | pending |
 | **2.0-20** | Portability (§30) | Orange Pi, X96 Max, x86_64 — через capabilities, hardware-specific в Hardware Detection | pending |
@@ -631,3 +631,32 @@
   file_write+ручной rollback, потребитель ok/fail). Локально 369
   passed (2 pre-existing Windows-фейла, 3 Linux-skip); CI после
   push (ожидание 374).
+
+### 03.10.2026 — PHASE 2.0-17: Appliance smoke test — **DONE**
+
+- tests/unit/test_appliance_smoke.py: единая цепочка §27 в одном
+  тесте (12 шагов): чистая установка → login → hardware detection
+  (/api/health, db.user_version=3, платформа 7 ключей) →
+  capabilities → network discovery (fake run_scan → job) → module
+  installation (notes, state в tmp) → role application (default,
+  ok:true) → jobs (install completed) → configuration change
+  (settings 45→30 с откатом) → версия из core.version (§34) →
+  failure simulation (syschange.BACKUP_ROOT в tmp, FakeApt сбой,
+  pkg-a не остался, модуль не помечен installed) → rollback
+  (настройки прежние, health жив).
+- tests/live/test_live_appliance_smoke.py: та же цепочка против
+  живого стенда (LAN_PANEL_URL + маркер live, skip при
+  user_version<3); apt/update.sh — вручную по §27/N6.
+- tests/live/conftest.py: пароль админа из LAN_PANEL_PASS;
+  tests/live/test_live_smoke.py: user_version in (2,3) — live-тесты
+  работают и против 1.1 (X96), и против стенда 2.0.
+- Фикс: module_manager._module_install_job — set_module_status
+  только после проверки result.ok (раньше при сбое apt+rollback
+  модуль всё равно помечался установленным).
+- Изоляция unit-цепочки: патчи core.db (devices+events в tmp),
+  jobs-manager, system_routes.DB (иначе health читает /opt),
+  module_state/roles/settings → tmp, фейковые run_scan/reconcile,
+  FakeApt на _run; выбор job — по дельте id до/после submit.
+- Тесты: +1 unit (12 шагов цепочки). Локально 370 passed
+  (2 pre-existing Windows-фейла, 3 Linux-skip); CI после push
+  (ожидание 375).
