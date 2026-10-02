@@ -37,12 +37,14 @@ import json
 import os
 import time
 
+from core import config
 from core import manifest as manifest_mod
 from core import process
 
 _CORE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODULES_DIR = os.path.join(_CORE_DIR, "modules")
-STATE_PATH = "/etc/lan-discovery/modules.json"
+# runtime state (§20): путь — единый справочник core.config
+STATE_PATH = config.MODULES_STATE_PATH
 
 # Ядро: всегда в навигации, не выключается. group — доменная группа (STEP 3).
 CORE_NAV = [

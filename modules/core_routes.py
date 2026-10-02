@@ -20,8 +20,12 @@ _rate_limits = {}
 IPTV_UPDATE_STATUS = "/etc/lan-discovery/iptv-update-status.json"
 NETWORK_CONFIG = "/etc/lan-discovery/network.json"
 NOTES_DIR = "/etc/lan-discovery/notes"
-SECRETS_DIR = "/etc/lan-discovery/secrets"
-SECRETS_KEY_PATH = "/etc/lan-discovery/secret.key"
+# владелец секретов/ключа — core.secrets (PHASE 2.0-14, §21); имена
+# SECRETS_DIR/SECRETS_KEY_PATH и _secrets_encrypt/_secrets_decrypt
+# сохранены (compat §32)
+from core.secrets import (SECRETS_DIR, SECRETS_KEY_PATH,
+                          decrypt as _secrets_decrypt,
+                          encrypt as _secrets_encrypt)
 TRANSMISSION_URL = "http://localhost:9091/transmission/rpc"
 TRANSMISSION_USER = ""
 TRANSMISSION_PASS = ""
@@ -807,83 +811,13 @@ def _notes_save_index(idx):
 
 
 # ==================== Secrets helpers ====================
-# Сейф: Fernet (AES-128-CBC + HMAC-SHA256, authenticated encryption).
-# Ключ — отдельный файл SECRETS_KEY_PATH (chmod 600), не в коде/БД.
-# Старый формат base64(HMAC[:16] || plaintext): HMAC реально проверяется,
-# запись мигрирует в Fernet при первом сохранении. Битые/нечитаемые записи
-# (id в _enc_ids) пишутся обратно без изменений — без двойного шифрования.
+# Криптография и ключ — core/secrets (PHASE 2.0-14, §21): Fernet
+# (AES-128-CBC + HMAC-SHA256), ключ — отдельный файл SECRETS_KEY_PATH
+# (chmod 600), legacy base64(HMAC[:16] || plaintext) читается/мигрирует
+# при первом сохранении. Здесь — только состояние миграции записей
+# UI-менеджера (id в _enc_ids пишутся обратно — без двойного шифрования).
 
 _enc_ids = set()
-_fernet_cache = {}
-
-
-def _get_secrets_key():
-    if os.path.exists(SECRETS_KEY_PATH):
-        with open(SECRETS_KEY_PATH, "rb") as f:
-            key = f.read()
-        if len(key) >= 32:
-            return key
-    key = os.urandom(32)
-    os.makedirs(os.path.dirname(SECRETS_KEY_PATH), exist_ok=True)
-    with open(SECRETS_KEY_PATH, "wb") as f:
-        f.write(key)
-    try:
-        os.chmod(SECRETS_KEY_PATH, 0o600)
-    except OSError:
-        pass
-    return key
-
-
-def _secrets_fernet():
-    from cryptography.fernet import Fernet
-    raw = _get_secrets_key()
-    hit = _fernet_cache.get(raw)
-    if hit is not None:
-        return hit
-    import base64
-    import hashlib
-    if len(raw) == 32:
-        key32 = raw
-    else:
-        key32 = None
-        stripped = raw.strip()
-        if len(stripped) == 64:
-            try:
-                key32 = bytes.fromhex(stripped.decode("ascii"))
-            except Exception:
-                key32 = None
-        if key32 is None:
-            key32 = hashlib.sha256(raw).digest()
-    f = Fernet(base64.urlsafe_b64encode(key32))
-    _fernet_cache[raw] = f
-    return f
-
-
-def _secrets_encrypt(text):
-    return _secrets_fernet().encrypt(text.encode("utf-8")).decode("ascii")
-
-
-def _secrets_decrypt(data):
-    try:
-        return _secrets_fernet().decrypt(data.encode("ascii")).decode("utf-8")
-    except Exception:
-        pass
-    from base64 import b64decode
-    from hashlib import sha256
-    from hmac import HMAC
-    try:
-        raw = b64decode(data, validate=True)
-    except Exception:
-        raise ValueError("secrets: corrupt entry")
-    if len(raw) < 16:
-        raise ValueError("secrets: corrupt entry")
-    body = raw[16:]
-    if HMAC(_get_secrets_key(), body, sha256).digest()[:16] != raw[:16]:
-        raise ValueError("secrets: hmac mismatch")
-    try:
-        return body.decode("utf-8")
-    except UnicodeDecodeError:
-        raise ValueError("secrets: corrupt entry")
 
 
 def _secrets_file():

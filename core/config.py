@@ -1,10 +1,19 @@
 # -*- coding: utf-8 -*-
-"""Settings layer (PHASE 2.0-2): settings.json без зависимости от app.
+"""Settings layer (PHASE 2.0-2 + 2.0-14): settings.json без app (§20).
 
 Проблема 1.1: путь SETTINGS_PATH и чтение settings продублированы в
 app.py, core/module_catalog.py, modules/system_routes.py,
 modules/weather_routes.py (см. docs/Инвентаризация-core-2.0.md) — здесь
 единый источник; потребители переезжают постепенно.
+
+Классы конфигов (спека §20) — единый справочник путей, «не всё в один
+файл»:
+
+- Core configuration -> SETTINGS_PATH (settings.json, этот модуль)
+- Secrets            -> core.secrets (SECRETS_DIR/kv.json, secret.key; §21)
+- Module configuration -> module.json манифесты (repo) + секции settings
+- Role configuration -> core.roles (roles/*.json + ROLES_STATE_PATH)
+- Runtime state      -> MODULES_STATE_PATH (modules.json), БД devices/jobs
 
 Контракт:
     SETTINGS_PATH            — путь по умолчанию (/etc/lan-discovery/...)
@@ -18,6 +27,9 @@ import os
 import time
 
 SETTINGS_PATH = "/etc/lan-discovery/settings.json"
+# runtime state (§20): владельцы — module_loader/roles (алиасы там)
+MODULES_STATE_PATH = "/etc/lan-discovery/modules.json"
+ROLES_STATE_PATH = "/etc/lan-discovery/roles.json"
 _TTL = 10
 _cache = {}  # путь -> {"data": dict, "ts": float}
 

@@ -27,10 +27,12 @@ import tarfile
 import time
 import urllib.request
 
+from core import config
 from core import manifest as manifest_mod
 from core.module_loader import MODULES_DIR, discover_modules, load_state, save_state
 
-SETTINGS_PATH = "/etc/lan-discovery/settings.json"
+# единый справочник путей (§20)
+SETTINGS_PATH = config.SETTINGS_PATH
 DEFAULT_REPO = "kotmartovskiy/Lan-discovery-modules"
 DEFAULT_BRANCH = "main"
 _ID_RE = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}$")
@@ -54,10 +56,20 @@ def _settings():
 def catalog_cfg():
     s = _settings().get("modules_catalog") or {}
     tp = s.get("trusted_publishers")
+    # токен каталога — секрет §21 (core.secrets); legacy-место в
+    # settings.json читаем временно как fallback (§32)
+    token = None
+    try:
+        from core import secrets as core_secrets
+        token = core_secrets.get("modules_catalog_token")
+    except Exception:
+        token = None
+    if token is None:
+        token = str(s.get("token") or "")
     return {
         "repo": str(s.get("repo") or DEFAULT_REPO),
         "branch": str(s.get("branch") or DEFAULT_BRANCH),
-        "token": str(s.get("token") or ""),
+        "token": token,
         "require_sha256": bool(s.get("require_sha256")),
         "trusted_publishers": [str(x) for x in tp] if isinstance(tp, list) else [],
     }

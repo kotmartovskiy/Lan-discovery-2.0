@@ -30,6 +30,7 @@ import os
 import re
 import time
 
+from core import config
 from core import manifest as manifest_mod
 from core.module_loader import (
     discover_modules,
@@ -40,7 +41,8 @@ from core.module_loader import (
     _missing_apt_packages,
 )
 
-STATE_PATH = "/etc/lan-discovery/roles.json"
+# runtime state (§20): путь — единый справочник core.config
+STATE_PATH = config.ROLES_STATE_PATH
 _CORE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROLES_DIR = os.path.join(_CORE_DIR, "roles")
 
