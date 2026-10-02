@@ -34,7 +34,7 @@
 | **2.0-15** | Module contract v2 (§19, §24) | uniform module context (`register_routes(app, ctx)`), миграция модулей по одному, builtin-манифесты → v2 (version/capabilities) | **DONE (02.10.2026)** |
 | **2.0-16** | System rollback (§26) | preflight→backup→apply→verify→rollback для apt/системных изменений (app-level rollback уже в update.sh) | **DONE (02.10.2026)** |
 | **2.0-17** | Appliance smoke test (§27) | интеграционная цепочка install→…→failure→rollback (на стенде; важнее мелких UI-тестов) | **DONE (03.10.2026)** |
-| **2.0-18** | Installer 2.0 (§25) | preflight + hardware detection + health check, ARM/x86_64/минимальные установки, без платы-специфики | pending |
+| **2.0-18** | Installer 2.0 (§25) | preflight + hardware detection + health check, ARM/x86_64/минимальные установки, без платы-специфики | **DONE (03.10.2026)** |
 | **2.0-19** | UI 2.0 shell (§22–24) | Application Shell → Navigation → Module Page, разделы HOME…ADMIN, dashboard-ответы, единые диалоги/уведомления/иконки | pending |
 | **2.0-20** | Portability (§30) | Orange Pi, X96 Max, x86_64 — через capabilities, hardware-specific в Hardware Detection | pending |
 | **2.0-21** | Release (§33 Ph.10, §34) | v2.0.0 + guides + документация §29 (CORE_API/MODULES/CAPABILITIES/…) + demo + release notes | pending |
@@ -660,3 +660,32 @@
 - Тесты: +1 unit (12 шагов цепочки). Локально 370 passed
   (2 pre-existing Windows-фейла, 3 Linux-skip); CI после push
   (ожидание 375).
+### 03.10.2026 — PHASE 2.0-18: Installer 2.0 — **DONE**
+
+- install.sh переведён на цепочку §25: preflight → hardware
+  detection → dependencies → core (code/venv) → modules →
+  configuration (config/db) → systemd → health check (main() — ровно
+  этот порядок, тест его фиксирует).
+- preflight 2.0: выбор python3/python >=3.9 (PY_BIN), arch/kernel,
+  дистрибутив из /etc/os-release (Debian/Ubuntu/Armbian → ok, иное →
+  WARN), apt/dpkg → WARN для не-Debian, место на диске (<400MB →
+  WARN); без предположений о плате (§25).
+- hardware detection: tools/hw_detect.py — переиспользует
+  core/hardware.detect_platform() (тот же источник, что /api/health;
+  только stdlib — работает до venv), отчёт $PREFIX/hw-detect.json
+  (platform/дистрибутив/python/kernel); сбой → WARN, не критично.
+- dependencies для minimal: критичные (python3-venv/cffi/cryptography/
+  bcrypt) обязательны, опциональные (nmap/traceroute/dnsutils/iw/bluez/
+  smartmontools/ffmpeg/mpv) — best-effort по одному; неудачи
+  дописываются в hw-detect.json (deps_missing).
+- modules: проверка discover_modules() (builtin-манифесты читаются,
+  инвариант №5 — потребитель core.module_loader).
+- health check без curl (minimal!): python3 urllib, порт из
+  settings.json (web.flask_port), валидация JSON, версия +
+  user_version (v<3 → WARN), до 60 с.
+- CI: шаг "Installer 2.0 (bash -n + dry-run §25)" в ci.yml +
+  py_compile tools/*.py; тесты: chain-порядок main(), dry-run (bash
+  находит рабочий на Windows-стенде, иначе skip), hw-detect report.
+- Тесты: +3 (tests/unit/test_installer.py). Локально 373 passed
+  (2 pre-existing Windows-фейла, 3 Linux-skip); CI после push
+  (ожидание 378).
