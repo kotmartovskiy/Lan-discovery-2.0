@@ -30,7 +30,7 @@
 | **2.0-11** | Device identity (§15) | `core/identity.py` (derive_id `mac:`/`ip:`, record_ip, identity_of), миграция v3 (device_id + ip_history + backfill, без смены devices.ip PK), reconcile присваивает/наследует device_id, аддитивный `GET /api/device/<ip>/identity`; события не тронуты | **DONE (02.10.2026)** |
 | **2.0-12** | Events 2.0 (§16) | namespace-имена `device./network./storage./camera./job./module./system.` (`NAMESPACE_EVENTS`, строгие для emit), фасад `events.emit/subscribe` (fan-out подписчикам, ошибки не роняют писателя), dual-read `list_events` (legacy⇄namespace), потребители: jobs `job.started/completed/failed/cancelled`, `wait()` = терминальный+финализирован (read-after-wait) | **DONE (02.10.2026)** |
 | **2.0-13** | Automation (§17) | `core/automation.py`: правила Event→Rule→Action (`automation_rules`, ensure-таблица), матчинг dual-read + cooldown + guard от петель, реестр действий (`log`/`event`, расширение модулями), engine на `events.subscribe` + `automation.start()` в app, CRUD API `/api/automation/rules*`, минимальный UI `/automation` (nav Система, admin), тесты | **DONE (02.10.2026)** |
-| **2.0-14** | Config & Secrets (§20–21) | классы конфигов (core/module/role/state), `secrets.get/set/delete`, секреты отдельно от settings | pending |
+| **2.0-14** | Config & Secrets (§20–21) | классы конфигов в docstring `core/config` + единый справочник путей (`SETTINGS_PATH`/`MODULES_STATE_PATH`/`ROLES_STATE_PATH`, потребители module_loader/roles/module_catalog); `core/secrets.py`: `get/set/delete/keys` (kv.json, Fernet at rest, 0600) + crypto перенесён из core_routes (compat-алиасы), токен каталога → secrets с fallback на settings; тесты | **DONE (02.10.2026)** |
 | **2.0-15** | Module contract v2 (§19, §24) | uniform module context (`register_routes(app, ctx)`), миграция модулей по одному, builtin-манифесты → v2 (version/capabilities) | pending |
 | **2.0-16** | System rollback (§26) | preflight→backup→apply→verify→rollback для apt/системных изменений (app-level rollback уже в update.sh) | pending |
 | **2.0-17** | Appliance smoke test (§27) | интеграционная цепочка install→…→failure→rollback (на стенде; важнее мелких UI-тестов) | pending |
@@ -550,3 +550,29 @@
   event-action+guard, start-stop подписка, API CRUD+404/400, auth,
   страница). Локально 347 passed (2 pre-existing Windows-фейла,
   3 Linux-skip); CI — после push (ожидание 352).
+
+
+### 02.10.2026 — PHASE 2.0-14: Config & Secrets — **DONE**
+
+- core/secrets.py — §21: KV API get/set/delete/keys поверх отдельного
+  файла secrets/kv.json (Fernet at rest, chmod 600, атомарная запись
+  tmp+fsync+replace; default только для отсутствующего ключа, битое
+  значение → лог + default); crypto (load_key/encrypt/decrypt + legacy
+  base64(HMAC||text) fallback) перенесён из modules/core_routes БЕЗ
+  смены формата — UI-менеджер /apps/passwords продолжает работать;
+  core_routes оставил compat-алиасы _secrets_encrypt/_secrets_decrypt
+  и имена SECRETS_DIR/SECRETS_KEY_PATH (§32), своё состояние — только
+  _enc_ids (миграция записей без двойного шифрования).
+- core/config.py — §20: docstring «Классы конфигов» (Core/Secrets/
+  Module/Role/Runtime state) + единый справочник путей
+  MODULES_STATE_PATH/ROLES_STATE_PATH; алиасы: module_loader.STATE_PATH,
+  roles.STATE_PATH, module_catalog.SETTINGS_PATH — берутся отсюда
+  (единственный источник).
+- core/module_catalog.py — потребитель §21: token каталога берётся из
+  secrets.get("modules_catalog_token"), fallback на legacy-место
+  settings["modules_catalog"]["token"] (§32, аддитивно).
+- Тесты: +10 (test_secrets.py: KV roundtrip/перезапись/deletion, at-rest
+  шифрование + 0600-ключ, coerce str, encrypt/decrypt/битое-исключение,
+  legacy HMAC + wrong key, fallback/приоритет токена, справочник путей).
+  Локально 357 passed (2 pre-existing Windows-фейла, 3 Linux-skip);
+  CI — после push (ожидание 362).
