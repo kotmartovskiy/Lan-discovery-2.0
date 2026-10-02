@@ -11,8 +11,7 @@ backup) исполняется в фоне, HTTP сразу возвращает
 - поля: id/type/meta/status/progress/queued_at/started_at/finished_at/
   logs/result/error/cancelable (Архитектура §5);
 - хранение: sqlite-таблица `jobs` в devices.db; DDL — JOBS_DDL,
-  ensure_jobs_table() идемпотентен (его зовёт и
-  modules/devices_routes._ensure_extra_tables);
+  ensure_jobs_table() идемпотентен (его зовёт и core/db._ensure_extra_tables);
 - retention: cleanup_old_jobs(con, days) — по образцу cleanup_old_events
   (настройка events.retention_days), плюс ежесуточный retention_loop();
 - отмена: cooperative — задача сама зовёт ctx.check_cancel() между шагами
@@ -276,7 +275,7 @@ class JobManager:
     def _db_path(self):
         if self._db_path_cfg:
             return self._db_path_cfg
-        from modules.devices_routes import DB
+        from core.db import DB
         return DB
 
     def _connect(self):
@@ -328,8 +327,8 @@ class JobManager:
         if self._retention_cfg is not None:
             return int(self._retention_cfg)
         try:
-            from app import _cfg
-            return int(_cfg("events", "retention_days", 180) or 0)
+            from core import config
+            return int(config.get("events", "retention_days", 180) or 0)
         except Exception:
             return 180
 

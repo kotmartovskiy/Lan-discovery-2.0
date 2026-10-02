@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Event engine (PHASE 7): формализованные события, единая точка записи/чтения.
 
-Схема events v2 (см. modules/devices_routes.init_db_schema): колонки
+Схема events v2 (см. core/db.init_db_schema): колонки
 `severity` (info/warning/critical), `source` (discovery/system/monitoring/
 user), `metadata` (JSON-текст).
 
@@ -133,11 +133,11 @@ def retention_loop(interval=86400):
     while True:
         time.sleep(interval)
         try:
-            from app import _cfg
-            days = int(_cfg("events", "retention_days", 180) or 0)
+            from core import config
+            days = int(config.get("events", "retention_days", 180) or 0)
             if days <= 0:
                 continue
-            from modules.devices_routes import get_db
+            from core.db import get_db
             con = get_db()
             try:
                 cleanup_old_events(con, days)

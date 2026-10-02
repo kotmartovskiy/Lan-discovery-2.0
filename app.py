@@ -15,6 +15,8 @@ sys.path.insert(0, "/opt/lan-discovery")
 
 from core import process as core_process
 from core import storage as core_storage
+from core.db import DB
+from core.version import APP_VERSION
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,7 +25,6 @@ logging.basicConfig(
 )
 log = logging.getLogger("lan-discovery")
 
-DB = "/opt/lan-discovery/devices.db"
 SETTINGS_PATH = "/etc/lan-discovery/settings.json"
 USERS_PATH = "/etc/lan-discovery/users.json"
 IPTV_CONFIG = "/etc/lan-discovery/iptv-playlists.json"
@@ -31,7 +32,6 @@ IPTV_DIR = core_storage.path("media", "IPTV")
 IPTV_UPDATE_STATUS = "/etc/lan-discovery/iptv-update-status.json"
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "games")
 TRANSMISSION_CONF = "/etc/transmission-daemon/settings.json"
-APP_VERSION = "2.0.0"
 _SERVICE_START = time.time()
 
 _settings_cache = {"data": None, "ts": 0}

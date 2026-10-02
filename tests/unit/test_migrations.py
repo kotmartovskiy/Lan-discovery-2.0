@@ -2,7 +2,7 @@
 """Unit: DB миграции и ensure-таблицы (PHASE 5: задачи 25-26)."""
 import sqlite3
 
-import modules.devices_routes as dr
+import core.db as dr
 
 CORE_TABLES = {"devices", "events"}
 ENSURE_TABLES = {"env_data", "mchs_alerts", "weather_alerts",
@@ -103,12 +103,12 @@ def test_init_twice_noop(tmp_path, monkeypatch):
 
 
 def test_retention_days_config(monkeypatch):
-    import app
-    monkeypatch.setattr(app, "load_settings", lambda: {})
+    from core import config
+    monkeypatch.setattr(config, "load", lambda path=None: {})
     assert dr._retention_days() == 180
-    monkeypatch.setattr(app, "load_settings",
-                        lambda: {"events": {"retention_days": 0}})
+    monkeypatch.setattr(config, "load",
+                        lambda path=None: {"events": {"retention_days": 0}})
     assert dr._retention_days() == 0
-    monkeypatch.setattr(app, "load_settings",
-                        lambda: {"events": {"retention_days": 30}})
+    monkeypatch.setattr(config, "load",
+                        lambda path=None: {"events": {"retention_days": 30}})
     assert dr._retention_days() == 30

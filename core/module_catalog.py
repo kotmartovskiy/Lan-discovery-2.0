@@ -70,7 +70,7 @@ def _sha256_hex(blob):
 def _app_version():
     """APP_VERSION ядра; недоступен → "" (проверку версии пропускаем)."""
     try:
-        from app import APP_VERSION
+        from core.version import APP_VERSION
         return str(APP_VERSION)
     except Exception:
         return ""

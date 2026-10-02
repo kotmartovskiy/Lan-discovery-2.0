@@ -32,7 +32,7 @@ def events_con(tmp_path):
 @pytest.fixture()
 def devices_db(tmp_path, monkeypatch):
     """Чистая БД devices через полный init (миграции 0→2 + ensure)."""
-    import modules.devices_routes as dr
+    import core.db as dr
     db = str(tmp_path / "devices.db")
     monkeypatch.setattr(dr, "DB", db)
     monkeypatch.setattr(dr, "_init_done", False)

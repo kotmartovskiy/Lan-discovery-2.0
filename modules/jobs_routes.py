@@ -22,7 +22,7 @@ _retention_started = False
 
 
 def register_routes(app, login_required, admin_required):
-    from modules.devices_routes import DB
+    from core.db import DB
     jobs.manager.configure(db_path=DB)
 
     global _retention_started

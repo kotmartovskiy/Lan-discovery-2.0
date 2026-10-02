@@ -29,8 +29,8 @@ _DEFAULT_SELF_IPS = ["192.168.3.234", "192.168.3.235"]
 
 
 def _cfg_net(key, default=None):
-    from app import _cfg
-    return _cfg("network", key, default)
+    from core import config
+    return config.get("network", key, default)
 
 
 def _subnet():
@@ -365,7 +365,7 @@ def scan_loop():
             current_devices = parse_scan(output)
             now = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
 
-            from modules.devices_routes import get_db
+            from core.db import get_db
 
             con = get_db()
             reconcile(con, current_devices, now)

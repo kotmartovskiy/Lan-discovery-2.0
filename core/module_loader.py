@@ -210,7 +210,7 @@ def status_context():
     from core import capabilities
     caps = capabilities.collect()
     try:
-        from app import APP_VERSION
+        from core.version import APP_VERSION
         app_version = str(APP_VERSION)
     except Exception:
         app_version = ""
