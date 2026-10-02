@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Automation</h2>
+
+<div class="info">
+Event → Rule → Action · компактный appliance engine (§17, не HA-клон) ·
+<a href="/api/automation/rules">/api/automation/rules</a> (JSON)
+</div>
+
+<div class="device-block">
+
+<h3>Новое правило</h3>
+
+<form id="rule-form" onsubmit="return createRule(event)">
+
+<div class="info-row">
+<span class="info-label">Имя:</span>
+<input type="text" id="f-name" required maxlength="100"
+       placeholder="offline-alert" style="min-width:220px">
+</div>
+
+<div class="info-row">
+<span class="info-label">Событие:</span>
+<select id="f-event" style="min-width:240px">
+<optgroup label="Namespace (§16)">
+{% for e in ns_events %}<option value="{{ e }}">{{ e }}</option>{% endfor %}
+</optgroup>
+<optgroup label="Legacy (алиас)">
+{% for e in legacy_events %}<option value="{{ e }}">{{ e }}</option>{% endfor %}
+</optgroup>
+</select>
+</div>
+
+<div class="info-row">
+<span class="info-label">Действие:</span>
+<select id="f-atype" onchange="atypeChange()">
+{% for a in actions %}<option value="{{ a }}">{{ a }}</option>{% endfor %}
+</select>
+<span id="w-log">
+&nbsp;сообщение:&nbsp;<input type="text" id="f-msg"
+  placeholder="устройство ушло в offline" style="min-width:220px">
+</span>
+<span id="w-event" style="display:none">
+&nbsp;событие:&nbsp;<select id="f-aevent">
+{% for e in ns_events %}<option value="{{ e }}">{{ e }}</option>{% endfor %}
+</select>
+</span>
+</div>
+
+<div class="info-row">
+<span class="info-label">Cooldown, сек:</span>
+<input type="number" id="f-cooldown" value="0" min="0" style="width:90px">
+<button type="submit">Добавить</button>
+</div>
+
+</form>
+
+</div>
+
+<div class="device-block">
+
+<h3>Правила ({{ rules|length }})</h3>
+
+{% if rules %}
+<div class="table-wrap">
+<table>
+<tr>
+<th scope="col">Вкл</th>
+<th scope="col">Имя</th>
+<th scope="col">Событие</th>
+<th scope="col">Действия</th>
+<th scope="col">Cooldown</th>
+<th scope="col">Срабатываний</th>
+<th scope="col">Последнее</th>
+<th scope="col"></th>
+</tr>
+{% for r in rules %}
+<tr>
+<td>
+{% if r.enabled %}
+<button class="btn-mini" onclick="toggleRule({{ r.id }})"
+        title="Выключить">● вкл</button>
+{% else %}
+<button class="btn-mini" onclick="toggleRule({{ r.id }})"
+        title="Включить">— выкл</button>
+{% endif %}
+</td>
+<td>{{ r.name }}</td>
+<td><code>{{ r.event }}</code></td>
+<td>
+{% for a in r.actions %}
+<span class="status-info">{{ a.type }}{% if a.message %}: {{ a.message }}{% elif a.event %} → {{ a.event }}{% endif %}</span>{% if not loop.last %}, {% endif %}
+{% endfor %}
+</td>
+<td>{{ r.cooldown_sec }} с</td>
+<td>{{ r.fired_count }}</td>
+<td>{{ r.last_fired_at or '—' }}</td>
+<td><button class="btn-mini" onclick="deleteRule({{ r.id }})"
+            title="Удалить">✕</button></td>
+</tr>
+{% endfor %}
+</table>
+</div>
+{% else %}
+<p class="na">Правил нет — создайте первое выше.</p>
+{% endif %}
+
+</div>
+
+<script>
+function atypeChange() {
+    var t = document.getElementById("f-atype").value;
+    document.getElementById("w-log").style.display = (t === "log") ? "" : "none";
+    document.getElementById("w-event").style.display = (t === "event") ? "" : "none";
+}
+
+async function api(url, method, body) {
+    var r = await fetch(url, {
+        method: method,
+        headers: {"Content-Type": "application/json"},
+        body: body ? JSON.stringify(body) : undefined
+    });
+    var d = {};
+    try { d = await r.json(); } catch (e) {}
+    if (!r.ok) { alert(d.error || ("Ошибка HTTP " + r.status)); return null; }
+    return d;
+}
+
+async function toggleRule(id) {
+    if (await api("/api/automation/rules/" + id + "/toggle", "POST"))
+        location.reload();
+}
+
+async function deleteRule(id) {
+    if (!confirm("Удалить правило?")) return;
+    if (await api("/api/automation/rules/" + id, "DELETE"))
+        location.reload();
+}
+
+async function createRule(ev) {
+    ev.preventDefault();
+    var name = document.getElementById("f-name").value.trim();
+    var event = document.getElementById("f-event").value;
+    var cooldown = parseInt(
+        document.getElementById("f-cooldown").value || "0", 10) || 0;
+    var type = document.getElementById("f-atype").value;
+    var actions;
+    if (type === "log") {
+        actions = [{type: "log",
+                    message: document.getElementById("f-msg").value}];
+    } else {
+        actions = [{type: "event",
+                    event: document.getElementById("f-aevent").value}];
+    }
+    var d = await api("/api/automation/rules", "POST", {
+        name: name, event: event, actions: actions, cooldown_sec: cooldown
+    });
+    if (d) location.reload();
+    return false;
+}
+</script>
+
+{% endblock %}

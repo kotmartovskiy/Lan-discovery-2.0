@@ -53,6 +53,7 @@ CORE_NAV = [
     {"page": "capabilities", "title": "Возможности", "url": "/capabilities", "order": 82, "group": "Система"},
     {"page": "roles", "title": "Роли", "url": "/roles", "order": 84, "group": "Система", "admin": True},
     {"page": "modules", "title": "Модули", "url": "/modules", "order": 85, "group": "Система", "admin": True},
+    {"page": "automation", "title": "Automation", "url": "/automation", "order": 86, "group": "Система", "admin": True},
     {"page": "about", "title": "О системе", "url": "/about", "order": 90, "group": "Система"},
     {"page": "help", "title": "Справка", "url": "/help", "order": 100, "group": "Помощь"},
 ]

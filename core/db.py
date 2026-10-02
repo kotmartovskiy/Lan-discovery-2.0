@@ -278,6 +278,9 @@ def _ensure_extra_tables(con):
     from core.jobs import ensure_jobs_table
     ensure_jobs_table(con)
 
+    from core.automation import ensure_automation_table
+    ensure_automation_table(con)
+
 
 def _retention_days():
     return int(config.get("events", "retention_days", 180) or 0)

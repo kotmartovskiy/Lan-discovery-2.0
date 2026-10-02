@@ -374,6 +374,11 @@ register_devices_routes(app)
 from modules.jobs_routes import register_routes as register_jobs_routes
 register_jobs_routes(app, login_required, admin_required)
 
+# ==================== Automation (PHASE 2.0-13) ====================
+
+from modules.automation_routes import register_routes as register_automation_routes
+register_automation_routes(app)
+
 # ==================== Weather ====================
 
 from modules.weather_routes import register_routes as register_weather_routes
@@ -467,6 +472,9 @@ if __name__ == "__main__":
 
     from core.events import retention_loop
     threading.Thread(target=retention_loop, daemon=True).start()
+
+    from core import automation as core_automation
+    core_automation.start()
 
     socketio.run(app,
                  host=_cfg("web", "flask_host", "0.0.0.0"),
