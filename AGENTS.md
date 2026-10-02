@@ -17,11 +17,12 @@
 **Любые дополнения и изменения кода, шаблонов и документации нужно коммитить и пушить на GitHub — иначе репозиторий отстаёт от работающей системы.**
 
 Репозитории:
-- **`Lan-discovery-1.1`** (приватный) — https://github.com/kotmartovskiy/Lan-discovery-1.1 — **ОСНОВНОЙ репозиторий (версия 1.1: UI/UX, capabilities/modules/roles)**. Код, `docs/`, `README.md`, `AGENTS.md`, `ROADMAP.md`, `UI_UX_AUDIT.md`. Ветка `main`, локальный `origin` указывает сюда; коммит/пуш — сюда (`git push origin main`).
-- **`Lan-discovery-ARM`** (приватный) — https://github.com/kotmartovskiy/Lan-discovery-ARM — **версия 1.0, ЗАМОРОЖЕНА** (Orange Pi работает на этой версии; локальный remote `origin-1.0`). Пушить только горячие фиксы 1.0 по отдельному указанию.
-- **`Lan-discovery-docs`** (публичный) — https://github.com/kotmartovskiy/Lan-discovery-docs — очищенная от рабочих IP/паролей копия `docs/`.
-- **`Lan-discovery-modules`** (публичный) — https://github.com/kotmartovskiy/Lan-discovery-modules — каталог модулей для вкладки «Модули» (`index.json` + `<id>/` с `module.json`); панель ставит/обновляет модули из этой ветки (настройка `modules_catalog` в `/etc/lan-discovery/settings.json`).
-- **`Lan-discovery-demo`** (публичный) — https://github.com/kotmartovskiy/Lan-discovery-demo — **статичный демо-слепок панели** для показа извне, сайт: https://kotmartovskiy.github.io/Lan-discovery-demo/ (GitHub Pages, ветка `main`, корень). Генератор `tools/make_demo.py`, проверка `tools/demo_lint.py`.
+- **`Lan-discovery-2.0`** (приватный) — https://github.com/kotmartovskiy/Lan-discovery-2.0 — **ОСНОВНОЙ репозиторий ЭТОЙ рабочей копии** (`C:\Users\Lenovo\Documents\Lan-discovery-2.0`, версия 2.0 — Universal Modular Appliance Platform). Код, `docs/` (`Спецификация-2.0.md`, `Архитектура-2.0.md`, `ROADMAP-1.1.md`), `README.md`, `AGENTS.md`, `ROADMAP.md`. Ветка `main`, локальный `origin` указывает сюда; коммит/пуш — сюда (`git push origin main`). Фазы 2.0 — в `ROADMAP.md` этого репо.
+- **`Lan-discovery-1.1`** (приватный) — https://github.com/kotmartovskiy/Lan-discovery-1.1 — **версия 1.1, продолжает жить отдельно** (боевая на X96/OP; рабочая копия `C:\Users\Lenovo\Documents\Default Project`, там свой origin). В репо 2.0 этот remote назван **`upstream-11`** — оттуда cherry-pick'аются горячие фиксы безопасности 1.1 в 2.0 и наоборот. Коммиты в 1.1 делаются в `Default Project`.
+- **`Lan-discovery-ARM`** (приватный) — https://github.com/kotmartovskiy/Lan-discovery-ARM — **версия 1.0, ЗАМОРОЖЕНА** (Orange Pi работает на этой версии; локальный remote `origin-1.0` в `Default Project`). Пушить только горячие фиксы 1.0 по отдельному указанию.
+- **`Lan-discovery-docs`** (публичный) — https://github.com/kotmartovskiy/Lan-discovery-docs — очищенная от рабочих IP/паролей копия `docs/` (пока — документация 1.1; для 2.0 публичную доку выделим отдельно по указанию).
+- **`Lan-discovery-modules`** (публичный) — https://github.com/kotmartovskiy/Lan-discovery-modules — каталог модулей для вкладки «Модули» (`index.json` + `<id>/` с `module.json`); панель ставит/обновляет модули из этой ветки (настройка `modules_catalog` в `/etc/lan-discovery/settings.json`). Схема манифеста: v1 сейчас, **v2 — PHASE 2.0-4** (после чего каталог пополнится publisher/sha256-полями).
+- **`Lan-discovery-demo`** (публичный) — https://github.com/kotmartovskiy/Lan-discovery-demo — **статичный демо-слепок панели** для показа извне, сайт: https://kotmartovskiy.github.io/Lan-discovery-demo/ (GitHub Pages, ветка `main`, корень). Генератор `tools/make_demo.py`, проверка `tools/demo_lint.py`. Слепок снимается с **боевой 1.1 на X96**.
 
 Порядок действий:
 1. `git status` → `git add <изменённые файлы>` (мусор типа `check_*`, `debug*`, `verify*`, `__pycache__` отфильтровывается `.gitignore`).
@@ -53,8 +54,14 @@
    только в `%LOCALAPPDATA%\lan-discovery\ssh_pass.txt`, в git не идёт).
 
 ## Рабочее окружение
+- **ЭТА копия — версия 2.0 (в разработке):** `C:\Users\Lenovo\Documents\Lan-discovery-2.0`.
+  **2.0 НЕ деплоится на X96 и Orange Pi** — обе боевые системы на 1.1;
+  деплой 2.0 будет только на отдельный префикс/устройство и ТОЛЬКО по
+  отдельному указанию. `tools/sync_check.py` и ежедневная задача №67
+  относятся к паре «`Default Project` ↔ X96» (1.1), для 2.0 — настраиваются
+  позже, когда появится деплой-цель.
 - **ТЕСТОВАЯ СИСТЕМА версии 1.1 — X96 Max** (`192.168.3.243:8080`, hostname `armbian`):
-  на неё деплоим всё новое из `Lan-discovery-1.1`, здесь проверяем этапы.
+  на неё деплоим всё новое из `Lan-discovery-1.1` (рабочая копия `Default Project`), здесь проверяем этапы 1.1; также источник cherry-pick-фиксов в 2.0.
 - **Orange Pi (`192.168.3.235`) — рабочий инструмент на версии 1.0**:
   **изменения 1.1 на OP НЕ деплоим**, она остаётся на текущей версии (`Lan-discovery-ARM`).
 - **Web panel: `http://192.168.3.243:8080`** (X96 Max / Armbian, hostname `armbian`)
