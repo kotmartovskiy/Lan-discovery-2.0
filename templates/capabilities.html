@@ -1,5 +1,18 @@
 {% extends "base.html" %}
 
+{% macro cap_row(label, c) -%}
+<div class="info-row">
+<span class="info-label">{{ label }}:</span>
+{%- if c.state == 'present' %}
+<span class="status-ok">● {% if c.value is defined and c.value %}{% if c.value is string or c.value is number %}{{ c.value }}{% else %}{{ c.value|join(', ') }}{% endif %}{% else %}обнаружено{% endif %}</span>
+{%- elif c.state == 'absent' %}
+<span class="na">— не обнаружено</span>
+{%- else %}
+<span class="status-unknown">неизвестно</span>
+{%- endif %}
+</div>
+{%- endmacro %}
+
 {% block content %}
 <h2>Возможности системы</h2>
 
@@ -34,18 +47,11 @@
 
 <h3>Накопители</h3>
 
-{% for label, key in [('eMMC', 'emmc'), ('SD-карта', 'sd'), ('HDD/SSD', 'hdd')] %}
-{% set c = capabilities.storage[key] %}
-<div class="info-row">
-<span class="info-label">{{ label }}:</span>
-{% if c.state == 'present' %}
-<span class="status-ok">● {{ c.value or 'обнаружено' }}</span>
-{% elif c.state == 'absent' %}
-<span class="na">— не обнаружено</span>
-{% else %}
-<span class="status-unknown">неизвестно</span>
-{% endif %}
-</div>
+{% for label, key in [('eMMC', 'emmc'), ('SD-карта', 'sd'), ('HDD/SSD', 'hdd'),
+                      ('Локальное хранилище', 'local'),
+                      ('Съёмные носители', 'removable'),
+                      ('SMART (smartctl)', 'smart')] %}
+{{ cap_row(label, capabilities.storage[key]) }}
 {% endfor %}
 
 </div>
@@ -67,6 +73,30 @@
 </div>
 
 </div>
+
+{% for title, g, rows in [
+  ('Сеть', 'network', [
+    ('Ethernet', 'ethernet'), ('Wi-Fi', 'wifi'),
+    ('Wi-Fi AP (точка доступа)', 'wifi_ap'),
+    ('Несколько интерфейсов', 'multiple_interfaces')]),
+  ('Оборудование', 'hardware', [
+    ('USB', 'usb'), ('GPIO', 'gpio'), ('UART', 'uart'),
+    ('RS-485', 'rs485'), ('I2C', 'i2c'), ('SPI', 'spi'),
+    ('1-Wire', 'onewire')]),
+  ('Радио', 'radio', [('SDR', 'sdr'), ('Sub-GHz', 'subghz')]),
+  ('Камеры', 'camera', [('USB-камеры', 'usb'), ('IP-камеры', 'ip')]),
+  ('Мультимедиа', 'media', [
+    ('Аудио (ALSA)', 'audio'), ('Графика (DRI)', 'video')]),
+  ('Службы', 'service', [('systemd', 'systemd'), ('Docker', 'docker')]),
+] %}
+<div class="device-block">
+<h3>{{ title }}</h3>
+{% for label, k in rows %}
+{% set c = (capabilities.get(g) or {}).get(k) %}
+{% if c %}{{ cap_row(label, c) }}{% endif %}
+{% endfor %}
+</div>
+{% endfor %}
 
 <div class="device-block">
 
