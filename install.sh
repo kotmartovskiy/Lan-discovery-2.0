@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-# LAN Discovery — installer для чистых Debian/Armbian систем (PHASE 9).
+# LAN Discovery — Installer 2.0 для чистых Debian/Ubuntu/Armbian (§25).
 #
-# Идемпотентен: повторный запусок поверх существующей установки ничего
+# Цепочка §25: preflight → hardware detection → dependencies → core →
+# modules → configuration → systemd → health check.
+# ARM/x86_64/minimal: без предположений о плате; опциональные пакеты
+# ставятся best-effort (не роняют установку минимальной системы).
+# Идемпотентен: повторный запуск поверх существующей установки ничего
 # не ломает (код не перезаписывается, config/БД/юнит только дополняются).
 #
 # Флаги:
@@ -14,16 +18,17 @@
 # Запуск: sudo ./install.sh   (из каталога с кодом) либо с флагами выше.
 set -euo pipefail
 
+usage() {
+    sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+}
+
 PREFIX="/opt/lan-discovery"
 UNIT_DIR="/etc/systemd/system"
 SETTINGS="/etc/lan-discovery/settings.json"
 SKIP_APT=0
 NO_ENABLE=0
 DRY_RUN=0
-
-usage() {
-    sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
-}
+PY_BIN=""   # заполняется в preflight: python3, иначе python (>=3.9)
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -60,17 +65,70 @@ need_root() {
 }
 
 # ---------------------------------------------------------------- preflight
+# §25: preflight — проверка окружения БЕЗ предположений о плате:
+# python, файлы-источники, дистрибутив (Debian/Ubuntu-совместимость),
+# место на диске, наличие apt (warn для не-Debian систем).
 step_preflight() {
     log "step: preflight"
-    command -v python3 >/dev/null 2>&1 || die "python3 не найден"
-    python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' \
-        || die "нужен Python >= 3.9 (есть: $(python3 -V))"
+    # python3 предпочтителен; fallback python (MSYS/нестандартные minimal)
+    local cand
+    for cand in python3 python; do
+        if command -v "$cand" >/dev/null 2>&1 \
+            && "$cand" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' 2>/dev/null; then
+            PY_BIN="$cand"
+            break
+        fi
+    done
+    [[ -n "$PY_BIN" ]] || die "нужен Python >= 3.9 (python3/python не найдены или стары)"
     [[ -f "$SCRIPT_DIR/app.py" ]] || die "app.py не найден рядом со install.sh ($SCRIPT_DIR)"
-    [[ -f "$SCRIPT_DIR/requirements.txt" ]] || die "requirements.txt не найден рядом со install.sh"
+    [[ -f "$SCRIPT_DIR/requirements.txt" ]] || die "requirements.txt не найден рядом со install.sh ($SCRIPT_DIR)"
     [[ -f "$SCRIPT_DIR/deploy/lan-discovery.service" ]] \
         || die "deploy/lan-discovery.service не найден"
     need_root
-    log "  python $(python3 -V 2>&1 | awk '{print $2}'), prefix=$PREFIX, unit-dir=$UNIT_DIR"
+    log "  python=$PY_BIN $($PY_BIN -V 2>&1 | awk '{print $2}'), prefix=$PREFIX, unit-dir=$UNIT_DIR"
+    log "  arch: $(uname -m), kernel: $(uname -r)"
+    # дистрибутив: Debian/Ubuntu/Armbian-совместимость (§25), иное — WARN
+    local distro_id="" distro_like=""
+    if [[ -r /etc/os-release ]]; then
+        # shellcheck disable=SC1091
+        distro_id=$(. /etc/os-release && echo "${ID:-}")
+        distro_like=$(. /etc/os-release && echo "${ID_LIKE:-}")
+        log "  distro: ${distro_id:-?} (${distro_like:-})"
+        case " $distro_id $distro_like " in
+            *debian*|*ubuntu*) ;;
+            *) warn "дистрибутив '$distro_id' не подтверждён как Debian/Ubuntu-compatible — продолжаем (§25), пакеты проверяются по факту" ;;
+        esac
+    else
+        warn "/etc/os-release не найден — дистрибутив определить нельзя"
+    fi
+    command -v apt-get >/dev/null 2>&1 || warn "apt-get не найден: ставьте зависимости вручную либо --skip-apt"
+    command -v dpkg >/dev/null 2>&1 || warn "dpkg не найден: проверка пакетов будет пропущена"
+    # место на диске под префикс (минимум ~400MB с venv+пакетами)
+    local avail_mb
+    avail_mb=$(df -Pm "$(dirname "$PREFIX")" 2>/dev/null | awk 'NR==2{print $4}' || echo "")
+    if [[ -n "$avail_mb" ]]; then
+        if (( avail_mb < 400 )); then
+            warn "мало места под $PREFIX: ${avail_mb}MB (рекомендуется >= 400MB)"
+        else
+            log "  диск: ${avail_mb}MB свободно под $(dirname "$PREFIX")"
+        fi
+    fi
+}
+
+# --------------------------------------------------------- hardware detection
+# §25: hardware detection — переиспользуем core/hardware.detect_platform()
+# (тот же источник, что /api/health; только stdlib — работает до venv).
+# Отчёт: $PREFIX/hw-detect.json; не критично — при сбое только WARN.
+step_hw() {
+    log "step: hw — hardware detection (core/hardware, без плато-специфики)"
+    if [[ $DRY_RUN -eq 1 ]]; then
+        log "DRY: $PY_BIN tools/hw_detect.py --out $PREFIX/hw-detect.json"
+        return
+    fi
+    run mkdir -p "$PREFIX"
+    if ! "$PY_BIN" "$SCRIPT_DIR/tools/hw_detect.py" --out "$PREFIX/hw-detect.json"; then
+        warn "hw-detect не удался (не критично): продолжаем без отчёта"
+    fi
 }
 
 # -------------------------------------------------------------------- code
@@ -95,27 +153,72 @@ step_code() {
 }
 
 # ------------------------------------------------------------------- deps
+# §25: dependencies для Debian/Ubuntu/ARM/minimal — критичные пакеты
+# обязательны (панель без них не стартует), опциональные — best-effort
+# (модульная функциональность: сеть/WiFi/BT/SMART/media); неудача
+# опциональных не роняет установку минимальной системы.
 step_deps() {
     if [[ $SKIP_APT -eq 1 ]]; then
         log "step: deps — пропущено (--skip-apt)"
         return
     fi
+    command -v apt-get >/dev/null 2>&1 || { warn "step: deps — нет apt-get, пропущено"; return; }
     # python3-cffi/cryptography/bcrypt — без wheel на armhf (armv7l):
     # pip падает на сборке cffi без компилятора, ставим из Debian в
     # системный site, venv создаётся с --system-site-packages (PHASE 4).
-    local pkgs=(nmap traceroute dnsutils iw bluez smartmontools ffmpeg mpv
-                python3-venv python3-cffi python3-cryptography python3-bcrypt)
-    local missing=()
-    for p in "${pkgs[@]}"; do
-        dpkg -s "$p" >/dev/null 2>&1 || missing+=("$p")
+    local critical=(python3-venv python3-cffi python3-cryptography python3-bcrypt)
+    local optional=(nmap traceroute dnsutils iw bluez smartmontools ffmpeg mpv)
+    local missing_crit=() missing_opt=()
+    local p
+    for p in "${critical[@]}"; do
+        dpkg -s "$p" >/dev/null 2>&1 || missing_crit+=("$p")
     done
-    if [[ ${#missing[@]} -eq 0 ]]; then
+    for p in "${optional[@]}"; do
+        dpkg -s "$p" >/dev/null 2>&1 || missing_opt+=("$p")
+    done
+    if [[ ${#missing_crit[@]} -eq 0 && ${#missing_opt[@]} -eq 0 ]]; then
         log "step: deps — все пакеты уже установлены"
         return
     fi
-    log "step: deps — apt-get install ${missing[*]}"
-    run apt-get update -qq
-    run apt-get install -y "${missing[@]}"
+    if [[ ${#missing_crit[@]} -gt 0 ]]; then
+        log "step: deps — apt-get install ${missing_crit[*]} (критичные)"
+        run apt-get update -qq
+        run apt-get install -y "${missing_crit[@]}"
+    fi
+    if [[ ${#missing_opt[@]} -gt 0 ]]; then
+        log "step: deps — опциональные: ${missing_opt[*]} (best-effort, по одному)"
+        run apt-get update -qq
+        local failed=()
+        for p in "${missing_opt[@]}"; do
+            if ! run apt-get install -y "$p"; then
+                warn "опциональный пакет '$p' не установился — модуль останется без функционала"
+                failed+=("$p")
+            fi
+        done
+        if [[ ${#failed[@]} -gt 0 && -f "$PREFIX/hw-detect.json" ]]; then
+            # дописываем в отчёт детекта, что не встало (для диагностики)
+            "$PY_BIN" - "$PREFIX/hw-detect.json" "${failed[@]}" <<'PYEOF'
+import json, sys
+path = sys.argv[1]
+try:
+    with open(path, encoding="utf-8") as f:
+        rep = json.load(f)
+except Exception:
+    sys.exit(0)
+rep["deps_missing"] = sys.argv[2:]
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(rep, f, indent=2, ensure_ascii=False)
+PYEOF
+        fi
+    fi
+}
+
+# ------------------------------------------------------------------ modules
+# §25: modules — проверка, что builtin-манифесты находятся и читаются
+# (потребитель core.module_loader.discover_modules, инвариант №5).
+step_modules() {
+    log "step: modules — проверка builtin-манифестов (core.module_loader)"
+    run bash -c "cd '$PREFIX' && ./venv/bin/python -c 'import core.module_loader as ml; mods = ml.discover_modules(force=True); assert mods, \"нет module.json\"; print(\"[install]   builtin modules: %d\" % len(mods))'"
 }
 
 # ------------------------------------------------------------------- venv
@@ -123,7 +226,7 @@ step_venv() {
     local venv="$PREFIX/venv"
     if [[ ! -x "$venv/bin/python" ]]; then
         log "step: venv — создаю $venv (--system-site-packages: apt-пакеты cffi/cryptography/bcrypt)"
-        run python3 -m venv --system-site-packages "$venv"
+        run "$PY_BIN" -m venv --system-site-packages "$venv"
     else
         log "step: venv — уже есть"
     fi
@@ -143,7 +246,7 @@ step_config() {
         return
     fi
     mkdir -p "$(dirname "$SETTINGS")"
-    python3 - "$SETTINGS" <<'PYEOF'
+    "$PY_BIN" - "$SETTINGS" <<'PYEOF'
 import ipaddress, json, subprocess, sys
 
 subnet = None
@@ -216,22 +319,52 @@ step_unit() {
 }
 
 # ------------------------------------------------------------------ health
+# §25: health check — живой запрос /api/health через python3 urllib
+# (curl НЕ требуется: на минимальной Debian его может не быть),
+# валидация JSON + отчёт о версии/схеме БД. Порт — из settings.json,
+# если он уже существует, иначе 8080.
 step_health() {
-    local port="${2:-8080}"
-    log "step: health — жду http://127.0.0.1:$port/api/health (до 60 с)"
+    log "step: health — жду http://127.0.0.1:<port>/api/health (до 60 с)"
     if [[ $DRY_RUN -eq 1 ]]; then
-        log "DRY: curl -fsS http://127.0.0.1:$port/api/health"
+        log "DRY: $PY_BIN urllib GET /api/health + проверка version/db.user_version"
         return
     fi
-    local i
-    for i in $(seq 1 30); do
-        if curl -fsS --max-time 3 "http://127.0.0.1:$port/api/health" >/dev/null 2>&1; then
-            log "step: health — OK (панель отвечает)"
-            return
-        fi
-        sleep 2
-    done
-    die "панель не отвечает на 127.0.0.1:$port — см. systemctl status lan-discovery / journalctl -u lan-discovery"
+    if ! "$PY_BIN" - "$SETTINGS" <<'PYEOF'
+import json, sys, time, urllib.error, urllib.request
+
+settings_path = sys.argv[1]
+port = 8080
+try:
+    with open(settings_path, encoding="utf-8") as f:
+        port = int(json.load(f).get("web", {}).get("flask_port", 8080))
+except Exception:
+    pass
+url = "http://127.0.0.1:%d/api/health" % port
+last = None
+data = None
+for _ in range(30):
+    try:
+        with urllib.request.urlopen(url, timeout=3) as resp:
+            data = json.load(resp)
+        break
+    except Exception as e:
+        last = e
+        time.sleep(2)
+if data is None:
+    print("[install] ERROR: панель не отвечает на %s (%s); см. systemctl status / journalctl -u lan-discovery"
+          % (url, last), file=sys.stderr)
+    sys.exit(1)
+db = data.get("db") or {}
+uv = db.get("user_version")
+print("[install]   health: OK, version=%s, user_version=%s"
+      % (data.get("version", "?"), uv))
+if not isinstance(uv, int) or uv < 3:
+    print("[install] WARN: схема БД user_version=%s (ожидалась 2.0 / v3) — возможно, установлен поверх старой версии"
+          % uv, file=sys.stderr)
+PYEOF
+    then
+        die "health check не пройден — см. systemctl status lan-discovery / journalctl -u lan-discovery"
+    fi
 }
 
 # ------------------------------------------------------------------ итог
@@ -241,6 +374,8 @@ summary() {
     log "  статус:   systemctl status lan-discovery"
     log "  журнал:   journalctl -u lan-discovery -f"
     log "  панель:   http://<IP-машины>:8080  (admin/1234 — смените пароль!)"
+    [[ -f "$PREFIX/hw-detect.json" ]] \
+        && log "  hw-отчёт: $PREFIX/hw-detect.json"
     if [[ $DRY_RUN -eq 1 ]]; then
         log "  (dry-run: изменения не применялись)"
     fi
@@ -248,11 +383,13 @@ summary() {
 }
 
 main() {
-    log "LAN Discovery installer$([[ $DRY_RUN -eq 1 ]] && echo ' [DRY-RUN]')"
+    log "LAN Discovery installer (§25)$([[ $DRY_RUN -eq 1 ]] && echo ' [DRY-RUN]')"
     step_preflight
+    step_hw
     step_code
     step_deps
     step_venv
+    step_modules
     step_config
     step_db
     step_unit

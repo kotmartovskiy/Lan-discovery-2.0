@@ -31,4 +31,9 @@ jobs:
 
       - name: Syntax check (py_compile)
         run: |
-          python -m py_compile app.py core/*.py modules/*.py
+          python -m py_compile app.py core/*.py modules/*.py tools/*.py
+
+      - name: Installer 2.0 (bash -n + dry-run §25)
+        run: |
+          bash -n install.sh
+          ./install.sh --dry-run --skip-apt
