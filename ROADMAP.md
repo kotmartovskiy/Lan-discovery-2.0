@@ -27,7 +27,7 @@
 | **2.0-8** | Хвост спецификации | §15–37 получен 02.10.2026 → `docs/Спецификация-2.0.md` дополнен (§0–37 целиком) | **DONE (02.10.2026)** |
 | **2.0-9** | Architecture Audit (спека §37 Phase 0) | обход репо (core/loader/catalog/capabilities/roles/discovery/network/storage/installer/update/recovery/tests), dependency graph, `docs/2.0/ARCHITECTURE_AUDIT.md` (A–O) → план фаз по §33 | **DONE (02.10.2026)** |
 | **2.0-10** | Core independence (§19, §34) | `core/version` (APP_VERSION — единый источник), `core/db` (схема+миграции, владение данными), удалить инверсии `core→app/modules` (8 точек: `_cfg`, `APP_VERSION`, `get_db/DB`), compat-reexport из devices_routes | **DONE (02.10.2026)** |
-| **2.0-11** | Device identity (§15) | device_id + ip_history + composite fingerprint; миграция devices PK через compat-адаптеры (§32), события не ломать | pending |
+| **2.0-11** | Device identity (§15) | `core/identity.py` (derive_id `mac:`/`ip:`, record_ip, identity_of), миграция v3 (device_id + ip_history + backfill, без смены devices.ip PK), reconcile присваивает/наследует device_id, аддитивный `GET /api/device/<ip>/identity`; события не тронуты | **DONE (02.10.2026)** |
 | **2.0-12** | Events 2.0 (§16) | именованные события `device./network./storage./job./module./system.`, фасад `events.emit/subscribe`, dual-read совместимость, эмиттеры из jobs/module-manager | pending |
 | **2.0-13** | Automation (§17) | правила Event → Rule → Action, хранение, минимальный UI/API, компактный appliance engine (не HA-клон) | pending |
 | **2.0-14** | Config & Secrets (§20–21) | классы конфигов (core/module/role/state), `secrets.get/set/delete`, секреты отдельно от settings | pending |
@@ -469,3 +469,28 @@
   (граница фазы: только core-инверсии, без контракта модулей).
 - Тесты: 319 passed локально (2 pre-existing Windows-фейла, 3 Linux-skip);
   CI — после push (ожидание 324).
+
+### 02.10.2026 — PHASE 2.0-11: Device identity — **DONE**
+
+- core/identity.py — `derive_id(mac, ip)` (``mac:<lower(mac)>`` при известном
+  MAC, иначе ``ip:<ip>``), `record_ip` (INSERT пары в ip_history + touch
+  last_seen), `identity_of(con, ip)` — read-API для роута. device_id
+  присваивается один раз (COALESCE) и НЕ переписывается при смене MAC
+  (§15: device_id первичен, MAC-смена остаётся событием MAC_CHANGED).
+- core/db.py — миграция v3: `MIGRATIONS` + `(3, _migration_v3)`,
+  SCHEMA_VERSION=3; ALTER devices + device_id, таблица ip_history +
+  индекс idx_ip_history_device, backfill (mac:/ip: + все пары истории);
+  идемпотентна (повторный прогон без дублей).
+- core/discovery.py reconcile — device_id во всех трёх путях:
+  fresh (INSERT с id), moved (наследует device_id прежней строки —
+  identity P5 сохранён), existing (COALESCE-присвоение); record_ip при
+  каждом подтверждении онлайн.
+- modules/devices_routes — аддитивный `GET /api/device/<ip>/identity`
+  (login): {ok, device_id, ip, mac, hostname, ip_history[]} / 404.
+- Сознательно вне границы фазы: devices.ip PK не менялся (§32 — слой
+  поверх старой таблицы, UI /device/<ip> не тронуты), event-модель не
+  тронута (namespace device./network./… — PHASE 2.0-12, §16).
+- Тесты: +6 (миграция v3 backfill/идемпотентность/user_version=3;
+  identity fresh/fallback/stable-on-mac-change/move-inherits;
+  API shape+404). Локально 325 passed (2 pre-existing Windows-фейла,
+  3 Linux-skip); CI — после push (ожидание 330).
