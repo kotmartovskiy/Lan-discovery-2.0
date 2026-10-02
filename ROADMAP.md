@@ -24,7 +24,8 @@
 | **2.0-5** | Roles 2.0 | `roles/<id>.json` манифесты (required_modules/optional_modules/capabilities/hardware_requirements/dependencies/conflicts/recommended_configuration/security_profile); загрузчик в `core/roles.py`, compat через `compute_status()`/capabilities; роли-примеры: Network Gateway, Home Server, Remote Site, Industrial Gateway, Network Diagnostic Box, Camera Gateway (SDR — ждём хвост спеки); apply/API не ломаем (ALWAYS_ON сохраняется) | **DONE (02.10.2026)** |
 | **2.0-6** | Network Core (транзакционный) | `core/network.py`: объекты interfaces/addresses/routes/firewall/…; каркас Prepare→Apply→Verify→Commit/Rollback; UI-warning «This operation may disconnect the current session»; авто-rollback; первый перенос: sys-network-операции; DHCP/DNS/VPN/AP/bridge — по мере модулей-потребителей | **DONE (02.10.2026)** |
 | **2.0-7** | Storage Core | `core/storage.py`: корни `/srv/media|data|backup`, disks/partitions/mounts/SMART (lsblk/smartctl уже в TOOL_PROBES), shares/backup targets; `storage.path()` для модулей; миграция констант модулей (IPTV_DIR/MEDIA_DIR/PLAYLISTS_DIR и др.) | **DONE (02.10.2026)** |
-| **2.0-8** | Хвост спецификации | разделы после «## SDR» (§14+) от заказчика → дополнить `docs/Архитектура-2.0.md` и этот ROADMAP | ждём ТЗ |
+| **2.0-8** | Хвост спецификации | §15–37 получен 02.10.2026 → `docs/Спецификация-2.0.md` дополнен (§0–37 целиком) | **DONE (02.10.2026)** |
+| **2.0-9** | Architecture Audit (спека §37 Phase 0) | обход репо (core/loader/catalog/capabilities/roles/discovery/network/storage/installer/update/recovery/tests), dependency graph, `docs/2.0/ARCHITECTURE_AUDIT.md` (A–O) → план фаз по §33 | pending |
 
 Статус фазы — только `pending` / `**DONE (дд.мм.гггг)**`; изменения
 состава — с записью ниже (§3).
