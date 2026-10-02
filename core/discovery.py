@@ -19,7 +19,7 @@ import time
 import logging
 from datetime import datetime
 
-from core import process
+from core import identity, process
 from core.events import add_event
 
 log = logging.getLogger("lan-discovery")
@@ -273,42 +273,60 @@ def reconcile(con, current_devices, now=None):
             if not was_online:
                 add_event(con, ip, hostname, mac, "ONLINE", timestamp=now)
                 stats["online"] += 1
+
+            # identity (2.0-11, §15): device_id присваивается один раз,
+            # ip_history фиксирует подтверждение пары (device_id, ip)
+            did = con.execute(
+                "SELECT device_id FROM devices WHERE ip=?", (ip,)
+            ).fetchone()
+            did = did[0] if did else None
+            if not did:
+                did = identity.derive_id(mac, ip)
+                con.execute(
+                    "UPDATE devices SET device_id=? WHERE ip=?", (did, ip)
+                )
+            identity.record_ip(con, did, ip, now)
         else:
             # identity (P5): MAC уже известен под другим IP = переезд
             moved = None
             if mac:
                 moved = con.execute(
-                    "SELECT ip, name, device_type, first_seen, appearances "
+                    "SELECT ip, name, device_type, first_seen, appearances, "
+                    "device_id "
                     "FROM devices WHERE lower(mac)=lower(?) AND ip<>? "
                     "ORDER BY last_seen DESC LIMIT 1",
                     (mac, ip),
                 ).fetchone()
 
             if moved:
+                did = moved[5] or identity.derive_id(mac, ip)
                 con.execute(
                     """
                     INSERT INTO devices
                     (ip, online, hostname, mac, vendor, first_seen,
                      last_seen, is_new, appearances, misses, name,
-                     device_type)
-                    VALUES (?, 1, ?, ?, ?, ?, ?, 0, ?, 0, ?, ?)
+                     device_type, device_id)
+                    VALUES (?, 1, ?, ?, ?, ?, ?, 0, ?, 0, ?, ?, ?)
                     """,
                     (ip, hostname, mac, vendor, moved[3] or now, now,
-                     (moved[4] or 0) + 1, moved[1], moved[2]),
+                     (moved[4] or 0) + 1, moved[1], moved[2], did),
                 )
+                identity.record_ip(con, did, ip, now)
                 add_event(con, ip, hostname, mac, "IP_CHANGED",
                           metadata={"old_ip": moved[0]}, timestamp=now)
                 stats["ip_changed"] += 1
             else:
+                did = identity.derive_id(mac, ip)
                 con.execute(
                     """
                     INSERT INTO devices
                     (ip, online, hostname, mac, vendor, first_seen, last_seen,
-                     is_new, appearances, misses, name)
-                    VALUES (?, 1, ?, ?, ?, ?, ?, 1, 1, 0, NULL)
+                     is_new, appearances, misses, name, device_id)
+                    VALUES (?, 1, ?, ?, ?, ?, ?, 1, 1, 0, NULL, ?)
                     """,
-                    (ip, hostname, mac, vendor, now, now),
+                    (ip, hostname, mac, vendor, now, now, did),
                 )
+                identity.record_ip(con, did, ip, now)
                 add_event(con, ip, hostname, mac, "NEW", timestamp=now)
                 stats["new"] += 1
 

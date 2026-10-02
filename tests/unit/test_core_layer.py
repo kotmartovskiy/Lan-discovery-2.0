@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Unit: PHASE 2.0-2 — core/process, services, config, network, storage
 (read-only контракты + первый перенос вызовов из system_routes)."""
+import sqlite3
 import subprocess
 import sys
 import time
@@ -298,3 +299,34 @@ def test_api_disks_shape(client):
         assert key in d, key
     assert isinstance(d["lsblk"], str)
     assert isinstance(d["df"], str)
+
+
+def test_device_identity_api(client, tmp_path, monkeypatch):
+    """2.0-11 §15: GET /api/device/<ip>/identity — аддитивный read API."""
+    import core.db as core_db
+
+    monkeypatch.setattr(core_db, "DB", str(tmp_path / "devices.db"))
+    monkeypatch.setattr(core_db, "_init_done", False)
+    core_db.init_db_schema(force=True)
+    con = sqlite3.connect(core_db.DB)
+    con.execute(
+        "INSERT INTO devices (ip, online, mac, first_seen, last_seen, "
+        "appearances, misses) VALUES ('192.168.3.50', 1, "
+        "'AA:BB:CC:DD:EE:10', 't1', 't2', 1, 0)")
+    con.execute(
+        "INSERT INTO ip_history (device_id, ip, first_seen, last_seen) "
+        "VALUES ('mac:aa:bb:cc:dd:ee:10', '192.168.3.50', 't1', 't2')")
+    con.commit()
+    con.close()
+
+    r = client.get("/api/device/192.168.3.50/identity")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["ok"] is True
+    assert data["device_id"] == "mac:aa:bb:cc:dd:ee:10"
+    assert data["ip"] == "192.168.3.50"
+    assert data["mac"] == "AA:BB:CC:DD:EE:10"
+    assert data["ip_history"] == [
+        {"ip": "192.168.3.50", "first_seen": "t1", "last_seen": "t2"}]
+    assert client.get(
+        "/api/device/10.255.255.254/identity").status_code == 404

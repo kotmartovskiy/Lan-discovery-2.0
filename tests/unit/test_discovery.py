@@ -304,3 +304,95 @@ def test_start_scan_thread_guard(monkeypatch):
         assert t1.is_alive()
     finally:
         hold.set()
+
+
+def _identity(db, ip):
+    con = sqlite3.connect(db)
+    row = con.execute("SELECT device_id FROM devices WHERE ip=?",
+                      (ip,)).fetchone()
+    did = row[0] if row else None
+    hist = []
+    if did:
+        hist = [r[0] for r in con.execute(
+            "SELECT ip FROM ip_history WHERE device_id=? "
+            "ORDER BY first_seen, id", (did,)).fetchall()]
+    con.close()
+    return did, hist
+
+
+def test_identity_new_device_mac_derived(monkeypatch, devices_db, no_dns):
+    """2.0-11 §15: свежее устройство получает mac:<mac> + запись в history."""
+    monkeypatch.setattr(d, "_max_misses", lambda: 6)
+    con = sqlite3.connect(devices_db)
+    d.reconcile(con, {"192.168.3.50": {"hostname": "pc",
+                                      "mac": "AA:BB:CC:DD:EE:10",
+                                      "vendor": None}},
+                now="01.02.2026 10:00:00")
+    con.commit()
+    con.close()
+    did, hist = _identity(devices_db, "192.168.3.50")
+    assert did == "mac:aa:bb:cc:dd:ee:10"
+    assert hist == ["192.168.3.50"]
+
+
+def test_identity_fallback_ip(monkeypatch, devices_db, no_dns):
+    """2.0-11 §15: без MAC — ip:<ip> (консервативный fallback)."""
+    monkeypatch.setattr(d, "_max_misses", lambda: 6)
+    con = sqlite3.connect(devices_db)
+    d.reconcile(con, {"192.168.3.51": {"hostname": None, "mac": None,
+                                      "vendor": None}},
+                now="01.02.2026 10:00:00")
+    con.commit()
+    con.close()
+    did, hist = _identity(devices_db, "192.168.3.51")
+    assert did == "ip:192.168.3.51"
+    assert hist == ["192.168.3.51"]
+
+
+def test_identity_stable_on_mac_change(monkeypatch, devices_db, no_dns):
+    """§15: device_id НЕ переписывается при смене MAC (MAC → событие)."""
+    monkeypatch.setattr(d, "_max_misses", lambda: 6)
+    _seed(devices_db, "192.168.3.60", mac="AA:BB:CC:DD:EE:20")
+    con = sqlite3.connect(devices_db)
+    con.execute("UPDATE devices SET device_id='mac:aa:bb:cc:dd:ee:20' "
+                "WHERE ip='192.168.3.60'")
+    con.commit()
+    d.reconcile(con, {"192.168.3.60": {"hostname": None,
+                                      "mac": "AA:BB:CC:DD:EE:99",
+                                      "vendor": None}},
+                now="01.02.2026 10:00:00")
+    con.commit()
+    ev = [r[0] for r in con.execute("SELECT event FROM events")]
+    con.close()
+    did, _ = _identity(devices_db, "192.168.3.60")
+    assert did == "mac:aa:bb:cc:dd:ee:20"
+    assert ev == ["MAC_CHANGED"]
+
+
+def test_identity_move_inherits_and_history(monkeypatch, devices_db, no_dns):
+    """§15: переезд наследует device_id, история содержит оба IP."""
+    monkeypatch.setattr(d, "_max_misses", lambda: 6)
+    _seed(devices_db, "192.168.3.70", mac="AA:BB:CC:DD:EE:30")
+    con = sqlite3.connect(devices_db)
+    # 1-й проход: existing-путь присваивает device_id и пишет историю
+    d.reconcile(con, {"192.168.3.70": {"hostname": None,
+                                      "mac": "AA:BB:CC:DD:EE:30",
+                                      "vendor": None}},
+                now="01.02.2026 10:00:00")
+    con.commit()
+    did_before, hist_before = _identity(devices_db, "192.168.3.70")
+    assert did_before == "mac:aa:bb:cc:dd:ee:30"
+    assert hist_before == ["192.168.3.70"]
+    # 2-й проход: тот же MAC на новом IP → наследование + 2 адреса в истории
+    d.reconcile(con, {"192.168.3.71": {"hostname": None,
+                                      "mac": "AA:BB:CC:DD:EE:30",
+                                      "vendor": None}},
+                now="01.02.2026 10:30:00")
+    con.commit()
+    con.close()
+    did, hist = _identity(devices_db, "192.168.3.71")
+    assert did == "mac:aa:bb:cc:dd:ee:30"
+    assert hist == ["192.168.3.70", "192.168.3.71"]
+    # старая строка знает тот же device_id
+    assert _identity(devices_db, "192.168.3.70")[0] == \
+        "mac:aa:bb:cc:dd:ee:30"

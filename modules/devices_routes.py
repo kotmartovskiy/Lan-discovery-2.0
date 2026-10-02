@@ -257,6 +257,22 @@ def register_routes(app):
             con.close()
         return jsonify({"ok": True})
 
+    @app.route("/api/device/<ip>/identity")
+    @login_required
+    def device_identity(ip):
+        """Идентичность устройства (2.0-11, §15): device_id + IP history."""
+        from core import identity as identity_core
+
+        con = get_db()
+        try:
+            ident = identity_core.identity_of(con, ip)
+        finally:
+            con.close()
+        if ident is None:
+            return jsonify({"ok": False,
+                            "error": "устройство не найдено"}), 404
+        return jsonify({"ok": True, **ident})
+
     @app.route("/api/events")
     @login_required
     def api_events():

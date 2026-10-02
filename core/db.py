@@ -19,7 +19,7 @@ log = logging.getLogger("lan-discovery")
 
 DB = "/opt/lan-discovery/devices.db"
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 _init_lock = threading.Lock()
 _init_done = False
 
@@ -99,11 +99,58 @@ def _migration_v2(con):
     )
 
 
+def _migration_v3(con):
+    """Миграция 2 → 3: явный device_id + таблица ip_history (спека §15).
+
+    device_id — стабильный идентификатор устройства (MAC-производный,
+    fallback на IP), НЕ переписывается при смене MAC (§15: device_id
+    первичен, MAC → hostname → IP history). Строки-переезды (один MAC
+    на разных IP) наследуют общий device_id. ip_history — цепочка IP.
+    """
+    columns = {
+        row[1]
+        for row in con.execute("PRAGMA table_info(devices)").fetchall()
+    }
+    if "device_id" not in columns:
+        con.execute("ALTER TABLE devices ADD COLUMN device_id TEXT")
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS ip_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_id TEXT NOT NULL,
+            ip TEXT NOT NULL,
+            first_seen TEXT,
+            last_seen TEXT
+        )
+    """)
+    con.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ip_history_device "
+        "ON ip_history(device_id, ip)"
+    )
+    # backfill: mac:xx… для строк с MAC, иначе ip:<ip>; история — все пары
+    con.execute("""
+        UPDATE devices SET device_id = CASE
+            WHEN mac IS NOT NULL AND mac <> ''
+                THEN 'mac:' || lower(mac)
+            ELSE 'ip:' || ip
+        END
+        WHERE device_id IS NULL
+    """)
+    con.execute("""
+        INSERT INTO ip_history (device_id, ip, first_seen, last_seen)
+        SELECT device_id, ip, first_seen, last_seen FROM devices
+        WHERE NOT EXISTS (
+            SELECT 1 FROM ip_history h
+            WHERE h.device_id = devices.device_id AND h.ip = devices.ip
+        )
+    """)
+
+
 # Нумерованные шаги: применяются строго по PRAGMA user_version,
 # каждый шаг переводит схему на следующую версию (P5-25).
 MIGRATIONS = (
     (1, _migration_v1),
     (2, _migration_v2),
+    (3, _migration_v3),
 )
 
 

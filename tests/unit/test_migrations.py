@@ -4,7 +4,7 @@ import sqlite3
 
 import core.db as dr
 
-CORE_TABLES = {"devices", "events"}
+CORE_TABLES = {"devices", "events", "ip_history"}
 ENSURE_TABLES = {"env_data", "mchs_alerts", "weather_alerts",
                  "weather_daily", "weather_forecast",
                  "weather_forecast_history", "weather_hourly",
@@ -77,6 +77,43 @@ def test_migration_steps_idempotent(tmp_path):
     con.close()
 
 
+def test_migration_v3_identity_backfill(tmp_path):
+    db = str(tmp_path / "v3.db")
+    con = sqlite3.connect(db)
+    dr._migration_v1(con)
+    dr._migration_v2(con)
+    con.execute(
+        "INSERT INTO devices (ip, online, mac, first_seen, last_seen, "
+        "appearances, misses) VALUES ('10.0.0.1', 1, 'AA:BB:CC:DD:EE:01', "
+        "'t1', 't2', 3, 0)"
+    )
+    con.execute(
+        "INSERT INTO devices (ip, online, mac, first_seen, last_seen, "
+        "appearances, misses) VALUES ('10.0.0.2', 0, NULL, "
+        "'t1', 't2', 1, 0)"
+    )
+    con.commit()
+    dr._migration_v3(con)
+    assert "device_id" in _columns(db, "devices")
+    assert "ip_history" in _tables(db)
+    assert "idx_ip_history_device" in _indexes(db)
+
+    rows = dict(con.execute("SELECT ip, device_id FROM devices").fetchall())
+    assert rows["10.0.0.1"] == "mac:aa:bb:cc:dd:ee:01"
+    assert rows["10.0.0.2"] == "ip:10.0.0.2"
+
+    hist = con.execute(
+        "SELECT device_id, ip, first_seen, last_seen FROM ip_history "
+        "ORDER BY ip"
+    ).fetchall()
+    assert hist == [("mac:aa:bb:cc:dd:ee:01", "10.0.0.1", "t1", "t2"),
+                    ("ip:10.0.0.2", "10.0.0.2", "t1", "t2")]
+    # идемпотентность: повторный прогон не дублирует историю
+    dr._migration_v3(con)
+    assert con.execute("SELECT COUNT(*) FROM ip_history").fetchone()[0] == 2
+    con.close()
+
+
 def test_full_init_clean_db(tmp_path, monkeypatch):
     db = str(tmp_path / "clean.db")
     monkeypatch.setattr(dr, "DB", db)
@@ -84,7 +121,9 @@ def test_full_init_clean_db(tmp_path, monkeypatch):
     assert dr.init_db_schema(force=True) is True
 
     con = sqlite3.connect(db)
-    assert con.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert con.execute("PRAGMA user_version").fetchone()[0] == 3
+    dev_cols = {r[1] for r in con.execute("PRAGMA table_info(devices)")}
+    assert "device_id" in dev_cols
     con.close()
 
     tables = _tables(db)
