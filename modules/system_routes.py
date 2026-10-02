@@ -221,7 +221,7 @@ def playlist_info(item):
 
 
 def board_title():
-    """Короткое имя платы для заголовков (напр. 'X96 Max')."""
+    """Короткое имя платы для заголовков (модель из device-tree, иначе hostname)."""
     m = (_read_file("/proc/device-tree/model") or "").replace("\x00", "").strip()
     if not m:
         return socket.gethostname()

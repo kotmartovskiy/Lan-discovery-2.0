@@ -65,6 +65,13 @@
 .netdata-link:hover { text-decoration: underline; }
 </style>
 
+{% if not monitoring_hosts %}
+<div class="empty-state">
+<p>Хосты мониторинга не настроены.</p>
+<p>Добавьте их в <code>settings.json → monitoring.hosts</code>.</p>
+</div>
+{% endif %}
+
 {% for host in monitoring_hosts %}
 
 <div class="accordion">

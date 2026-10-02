@@ -242,8 +242,8 @@ def _help_facts():
     """Данные «эта панель» + накопители для templates/help.html.
 
     Справка генерируется по фактическим данным хоста (device-tree, ip,
-    lsblk, settings), а не зашита под X96 Max — корректна на X96,
-    Orange Pi и generic Debian.
+    lsblk, settings), а не зашита под конкретную плату (§30) — корректна
+    на ARM/x86 и generic Debian.
     """
     import re as _re
     from modules.system_routes import (
@@ -314,22 +314,31 @@ def _help_facts():
             "role": role,
         })
 
+    # §30: host list — данные, не знание о платах; показываем только если
+    # primary принадлежит настроенной подсети (иначе список неактуален).
+    import ipaddress
+    try:
+        show_lan = ipaddress.ip_address(primary) \
+            in ipaddress.ip_network(subnet, strict=False)
+    except ValueError:
+        show_lan = False
+
     lan = [
-        {"title": "X96 Max (панель)", "ip": "192.168.3.243",
-         "desc": "Панель X96 Max (основной сервер)"},
-        {"title": "X96 Max (WiFi)", "ip": "192.168.3.244",
-         "desc": "WiFi-интерфейс X96 Max"},
-        {"title": "Orange Pi (LAN)", "ip": "192.168.3.234",
-         "desc": "Удалённый сервер (кабель отвален \u2014 не отвечает)"},
-        {"title": "Orange Pi (WiFi AP)", "ip": "192.168.3.235",
-         "desc": "Доступ к Orange Pi через его WiFi AP"},
-        {"title": "ThinkPad T480", "ip": "192.168.3.236",
+        {"title": "Основная панель", "ip": "192.168.3.243",
+         "desc": "Эта панель (основной сервер)"},
+        {"title": "Панель (WiFi)", "ip": "192.168.3.244",
+         "desc": "WiFi-интерфейс этой панели"},
+        {"title": "Удалённый сервер", "ip": "192.168.3.234",
+         "desc": "Вторая панель (LAN)"},
+        {"title": "Удалённый сервер (WiFi AP)", "ip": "192.168.3.235",
+         "desc": "Доступ к нему через его WiFi AP"},
+        {"title": "Рабочая станция", "ip": "192.168.3.236",
          "display": "192.168.3.236 / .239", "desc": "Рабочая станция"},
-        {"title": "Роутер", "ip": "192.168.3.1",
-         "desc": "Шлюз, веб-интерфейс"},
+        {"title": "Шлюз", "ip": "192.168.3.1",
+         "desc": "Веб-интерфейс роутера"},
         {"title": "DNS-сервер", "ip": "192.168.3.51",
          "desc": "Локальный DNS"},
-    ]
+    ] if show_lan else []
     for n in lan:
         n["here"] = (n["ip"] == primary)
         n.setdefault("display", n["ip"])

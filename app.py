@@ -180,7 +180,7 @@ def recycling_category_name(cat):
 def panel_name():
     """Имя панели для шапки/вкладки: settings.panel_name, иначе hostname.
 
-    Позволяет различать несколько открытых панелей (X96 Max / Orange Pi).
+    Позволяет различать несколько открытых панелей в разных вкладках.
     """
     name = str(load_settings().get("panel_name") or "").strip()
     if name:

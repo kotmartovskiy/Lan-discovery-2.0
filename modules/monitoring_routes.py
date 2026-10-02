@@ -20,12 +20,8 @@ def register_routes(app, ctx):
 
         data = page_data()
 
-        hosts = _cfg("monitoring", "hosts", [
-            {"ip": "192.168.3.234", "name": "Orange Pi", "netdata": True},
-            {"ip": "192.168.3.7", "name": "Комп рабочий LAN", "netdata": False},
-            {"ip": "192.168.3.236", "name": "Thinkpad T480 WiFi", "netdata": False},
-            {"ip": "192.168.3.239", "name": "Thinkpad T480 LAN", "netdata": False},
-        ])
+        # §30: без плато-специфики в дефолтах — хосты задаются в настройках
+        hosts = _cfg("monitoring", "hosts", [])
 
         monitoring_hosts = []
         for host in hosts:

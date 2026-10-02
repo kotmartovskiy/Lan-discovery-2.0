@@ -1,14 +1,14 @@
 {
   "id": "sys-board",
   "version": "2.0.0",
-  "name": "X96 Max",
+  "name": "Плата",
   "description": "Статус платы, uptime, температура и управление сервисами",
   "builtin": true,
   "type": "block",
   "block": {
     "slot": "system",
     "order": 10,
-    "title": "X96 Max"
+    "title": "Плата"
   },
   "help": true,
   "prefixes": []
