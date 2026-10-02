@@ -8,6 +8,17 @@
 ## [2.0.0] — не выпущена (в разработке)
 
 ### Добавлено
+- **Storage Core (PHASE 2.0-7):** `core/storage.py` — корни `ROOTS`
+  (`/srv/media|/srv/data|/srv/backup`) + `path()` (posixpath, неизвестный
+  корень → ValueError) как единственный источник путей; IPTV_DIR (app/
+  media/system), MEDIA_DIR, PLAYLISTS_DIR переведены на `path()` — значения
+  не изменились. Backup targets `DB_BACKUP_DIR`/`EMMC_BACKUP_PATH` в storage
+  (legacy-значения сохранены — читают recovery.sh/restore_server/systemd
+  за границей репо), хардкоды emmc из system_routes убраны, консистентность
+  путей по файлам репо закрыта тестами. `clone_disk()` — перенос do_clone
+  (dd + прогресс 5..95% по /proc, cooperative-отмена, таймаут → kill;
+  `_dd_progress_watcher` удалён). Disks/SMART — read-only контракты 2.0-2;
+  structured-JSON и list-shares — до потребителей. Тесты: 16.
 - **Network Core + транзакции (PHASE 2.0-6):** `core/network.py` —
   read-only объектный API (`list_interfaces/list_addresses/list_routes`,
   недоступный источник → None → unknown, а не absent) и транзакционный

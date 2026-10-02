@@ -23,7 +23,7 @@
 | **2.0-4** | Module manifest 2.0 + permissions + trust | схема v2 (capabilities/dependencies/conflicts/services/configuration/role_support + publisher/sha256/min_core_version/max_core_version) — back-compat v1; сетка прав (network/storage/services/process/camera/usb/gpio/serial) в манифесте и UI-запрос при установке; catalog: SHA-256 тарболла из index, trusted sources, core-compat check; без PKI/sandbox (спека §11–12) | **DONE (02.10.2026)** |
 | **2.0-5** | Roles 2.0 | `roles/<id>.json` манифесты (required_modules/optional_modules/capabilities/hardware_requirements/dependencies/conflicts/recommended_configuration/security_profile); загрузчик в `core/roles.py`, compat через `compute_status()`/capabilities; роли-примеры: Network Gateway, Home Server, Remote Site, Industrial Gateway, Network Diagnostic Box, Camera Gateway (SDR — ждём хвост спеки); apply/API не ломаем (ALWAYS_ON сохраняется) | **DONE (02.10.2026)** |
 | **2.0-6** | Network Core (транзакционный) | `core/network.py`: объекты interfaces/addresses/routes/firewall/…; каркас Prepare→Apply→Verify→Commit/Rollback; UI-warning «This operation may disconnect the current session»; авто-rollback; первый перенос: sys-network-операции; DHCP/DNS/VPN/AP/bridge — по мере модулей-потребителей | **DONE (02.10.2026)** |
-| **2.0-7** | Storage Core | `core/storage.py`: корни `/srv/media|data|backup`, disks/partitions/mounts/SMART (lsblk/smartctl уже в TOOL_PROBES), shares/backup targets; `storage.path()` для модулей; миграция констант модулей (IPTV_DIR/MEDIA_DIR/PLAYLISTS_DIR и др.) | pending |
+| **2.0-7** | Storage Core | `core/storage.py`: корни `/srv/media|data|backup`, disks/partitions/mounts/SMART (lsblk/smartctl уже в TOOL_PROBES), shares/backup targets; `storage.path()` для модулей; миграция констант модулей (IPTV_DIR/MEDIA_DIR/PLAYLISTS_DIR и др.) | **DONE (02.10.2026)** |
 | **2.0-8** | Хвост спецификации | разделы после «## SDR» (§14+) от заказчика → дополнить `docs/Архитектура-2.0.md` и этот ROADMAP | ждём ТЗ |
 
 Статус фазы — только `pending` / `**DONE (дд.мм.гггг)**`; изменения
@@ -336,3 +336,41 @@
   (info-контракт, admin 403/400/clamp grace, делегирование wifi/
   nettools). Локально: 303 passed (+2 pre-existing Windows-фейла,
   3 Linux-skip); CI — после push.
+
+### 02.10.2026 — PHASE 2.0-7: Storage Core — **DONE**
+
+- Спека §7: `core/storage.py` — `ROOTS` (media/data/backup) + `path(root,
+  *parts)` (posixpath — пути POSIX, локальный прогон на Windows не ломает;
+  неизвестный корень → ValueError, прецедент services.control). Единственный
+  источник путей для модулей.
+- Миграция констант (значения НЕ изменились — 1.1-совместимость):
+  `IPTV_DIR` (app.py, media_routes, system_routes), `MEDIA_DIR`,
+  `PLAYLISTS_DIR` → `storage.path(...)`; дублей строк больше нет
+  (тест-инвариант: app == media == system == path()).
+- Backup targets: `DB_BACKUP_DIR` (`/srv/backup-db`) и `EMMC_BACKUP_PATH`
+  (`/srv/backup-system/emmc.img.zst`) переопределены в storage;
+  значения сохранены — их читают recovery.sh/restore_server/systemd-юниты,
+  живущие за границей репо; миграция путей под `/srv/backup` без переноса
+  данных отложена (legacy вне корней, честно записано в §3.7).
+  system_routes: 3 хардкода emmc-пути → `core_storage.EMMC_BACKUP_PATH`;
+  консистентность закрыта тестами (restore_server.py / deploy/backup-db.sh
+  / recovery.sh сверяются со storage).
+- `clone_disk(src, dst, on_progress, should_continue)` — перенос do_clone
+  (Инвентаризация: 2.0-7): sync до/после, Popen dd, watcher-тред по
+  /proc/<pid>/io с процентами 5..95 (как 1.1), cooperative-отмена через
+  should_continue (сам dd убивает внешний cancel-путь), таймаут → kill;
+  `_dd_progress_watcher` удалён из system_routes, роут clone вызывает
+  core API. Исключений наружу нет — `{ok, error}`.
+- Честность состава: disks/partitions/mounts/SMART уже абстрагированы в
+  2.0-2 (`lsblk_text/df_text/smart_report`, потребитель `/api/disks`) —
+  structured-JSON API отложена до потребителя (инвариант №5); shares —
+  management guest-шары уже в `core/samba_guest.py`, list-shares по мере
+  UI-потребителя; `ensure_roots()` не делаем — создание корней при первом
+  реальном потребителе (сейчас makedirs делают сами модули под свои
+  подкаталоги).
+- Тесты `test_storage_core.py` — 16: корни/path/ValueError, единственный
+  источник констант, консистентность бэкап-путей по файлам репо,
+  миграция clone (grep-инварианты), clone_disk (валидация устройств,
+  happy/error/timeout-kill/исключение, шкала процентов, watcher:
+  cancel-выход без задержки, пропуск без total). Локально: 319 passed
+  (+2 pre-existing Windows-фейла, 3 Linux-skip); CI — после push.
