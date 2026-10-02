@@ -28,7 +28,7 @@
 | **2.0-9** | Architecture Audit (спека §37 Phase 0) | обход репо (core/loader/catalog/capabilities/roles/discovery/network/storage/installer/update/recovery/tests), dependency graph, `docs/2.0/ARCHITECTURE_AUDIT.md` (A–O) → план фаз по §33 | **DONE (02.10.2026)** |
 | **2.0-10** | Core independence (§19, §34) | `core/version` (APP_VERSION — единый источник), `core/db` (схема+миграции, владение данными), удалить инверсии `core→app/modules` (8 точек: `_cfg`, `APP_VERSION`, `get_db/DB`), compat-reexport из devices_routes | **DONE (02.10.2026)** |
 | **2.0-11** | Device identity (§15) | `core/identity.py` (derive_id `mac:`/`ip:`, record_ip, identity_of), миграция v3 (device_id + ip_history + backfill, без смены devices.ip PK), reconcile присваивает/наследует device_id, аддитивный `GET /api/device/<ip>/identity`; события не тронуты | **DONE (02.10.2026)** |
-| **2.0-12** | Events 2.0 (§16) | именованные события `device./network./storage./job./module./system.`, фасад `events.emit/subscribe`, dual-read совместимость, эмиттеры из jobs/module-manager | pending |
+| **2.0-12** | Events 2.0 (§16) | namespace-имена `device./network./storage./camera./job./module./system.` (`NAMESPACE_EVENTS`, строгие для emit), фасад `events.emit/subscribe` (fan-out подписчикам, ошибки не роняют писателя), dual-read `list_events` (legacy⇄namespace), потребители: jobs `job.started/completed/failed/cancelled`, `wait()` = терминальный+финализирован (read-after-wait) | **DONE (02.10.2026)** |
 | **2.0-13** | Automation (§17) | правила Event → Rule → Action, хранение, минимальный UI/API, компактный appliance engine (не HA-клон) | pending |
 | **2.0-14** | Config & Secrets (§20–21) | классы конфигов (core/module/role/state), `secrets.get/set/delete`, секреты отдельно от settings | pending |
 | **2.0-15** | Module contract v2 (§19, §24) | uniform module context (`register_routes(app, ctx)`), миграция модулей по одному, builtin-манифесты → v2 (version/capabilities) | pending |
@@ -494,3 +494,30 @@
   identity fresh/fallback/stable-on-mac-change/move-inherits;
   API shape+404). Локально 325 passed (2 pre-existing Windows-фейла,
   3 Linux-skip); CI — после push (ожидание 330).
+
+
+### 02.10.2026 — PHASE 2.0-12: Events 2.0 — **DONE**
+
+- core/events.py — §16: `NAMESPACE_EVENTS` (20 канонических имён
+  device./network./storage./camera./job./module./system. — строгие для
+  emit, severity в той же карте, видны и старому add_event);
+  `LEGACY_ALIASES` NEW⇄device.new … IP_CHANGED⇄device.ip_changed;
+  `emit()` (INSERT + fan-out, persist best-effort: ошибка БД/подписчика
+  логируется, писатель не падает, con= → core.db.get_db);
+  `subscribe()` → unsubscribe, `_notify` глотает ошибки подписчиков
+  (фундамент Automation §17); dual-read в `list_events` — фильтр event
+  строит варианты legacy⇄namespace (лента/UI-фильтры не ломаются).
+- core/jobs.py — потребитель: `job.started` (старт), финальные
+  `job.completed/failed/cancelled` (metadata job_id/job_type/error),
+  `job.cancelled` в cancel-queued; **исправлена гонка read-after-wait**:
+  `wait()` возвращал терминальный статус из памяти раньше persist/emit —
+  введён `_finalized` (Task возвращается только терминальный+финализированный;
+  строка из БД считается финализированной) — раньше тесты/подписчики могли
+  не увидеть событие (флаки).
+- Тесты: +11 (test_events ×8: strict-name, severity, persist,
+  subscribe/unsubscribe, payload shape, сломанный подписчик, dual-read;
+  test_jobs ×3: пишутся job.started/completed, failed→critical,
+  подписчик видит жизненный цикл; фикстура jobs_db патчит core.db.DB →
+  tmp). Локально 336 passed (2 pre-existing Windows-фейла, 3 Linux-skip),
+  стабильность гонки — 3 прогона jobs/events ×53 passed; CI — после push
+  (ожидание 341).
