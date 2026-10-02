@@ -22,7 +22,7 @@
 | **2.0-3** | Jobs subsystem | `core/jobs.py`: manager + worker-треды, состояния queued/running/completed/failed/cancelled, поля id/type/status/progress/started_at/finished_at/logs/result/error/cancelable; sqlite-таблица `jobs` (retention как у events); `GET /api/jobs` + `POST /api/jobs/<id>/cancel`; UI-виджет активных jobs; миграция на jobs: module install/update, backup/restore БД, network scan | **DONE (02.10.2026)** |
 | **2.0-4** | Module manifest 2.0 + permissions + trust | схема v2 (capabilities/dependencies/conflicts/services/configuration/role_support + publisher/sha256/min_core_version/max_core_version) — back-compat v1; сетка прав (network/storage/services/process/camera/usb/gpio/serial) в манифесте и UI-запрос при установке; catalog: SHA-256 тарболла из index, trusted sources, core-compat check; без PKI/sandbox (спека §11–12) | **DONE (02.10.2026)** |
 | **2.0-5** | Roles 2.0 | `roles/<id>.json` манифесты (required_modules/optional_modules/capabilities/hardware_requirements/dependencies/conflicts/recommended_configuration/security_profile); загрузчик в `core/roles.py`, compat через `compute_status()`/capabilities; роли-примеры: Network Gateway, Home Server, Remote Site, Industrial Gateway, Network Diagnostic Box, Camera Gateway (SDR — ждём хвост спеки); apply/API не ломаем (ALWAYS_ON сохраняется) | **DONE (02.10.2026)** |
-| **2.0-6** | Network Core (транзакционный) | `core/network.py`: объекты interfaces/addresses/routes/firewall/…; каркас Prepare→Apply→Verify→Commit/Rollback; UI-warning «This operation may disconnect the current session»; авто-rollback; первый перенос: sys-network-операции; DHCP/DNS/VPN/AP/bridge — по мере модулей-потребителей | pending |
+| **2.0-6** | Network Core (транзакционный) | `core/network.py`: объекты interfaces/addresses/routes/firewall/…; каркас Prepare→Apply→Verify→Commit/Rollback; UI-warning «This operation may disconnect the current session»; авто-rollback; первый перенос: sys-network-операции; DHCP/DNS/VPN/AP/bridge — по мере модулей-потребителей | **DONE (02.10.2026)** |
 | **2.0-7** | Storage Core | `core/storage.py`: корни `/srv/media|data|backup`, disks/partitions/mounts/SMART (lsblk/smartctl уже в TOOL_PROBES), shares/backup targets; `storage.path()` для модулей; миграция констант модулей (IPTV_DIR/MEDIA_DIR/PLAYLISTS_DIR и др.) | pending |
 | **2.0-8** | Хвост спецификации | разделы после «## SDR» (§14+) от заказчика → дополнить `docs/Архитектура-2.0.md` и этот ROADMAP | ждём ТЗ |
 
@@ -283,3 +283,56 @@
   overview, контракт аддитивных ключей; legacy-тесты переведены с
   PROFILES на load_roles). Локально: 276 passed (+2 pre-existing
   Windows-фейла); CI — после push.
+
+### 02.10.2026 — PHASE 2.0-6: Network Core (транзакционный) — **DONE**
+
+- Спека §5–6: `core/network.py` расширен до Core Network Manager (контракт
+  `physical_ifaces` из 2.0-2 не менялся — потребитель capabilities
+  сохранён): read-only объектный API `list_interfaces()` (`ip -j link` +
+  sysfs-классификация wired/wifi/virtual; недоступный источник → None,
+  вызывающий отвечает unknown), `list_addresses()` (`ip -j addr`),
+  `list_routes()` (`ip -j route`, main table); перенос wifi-scan —
+  `_parse_iw_scan()` (парсер построчно сохранён, контракт 1.1 включая
+  «iw отработал, но пусто» → `ok: True, networks: []`) + `wifi_scan(ifaces)`.
+- Транзакционный каркас (спека §6) `Transaction`: `add(label, apply,
+  prepare=None, verify=None, rollback=None)` → `run()` = Prepare (снимки
+  ДО любых изменений; провал prepare → ничего не применялось) → Apply +
+  Verify пошагово → Commit; провал apply/verify → Rollback применённых
+  шагов в обратном порядке. Конвенция: True/None — успех,
+  False/исключение — провал; prepare возвращает rollback-данные (False
+  зарезервирован под провал); шаг без rollback → `rolled_back: False`
+  (честно о неполноте); ошибки rollback не затирают первичную ошибку
+  apply/verify. Результат — dict с phase/rolled_back/steps/log,
+  исключений наружу нет.
+- Insurance (авто-rollback по таймауту/неверификации): `schedule_rollback(
+  check_fn, grace)` — daemon-тред через grace сек проверяет `check_fn()`,
+  при провале откатывает сохранённые rollback-данные; результат в
+  `tx.insurance`/`tx.insurance_done` (тестируемо).
+- Первые операторы-мутации (сетевые операции переезжают из модулей в
+  Core): `set_address/del_address` (ip addr replace/del + verify по
+  снимку; rollback = flush + восстановление снимка с scope; динамические
+  адреса восстанавливаются статическими — осознанный компромисс ради
+  доступности) и `set_route/del_route` (ip route replace/del, dst
+  «default»/нормализованный network, хотя бы gateway/dev, rollback =
+  flush dst + restore снимка main table). Валидация ДО транзакции: имя
+  интерфейса ≤15 символов, CIDR/dst/gateway/metric — строгие форматы,
+  argv без shell. DHCP/DNS/VPN/AP/bridge и firewall — по мере
+  модулей-потребителей (firewall требует модели nft — отдельно).
+- Миграция по плану Инвентаризации: nettools ping/dns/trace →
+  `core.process.run` (JSON-контракты роутов не менялись), wifi-scan →
+  `core.network.wifi_scan`; новые роуты аддитивно: `GET /api/network/info`
+  (login) и `POST /api/network/address` (admin, `insurance_grace`
+  клампится 0..300).
+- UI sys-network block (admin): предупреждение «Эта операция может
+  разорвать текущее подключение (This operation may disconnect the
+  current session)» — в карточке и в confirm перед отправкой; выбор
+  интерфейса/CIDR, статус фазы транзакции, авто-проверка через 20 с.
+- Тесты `test_network_core.py` — 27: объекты/парсеры (классификация,
+  iw-поля+сортировка, контракты wifi_scan), валидация входа, каркас
+  (happy/prepare-fail/apply-fail-обратный-откат/verify-fail/исключения/
+  без rollback/пустая), insurance (провал→откат, ок, выключено),
+  операторы (валидация до чтения состояния, снимок в rollback,
+  del-контракты, маршрутные счётчики prepare/verify), роуты
+  (info-контракт, admin 403/400/clamp grace, делегирование wifi/
+  nettools). Локально: 303 passed (+2 pre-existing Windows-фейла,
+  3 Linux-skip); CI — после push.

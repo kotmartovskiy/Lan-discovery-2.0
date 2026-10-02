@@ -8,6 +8,24 @@
 ## [2.0.0] — не выпущена (в разработке)
 
 ### Добавлено
+- **Network Core + транзакции (PHASE 2.0-6):** `core/network.py` —
+  read-only объектный API (`list_interfaces/list_addresses/list_routes`,
+  недоступный источник → None → unknown, а не absent) и транзакционный
+  каркас `Transaction` (спека §6: Prepare → Apply → Verify → Commit,
+  провал → Rollback в обратном порядке; prepare-снимки = rollback-данные;
+  шаг без rollback → `rolled_back: False`; исключений наружу нет) +
+  insurance — отложенная страховка `schedule_rollback(check_fn, grace)`:
+  через grace секунд авто-проверка и авто-rollback в daemon-треде.
+  Операторы `set_address/del_address/set_route/del_route` (ip addr/route,
+  валидация входа до транзакции, verify по снимку, restore с scope);
+  DHCP/DNS/VPN/AP/bridge — по мере модулей-потребителей, firewall —
+  отдельной фазой. Переносы по Инвентаризации: nettools ping/dns/trace →
+  `core.process.run`, wifi-scan → `core.network.wifi_scan` (JSON-контракты
+  роутов не менялись). Новые роуты: `GET /api/network/info` (login),
+  `POST /api/network/address` (admin, grace 0..300). UI sys-network block —
+  предупреждение «Эта операция может разорвать текущее подключение
+  (This operation may disconnect the current session)» + форма
+  интерфейса/CIDR. Тесты: `test_network_core.py` (27).
 - **Roles 2.0 (PHASE 2.0-5):** роли переехали из кода PROFILES в
   манифесты `roles/<id>.json` (9 файлов: legacy default/media/network +
   6 ролей спеки §14 — Network Gateway, Home Server, Remote Site,
