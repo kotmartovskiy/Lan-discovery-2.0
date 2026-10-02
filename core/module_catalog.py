@@ -5,8 +5,19 @@ index.json с raw.githubusercontent.com описывает доступные м
 (codeload.github.com) в modules/<id>/. Только для администратора.
 
 Настройки (опционально) в /etc/lan-discovery/settings.json:
-    "modules_catalog": {"repo": "owner/name", "branch": "main", "token": "..."}
+    "modules_catalog": {"repo": "owner/name", "branch": "main", "token": "...",
+        "require_sha256": true,            # отказывать без sha256 в index
+        "trusted_publishers": ["Alice"]}   # непустой список = fail-closed:
+                                           # index без publisher или с чужим
+                                           # издателем не ставится
+
+Trust (спека §12, PHASE 2.0-4): SHA-256 тарболла берётся из index.json и
+сверяется всегда, когда там есть; trusted_publishers — opt-in fail-closed;
+min_core_version/max_core_version (index и module.json) против APP_VERSION;
+манифест после распаковки проходит core.manifest.validate_manifest.
+Подписи/PKI — нет (спека: только фундамент).
 """
+import hashlib
 import io
 import json
 import os
@@ -16,6 +27,7 @@ import tarfile
 import time
 import urllib.request
 
+from core import manifest as manifest_mod
 from core.module_loader import MODULES_DIR, discover_modules, load_state, save_state
 
 SETTINGS_PATH = "/etc/lan-discovery/settings.json"
@@ -41,11 +53,85 @@ def _settings():
 
 def catalog_cfg():
     s = _settings().get("modules_catalog") or {}
+    tp = s.get("trusted_publishers")
     return {
         "repo": str(s.get("repo") or DEFAULT_REPO),
         "branch": str(s.get("branch") or DEFAULT_BRANCH),
         "token": str(s.get("token") or ""),
+        "require_sha256": bool(s.get("require_sha256")),
+        "trusted_publishers": [str(x) for x in tp] if isinstance(tp, list) else [],
     }
+
+
+def _sha256_hex(blob):
+    return hashlib.sha256(blob).hexdigest()
+
+
+def _app_version():
+    """APP_VERSION ядра; недоступен → "" (проверку версии пропускаем)."""
+    try:
+        from app import APP_VERSION
+        return str(APP_VERSION)
+    except Exception:
+        return ""
+
+
+def _trust_index_meta(meta):
+    """Trust-проверки записи index.json до скачивания архива."""
+    cfg = catalog_cfg()
+    pub = str(meta.get("publisher") or "")
+    tp = cfg["trusted_publishers"]
+    if tp and pub not in tp:
+        raise CatalogError(
+            "издатель %r не входит в доверенные (trusted_publishers)"
+            % (pub or "не указан"))
+    ok, why = manifest_mod.core_version_ok(
+        meta.get("min_core_version"), meta.get("max_core_version"),
+        _app_version())
+    if not ok:
+        raise CatalogError("модуль «%s» несовместим: %s" % (meta["id"], why))
+
+
+def _verify_checksum(blob, meta):
+    """SHA-256 тарболла против index.json. Возвращает hex или ""."""
+    want = str(meta.get("sha256") or "").strip().lower()
+    if want:
+        got = _sha256_hex(blob)
+        if got != want:
+            raise CatalogError(
+                "SHA-256 архива не совпадает (ожидался %s…, получен %s…)"
+                % (want[:12], got[:12]))
+        return got
+    if catalog_cfg()["require_sha256"]:
+        raise CatalogError(
+            "в index нет sha256 для «%s», а require_sha256=true" % meta["id"])
+    return ""
+
+
+def _validate_extracted_manifest(raw, meta, mid):
+    """Проверка module.json из архива: JSON + схема v2 + id/publisher/версия."""
+    try:
+        mj = json.loads(raw.decode("utf-8"))
+    except Exception as e:
+        raise CatalogError("module.json не читается: %s" % e)
+    if mj.get("id") != mid:
+        raise CatalogError(
+            "id в module.json (%r) не совпадает с каталогом (%r)"
+            % (mj.get("id"), mid))
+    errs = manifest_mod.validate_manifest(mj)
+    if errs:
+        raise CatalogError("манифест невалиден: %s" % "; ".join(errs))
+    ipub = str(meta.get("publisher") or "")
+    if ipub and str(mj.get("publisher") or "") != ipub:
+        raise CatalogError(
+            "publisher в module.json (%r) не совпадает с index (%r)"
+            % (mj.get("publisher") or "не указан", ipub))
+    ok, why = manifest_mod.core_version_ok(
+        mj.get("min_core_version"), mj.get("max_core_version"),
+        _app_version())
+    if not ok:
+        raise CatalogError("модуль «%s» несовместим: %s" % (mj.get("id"), why))
+    return mj
 
 
 def _http_get(url, token="", timeout=30):
@@ -106,6 +192,7 @@ def install_module(mid, update=False):
     meta = next((m for m in idx["modules"] if m["id"] == mid), None)
     if not meta:
         raise CatalogError("модуль «%s» отсутствует в каталоге" % mid)
+    _trust_index_meta(meta)
 
     dest = os.path.join(MODULES_DIR, mid)
     exists = os.path.isdir(dest)
@@ -120,6 +207,7 @@ def install_module(mid, update=False):
         blob = _http_get(url, cfg["token"], timeout=120)
     except Exception as e:
         raise CatalogError("не удалось скачать архив: %s" % e)
+    digest = _verify_checksum(blob, meta)
 
     try:
         tf = tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz")
@@ -144,6 +232,8 @@ def install_module(mid, update=False):
                 raise CatalogError("небезопасный путь в архиве")
             src = tf.extractfile(m)
             files[rel] = src.read() if src else b""
+
+    _validate_extracted_manifest(files["module.json"], meta, mid)
 
     tmp = dest + ".new"
     old = dest + ".old"
@@ -177,6 +267,8 @@ def install_module(mid, update=False):
         "source": "catalog",
         "version": str(meta.get("version") or ""),
         "installed_at": time.strftime("%d.%m.%Y %H:%M:%S"),
+        "publisher": str(meta.get("publisher") or ""),
+        "sha256": digest,
     })
     state[mid] = entry
     save_state(state)

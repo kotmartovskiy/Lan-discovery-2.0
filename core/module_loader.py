@@ -14,9 +14,19 @@
                    "ports": [...]} — ставится кнопкой «Установить зависимости»
     version     — версия модуля (STEP 8; старые манифесты без поля → «Unknown»)
     source      — происхождение (например URL репозитория, "builtin")
-    permissions — ["admin", "network", ...] — что требует модуль
+    permissions — ключи сетки прав core/manifest.py (network.read, ...) —
+                  что требует модуль; показывается как запрос прав в UI
     hardware    — {"arch": [...], "tools": [...], "storage": [...]} —
                   аппаратные требования против core/capabilities (STEP 8)
+Поля манифеста 2.0 (спека §10; старые манифесты валидны — нет полей → defaults,
+валидация — core/manifest.validate_manifest при установке из каталога):
+    capabilities   — ["group"/"group.key"] требования к core/capabilities
+    dependencies   — ["<module-id>"] — должны быть установлены и включены
+    conflicts      — ["<module-id>"] — несовместимы одновременно
+    services       — ["<service>"] — используемые системные сервисы
+    configuration  — {} — схема настроек (контракт для UI/SDR)
+    role_support   — ["<role-id>"] — роли, включающие модуль (Roles 2.0)
+    publisher, min_core_version, max_core_version — trust/совместимость
 Состояние (installed/enabled/last_install) хранится в /etc/lan-discovery/modules.json.
 Вычисляемые статусы (STEP 8): см. compute_status() — error / incompatible /
 requires-hardware / requires-dependency / disabled / active / available /
@@ -26,6 +36,8 @@ import glob
 import json
 import os
 import time
+
+from core import manifest as manifest_mod
 
 _CORE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODULES_DIR = os.path.join(_CORE_DIR, "modules")
@@ -194,10 +206,16 @@ def _missing_apt_packages(pkgs):
 
 
 def status_context():
-    """Контекст для compute_status: архитектура + capabilities (кэш 30 с)."""
+    """Контекст для compute_status: архитектура + capabilities + APP_VERSION."""
     from core import capabilities
     caps = capabilities.collect()
-    return {"arch": (caps.get("board") or {}).get("arch"), "caps": caps}
+    try:
+        from app import APP_VERSION
+        app_version = str(APP_VERSION)
+    except Exception:
+        app_version = ""
+    return {"arch": (caps.get("board") or {}).get("arch"), "caps": caps,
+            "app_version": app_version}
 
 
 def compute_status(m, entry, ctx, missing_pkgs=None):
@@ -207,10 +225,27 @@ def compute_status(m, entry, ctx, missing_pkgs=None):
     error → disabled → active → available; исключение/битый манифест →
     unknown. missing_pkgs — множество отсутствующих apt-пакетов (общий
     dpkg-batch из modules_with_status).
+
+    Манифест 2.0 (все чеки опциональны — старые манифесты ведут себя
+    как раньше; ctx без app_version — проверку версии пропускаем):
+    min_core_version/max_core_version → incompatible (fail-closed на
+    нечитаемых строках версии); capabilities "group.key" → requires-hardware
+    (только item-level; голые группы не проверяем — не гадаем);
+    dependencies (id модулей) → requires-dependency, пока хоть одна
+    зависимость не установлена/выключена.
     """
     try:
         if not isinstance(m, dict) or not m.get("id"):
             return "unknown"
+
+        if m.get("min_core_version") or m.get("max_core_version"):
+            app_ver = ctx.get("app_version")
+            if app_ver:
+                ok, _why = manifest_mod.core_version_ok(
+                    m.get("min_core_version"), m.get("max_core_version"), app_ver)
+                if not ok:
+                    return "incompatible"
+
         hw = m.get("hardware") or {}
         if not isinstance(hw, dict):
             hw = {}
@@ -230,6 +265,14 @@ def compute_status(m, entry, ctx, missing_pkgs=None):
             c = storage.get(s)
             if not c or c.get("state") != "present":
                 return "requires-hardware"
+        for key in m.get("capabilities") or []:
+            if not isinstance(key, str) or "." not in key:
+                continue  # группа целиком / битый ключ — не гадаем
+            grp, item = key.split(".", 1)
+            g = caps.get(grp)
+            c = g.get(item) if isinstance(g, dict) else None
+            if not isinstance(c, dict) or c.get("state") != "present":
+                return "requires-hardware"
 
         deps = m.get("deps") or {}
         if missing_pkgs:
@@ -238,6 +281,14 @@ def compute_status(m, entry, ctx, missing_pkgs=None):
                 return "requires-dependency"
         for d in deps.get("dirs") or []:
             if not os.path.isdir(d):
+                return "requires-dependency"
+        for dep in m.get("dependencies") or []:
+            if not isinstance(dep, str) or not dep:
+                continue
+            if get_module(dep) is None:
+                return "requires-dependency"
+            d_installed, d_enabled = module_status(dep)
+            if not (d_installed and d_enabled):
                 return "requires-dependency"
 
         last = (entry or {}).get("last")

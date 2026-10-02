@@ -430,9 +430,11 @@ class JobManager:
         with self._lock:
             job.finished_at = now_ts()
             ev = self._events.pop(job.id, None)
+        # persist до ev.set(): wait() возвращает управление только когда
+        # строка уже в sqlite (read-after-wait не видит status=running)
+        self._persist(job)
         if ev:
             ev.set()
-        self._persist(job)
 
     # --- отмена -------------------------------------------------------------
 
@@ -449,9 +451,9 @@ class JobManager:
                 job.status = "cancelled"
                 job.finished_at = now_ts()
                 ev = self._events.get(jid)
+                self._persist(job)
                 if ev:
                     ev.set()
-                self._persist(job)
                 return {"ok": True, "status": "cancelled"}
             if not job.cancelable:
                 return {"ok": False, "status": job.status,
