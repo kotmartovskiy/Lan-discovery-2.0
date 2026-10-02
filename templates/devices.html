@@ -124,16 +124,55 @@ async function scanNow() {
             body: '{}'
         });
         var d = await r.json();
-        if (d.ok) {
+        if (!d.ok) {
+            alert('Скан не запущен: ' + (d.error || ('HTTP ' + r.status)));
+            btn.disabled = false;
+            btn.textContent = '🔍 Сканировать';
+            return;
+        }
+        var job = await waitForJob(d.job);
+        if (job.status === 'completed') {
             location.reload();
             return;
         }
-        alert('Скан не выполнен: ' + (d.error || ('HTTP ' + r.status)));
+        alert('Скан не выполнен: ' + (job.error || job.status));
     } catch (e) {
         alert('Скан не выполнен: ' + e);
     }
     btn.disabled = false;
     btn.textContent = '🔍 Сканировать';
+}
+
+function waitForJob(id) {
+    return new Promise(function (resolve, reject) {
+        var n = 0;
+        var t = setInterval(function () {
+            n++;
+            fetch('/api/jobs/' + id)
+                .then(function (r) { return r.json(); })
+                .then(function (j) {
+                    if (!j.ok) {
+                        clearInterval(t);
+                        reject(new Error('задача не найдена'));
+                        return;
+                    }
+                    var s = j.job.status;
+                    if (s === 'completed' || s === 'failed' || s === 'cancelled') {
+                        clearInterval(t);
+                        resolve(j.job);
+                    } else if (n > 180) {
+                        clearInterval(t);
+                        reject(new Error('таймаут ожидания (3 мин)'));
+                    }
+                })
+                .catch(function () {
+                    if (n > 180) {
+                        clearInterval(t);
+                        reject(new Error('сеть недоступна'));
+                    }
+                });
+        }, 1000);
+    });
 }
 </script>
 {% endif %}
