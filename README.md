@@ -1,6 +1,12 @@
-# Lan-discovery 1.1
+# Lan-discovery 2.0 (в разработке)
 
 Веб-панель управления домашней сетью для одноплатных компьютеров (Orange Pi, X96 Max / Amlogic, generic Debian/ARM): обнаружение устройств, мониторинг, IPTV/радио/плеер, сетевые инструменты, файлы, заметки, бэкапы и клонирование eMMC → SD.
+
+> **Статус 2.0:** параллельная разработка Universal Modular Appliance
+> Platform (спека — `docs/Спецификация-2.0.md`, архитектура —
+> `docs/Архитектура-2.0.md`, фазы — `ROADMAP.md`). **Боевые системы
+> (X96, Orange Pi) работают на версии 1.1** — репозиторий
+> `Lan-discovery-1.1`; 2.0 на них не деплоится.
 
 - **Панель:** `http://<ip>:8080` (Flask, Python 3, venv)
 - **Сервис:** `systemctl status lan-discovery`, код — `/opt/lan-discovery/app.py`
@@ -15,7 +21,7 @@
 ## Что нового в версии 1.1 (01.10.2026)
 
 Версия 1.1 — **UI/UX-редизайн + слой Hardware → Capabilities → Modules → Roles**
-(полный журнал — [ROADMAP.md](ROADMAP.md) §9, аудит — [UI_UX_AUDIT.md](UI_UX_AUDIT.md)):
+(полный журнал — [docs/ROADMAP-1.1.md](docs/ROADMAP-1.1.md) §9, аудит — [UI_UX_AUDIT.md](UI_UX_AUDIT.md)):
 
 - **UI/UX**: единый design system (`static/style.css`), доменные группы навигации,
   сводная панель `GET /api/dashboard` (один запрос вместо ×2), новые таблицы

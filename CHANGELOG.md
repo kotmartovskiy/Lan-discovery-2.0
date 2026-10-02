@@ -5,6 +5,20 @@
 `APP_VERSION` в `app.py` (показывается в `/api/health`, `/api/system/health`
 и на странице «О системе»). Git-тег `vX.Y.Z` ставится на релиз.
 
+## [2.0.0] — не выпущена (в разработке)
+
+### Добавлено
+- **Основа 2.0 (PHASE 2.0-0, 01.10.2026):** репозиторий выделен из
+  `Lan-discovery-1.1` с полной историей (remote `upstream-11` для
+  cherry-pick); `docs/Спецификация-2.0.md` — входное ТЗ (Universal
+  Modular Appliance Platform); `docs/Архитектура-2.0.md` — аудит 1.1
+  по слоям Hardware→Capabilities→Core→Modules→Roles, gaps с
+  обоснованиями, черновики контрактов core API; `ROADMAP.md` — фазы
+  2.0-1…2.0-8 (Capabilities 2.0, Core skeleton+инвентаризация
+  subprocess/systemctl, Jobs, Module manifest v2+permissions+trust,
+  Roles v2, Network Core с транзакциями, Storage Core); `README` —
+  статус «в разработке», боевые системы остаются на 1.1.
+
 ## [1.1.0] — 01.10.2026
 
 ### Добавлено

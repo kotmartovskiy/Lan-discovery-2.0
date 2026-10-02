@@ -29,7 +29,7 @@ IPTV_DIR = "/srv/media/IPTV"
 IPTV_UPDATE_STATUS = "/etc/lan-discovery/iptv-update-status.json"
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "games")
 TRANSMISSION_CONF = "/etc/transmission-daemon/settings.json"
-APP_VERSION = "1.1.0"
+APP_VERSION = "2.0.0"
 _SERVICE_START = time.time()
 
 _settings_cache = {"data": None, "ts": 0}
