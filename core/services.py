@@ -17,7 +17,7 @@ import subprocess
 
 from core import process
 
-ACTIONS = ("start", "stop", "restart", "enable", "disable")
+ACTIONS = ("start", "stop", "restart", "enable", "disable", "reload")
 _ACTIVE_OK = ("active", "reloading", "activating")
 
 
@@ -33,7 +33,7 @@ def status(unit, timeout=5):
 
 
 def control(unit, action, timeout=15):
-    """Управление службой: start/stop/restart/enable/disable."""
+    """Управление службой: start/stop/restart/enable/disable/reload."""
     if action not in ACTIONS:
         raise ValueError("недопустимое действие: %r" % (action,))
     try:

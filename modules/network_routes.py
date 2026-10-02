@@ -2,7 +2,6 @@ import json
 import os
 import re
 import socket
-import subprocess
 import threading
 import time
 
@@ -62,10 +61,10 @@ def save_network_config(data):
 def _bt_cmd(command, timeout=10):
     """Run a bluetoothctl command non-interactively via stdin pipe."""
     try:
-        r = subprocess.run(
+        r = core_process.run(
             ["timeout", str(timeout), "bluetoothctl"],
             input=command + "\nquit\n",
-            capture_output=True, text=True, timeout=timeout + 2
+            timeout=timeout + 2
         )
         # Strip ANSI escape codes and bluetoothctl prompt artifacts
         out = r.stdout

@@ -5,7 +5,6 @@ import time
 import re
 import sqlite3
 import logging
-import subprocess
 import shutil
 import threading
 from datetime import datetime, timezone, timedelta
@@ -14,6 +13,7 @@ from html import escape as _html_escape
 
 sys.path.insert(0, "/opt/lan-discovery")
 
+from core import process as core_process
 from core import storage as core_storage
 
 logging.basicConfig(
@@ -89,11 +89,7 @@ def _max_misses():
 
 
 def _cmd(cmd, timeout=30):
-    try:
-        r = subprocess.run(cmd, shell=isinstance(cmd, str), capture_output=True, text=True, timeout=timeout)
-        return r.stdout.strip()
-    except Exception:
-        return ""
+    return core_process.out(cmd, timeout=timeout)
 
 
 def _read_file(path):
@@ -128,7 +124,7 @@ def _human_size(value):
 
 def check_internet():
     try:
-        r = subprocess.run(["ping", "-c", "1", "-W", "2", "1.1.1.1"], capture_output=True, timeout=5)
+        r = core_process.run(["ping", "-c", "1", "-W", "2", "1.1.1.1"], timeout=5)
         return r.returncode == 0
     except Exception:
         return False

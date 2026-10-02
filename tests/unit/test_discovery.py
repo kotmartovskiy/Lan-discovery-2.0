@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """Unit: discovery engine (PHASE 6): parse_scan, run_scan, reconcile."""
 import sqlite3
 import threading
@@ -48,7 +48,7 @@ def _runner(stdout="", rc=0, exc=None):
 
 
 def test_run_scan_adds_self_ips(monkeypatch):
-    monkeypatch.setattr(d.subprocess, "run", _runner(
+    monkeypatch.setattr(d.process, "run", _runner(
         stdout="Nmap scan report for 192.168.3.99\nHost is up.\n"))
     monkeypatch.setattr(d, "_scan_ifaces", lambda: ["eth0"])
     monkeypatch.setattr(d, "_subnet", lambda: "192.168.3.0/24")
@@ -61,7 +61,7 @@ def test_run_scan_adds_self_ips(monkeypatch):
 
 
 def test_run_scan_self_ip_not_duplicated(monkeypatch):
-    monkeypatch.setattr(d.subprocess, "run", _runner(
+    monkeypatch.setattr(d.process, "run", _runner(
         stdout="Nmap scan report for 10.0.0.50\nHost is up.\n"))
     monkeypatch.setattr(d, "_scan_ifaces", lambda: ["eth0"])
     monkeypatch.setattr(d, "_subnet", lambda: "10.0.0.0/24")
@@ -72,20 +72,20 @@ def test_run_scan_self_ip_not_duplicated(monkeypatch):
 
 
 def test_run_scan_nmap_missing(monkeypatch):
-    monkeypatch.setattr(d.subprocess, "run", _runner(exc=FileNotFoundError()))
+    monkeypatch.setattr(d.process, "run", _runner(exc=FileNotFoundError()))
     monkeypatch.setattr(d, "_self_ips", lambda: [])
     assert d.run_scan(subnet="192.168.3.0/24", ifaces=["eth0"]) is None
 
 
 def test_run_scan_all_ifaces_fail(monkeypatch):
-    monkeypatch.setattr(d.subprocess, "run", _runner(stdout="", rc=1))
+    monkeypatch.setattr(d.process, "run", _runner(stdout="", rc=1))
     monkeypatch.setattr(d, "_self_ips", lambda: [])
     assert d.run_scan(subnet="192.168.3.0/24",
                       ifaces=["eth0", "wlan0"]) is None
 
 
 def test_run_scan_empty_output(monkeypatch):
-    monkeypatch.setattr(d.subprocess, "run", _runner(stdout="   ", rc=0))
+    monkeypatch.setattr(d.process, "run", _runner(stdout="   ", rc=0))
     monkeypatch.setattr(d, "_self_ips", lambda: ["10.0.0.1"])
     # только self_ips → хост есть → результат есть
     out = d.run_scan(subnet="192.168.3.0/24", ifaces=["eth0"])

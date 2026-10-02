@@ -18,6 +18,8 @@ import shutil
 import subprocess
 import time
 
+from core import process, services
+
 SMB_CONF = "/etc/samba/smb.conf"
 MANAGED_PREFIX = "# lan-discovery guest: "
 SKIP_SECTIONS = {"global", "printers", "print$", "homes"}
@@ -153,16 +155,17 @@ def guest_state(conf_path=SMB_CONF):
 
 
 def _reload_smbd():
-    for cmd in (["smbcontrol", "all", "reload-config"],
-                ["systemctl", "reload", "smbd"]):
-        try:
-            result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=15
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            continue
+    try:
+        result = process.run(
+            ["smbcontrol", "all", "reload-config"], timeout=15
+        )
         if result.returncode == 0:
             return None
+    except Exception:
+        pass
+    res = services.control("smbd", "reload", timeout=15)
+    if res.get("ok"):
+        return None
     return "конфиг записан, но перезагрузить smbd не удалось"
 
 
@@ -186,9 +189,8 @@ def apply_samba_guest(enabled, conf_path=SMB_CONF):
         with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(new_text)
         try:
-            result = subprocess.run(
-                ["testparm", "-s", tmp],
-                capture_output=True, text=True, timeout=20
+            result = process.run(
+                ["testparm", "-s", tmp], timeout=20
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
             return {

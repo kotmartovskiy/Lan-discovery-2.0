@@ -1,10 +1,10 @@
 import requests
 import json
-import subprocess
 import re
 import time
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from core import process
 from core.hardware import thermal_temp
 
 
@@ -14,16 +14,7 @@ _cpu_cache = {"percent": 0, "ts": 0}
 
 
 def _cmd(cmd, timeout=10):
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout
-        )
-        return result.stdout.strip()
-    except Exception:
-        return ""
+    return process.out(cmd, timeout=timeout)
 
 
 def _get_cpu_percent_from_netdata(host_ip, port=19999):

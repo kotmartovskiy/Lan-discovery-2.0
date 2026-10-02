@@ -14,12 +14,12 @@ UI-роуты остались в `modules/devices_routes.py` (реэкспор�
 """
 import re
 import socket
-import subprocess
 import threading
 import time
 import logging
 from datetime import datetime
 
+from core import process
 from core.events import add_event
 
 log = logging.getLogger("lan-discovery")
@@ -149,10 +149,10 @@ def run_scan(subnet=None, ifaces=None):
 
     for iface in ifaces:
         try:
-            r = subprocess.run(
+            r = process.run(
                 ["nmap", "-sn", "-PR", "-e", iface, "--host-timeout", "3s",
                  subnet],
-                capture_output=True, text=True, timeout=45,
+                timeout=45,
             )
         except FileNotFoundError:
             log.error("SCAN: nmap не установлен — сканирование недоступно")

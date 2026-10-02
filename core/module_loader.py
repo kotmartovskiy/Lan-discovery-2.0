@@ -38,6 +38,7 @@ import os
 import time
 
 from core import manifest as manifest_mod
+from core import process
 
 _CORE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODULES_DIR = os.path.join(_CORE_DIR, "modules")
@@ -189,10 +190,9 @@ def _missing_apt_packages(pkgs):
     if _pkg_cache["installed"] is None or now - _pkg_cache["ts"] >= 60:
         installed = set()
         try:
-            import subprocess
-            r = subprocess.run(
+            r = process.run(
                 ["dpkg-query", "-W", "-f", "${Package} ${Status}\n"] + pkgs,
-                capture_output=True, text=True, timeout=15,
+                timeout=15,
             )
             for line in (r.stdout or "").splitlines():
                 parts = line.rsplit(" ", 3)

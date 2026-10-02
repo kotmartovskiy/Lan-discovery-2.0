@@ -1,7 +1,6 @@
 import os
 import json
 import time
-import subprocess
 import threading
 import shutil
 import socket
@@ -9,6 +8,7 @@ import struct
 import select
 from pathlib import Path
 from datetime import datetime
+from core import process
 
 
 # ==================== Cache dicts ====================
@@ -75,16 +75,7 @@ def _cfg(section, key, default=None):
 
 
 def _cmd(cmd, timeout=5):
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout
-        )
-        return result.stdout.strip()
-    except Exception:
-        return ""
+    return process.out(cmd, timeout=timeout)
 
 
 def _read_file(path):
