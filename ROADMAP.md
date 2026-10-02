@@ -29,7 +29,7 @@
 | **2.0-10** | Core independence (§19, §34) | `core/version` (APP_VERSION — единый источник), `core/db` (схема+миграции, владение данными), удалить инверсии `core→app/modules` (8 точек: `_cfg`, `APP_VERSION`, `get_db/DB`), compat-reexport из devices_routes | **DONE (02.10.2026)** |
 | **2.0-11** | Device identity (§15) | `core/identity.py` (derive_id `mac:`/`ip:`, record_ip, identity_of), миграция v3 (device_id + ip_history + backfill, без смены devices.ip PK), reconcile присваивает/наследует device_id, аддитивный `GET /api/device/<ip>/identity`; события не тронуты | **DONE (02.10.2026)** |
 | **2.0-12** | Events 2.0 (§16) | namespace-имена `device./network./storage./camera./job./module./system.` (`NAMESPACE_EVENTS`, строгие для emit), фасад `events.emit/subscribe` (fan-out подписчикам, ошибки не роняют писателя), dual-read `list_events` (legacy⇄namespace), потребители: jobs `job.started/completed/failed/cancelled`, `wait()` = терминальный+финализирован (read-after-wait) | **DONE (02.10.2026)** |
-| **2.0-13** | Automation (§17) | правила Event → Rule → Action, хранение, минимальный UI/API, компактный appliance engine (не HA-клон) | pending |
+| **2.0-13** | Automation (§17) | `core/automation.py`: правила Event→Rule→Action (`automation_rules`, ensure-таблица), матчинг dual-read + cooldown + guard от петель, реестр действий (`log`/`event`, расширение модулями), engine на `events.subscribe` + `automation.start()` в app, CRUD API `/api/automation/rules*`, минимальный UI `/automation` (nav Система, admin), тесты | **DONE (02.10.2026)** |
 | **2.0-14** | Config & Secrets (§20–21) | классы конфигов (core/module/role/state), `secrets.get/set/delete`, секреты отдельно от settings | pending |
 | **2.0-15** | Module contract v2 (§19, §24) | uniform module context (`register_routes(app, ctx)`), миграция модулей по одному, builtin-манифесты → v2 (version/capabilities) | pending |
 | **2.0-16** | System rollback (§26) | preflight→backup→apply→verify→rollback для apt/системных изменений (app-level rollback уже в update.sh) | pending |
@@ -521,3 +521,32 @@
   tmp). Локально 336 passed (2 pre-existing Windows-фейла, 3 Linux-skip),
   стабильность гонки — 3 прогона jobs/events ×53 passed; CI — после push
   (ожидание 341).
+
+
+### 02.10.2026 — PHASE 2.0-13: Automation — **DONE**
+
+- core/automation.py — §17 Event→Rule→Action, компактный appliance
+  engine: правило {name, enabled, event, actions[], cooldown_sec} в
+  automation_rules (DDL в модуле + ensure через core.db, паттерн
+  JOBS_DDL); validate_rule (имя события из NAMESPACE_EVENTS или алиаса,
+  actions — только зарегистрированные типы, cooldown >= 0);
+  list/get/add/delete/set_enabled.
+- Матчинг: dual-read через events._event_variants — правило "OFFLINE"
+  ловит device.offline и обратно; cooldown в памяти (_last_fired),
+  fired_count/last_fired_at в БД; guard от петель: metadata.automation
+  → handle_event выходит (цепочки правил §17 — вне объёма).
+- Действия: реестр register_action (log — в лог панели, event — новое
+  namespace-событие source=automation с metadata {automation, trigger});
+  ошибки действия логируются, engine не падает; модули добавляют свои
+  типы через register_action.
+- Интеграция: engine — подписчик events.subscribe (start/stop
+  идемпотентны), automation.start() в __main__ app.py рядом с
+  retention_loop; роуты modules/automation_routes.py: страница
+  /automation (login, render_template) + API list/create/toggle/delete
+  (can_edit на мутациях); пункт CORE_NAV «Automation» /automation
+  (Система, admin, order 86); шаблон templates/automation.html (форма +
+  таблица, vanilla JS, CSRF авточерез обёртку fetch base.html).
+- Тесты: +11 (CRUD-круг, валидация ×7, матчинг/cooldown/disabled,
+  event-action+guard, start-stop подписка, API CRUD+404/400, auth,
+  страница). Локально 347 passed (2 pre-existing Windows-фейла,
+  3 Linux-skip); CI — после push (ожидание 352).
