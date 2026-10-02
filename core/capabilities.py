@@ -221,27 +221,14 @@ def _storage_smart():
 # --- network --------------------------------------------------------------
 
 def _net_ifaces():
-    """(wired, wireless) — физические интерфейсы из sysfs.
+    """(wired, wireless) — через read-only контракт core.network.
 
     None — /sys/class/net недоступен. Виртуальные (lo, veth, docker0,
-    bridge): нет device/ и нет wireless/ → пропускаются.
+    bridge): нет device/ и нет wireless/ → пропускаются (см.
+    core.network.physical_ifaces).
     """
-    if not os.path.isdir("/sys/class/net"):
-        return None
-    try:
-        names = os.listdir("/sys/class/net")
-    except Exception:
-        return None
-    wired, wireless = [], []
-    for n in sorted(names):
-        if n == "lo":
-            continue
-        base = "/sys/class/net/" + n
-        is_wifi = os.path.isdir(base + "/wireless")
-        if not is_wifi and not os.path.exists(base + "/device"):
-            continue
-        (wireless if is_wifi else wired).append(n)
-    return wired, wireless
+    from core.network import physical_ifaces
+    return physical_ifaces()
 
 
 def _wifi_ap(has_wifi):

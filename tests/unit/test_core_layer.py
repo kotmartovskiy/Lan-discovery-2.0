@@ -1,0 +1,291 @@
+# -*- coding: utf-8 -*-
+"""Unit: PHASE 2.0-2 — core/process, services, config, network, storage
+(read-only контракты + первый перенос вызовов из system_routes)."""
+import subprocess
+import sys
+import time
+
+import pytest
+
+import app
+import modules.auth as auth
+from core import config as core_config
+from core import network as core_network
+from core import process as core_process
+from core import services as core_services
+from core import storage as core_storage
+
+
+@pytest.fixture()
+def client(monkeypatch):
+    app.app.config["TESTING"] = True
+    monkeypatch.setattr(
+        auth, "load_users",
+        lambda: {"admin": {"enabled": True, "role": "admin"}},
+    )
+    c = app.app.test_client()
+    with c.session_transaction() as s:
+        s["user"] = "admin"
+        s["login_ts"] = time.time()
+    yield c
+
+
+# --- core.process ---------------------------------------------------------
+
+def test_process_run_text():
+    r = core_process.run(
+        [sys.executable, "-c", "print('p202-ok')"], timeout=15)
+    assert r.returncode == 0
+    assert "p202-ok" in r.stdout
+
+
+def test_process_out_strips_and_swallows_errors():
+    assert core_process.out(
+        [sys.executable, "-c", "print('  spaced  ')"], timeout=15) == "spaced"
+    assert core_process.out(["__no_such_binary__"], timeout=5) == ""
+
+
+def test_process_timeout():
+    with pytest.raises(subprocess.TimeoutExpired):
+        core_process.run(
+            [sys.executable, "-c", "import time; time.sleep(10)"],
+            timeout=0.5)
+
+
+def test_process_shell_string():
+    r = core_process.run("echo shell-ok", timeout=10)
+    assert r.returncode == 0
+    assert "shell-ok" in r.stdout
+
+
+# --- core.services --------------------------------------------------------
+
+def _cp(returncode=0, stdout="", stderr=""):
+    return subprocess.CompletedProcess(
+        ["systemctl"], returncode, stdout, stderr)
+
+
+def test_services_status(monkeypatch):
+    def fake_out(cmd, timeout=5, **kw):
+        return "active" if "is-active" in cmd else "enabled"
+
+    monkeypatch.setattr(core_services.process, "out", fake_out)
+    st = core_services.status("lan-discovery")
+    assert st == {"unit": "lan-discovery", "active": "active",
+                  "enabled": "enabled"}
+
+
+def test_services_status_unknown(monkeypatch):
+    monkeypatch.setattr(core_services.process, "out",
+                        lambda cmd, timeout=5, **kw: "")
+    st = core_services.status("no-such.service")
+    assert st["active"] == "unknown"
+    assert st["enabled"] == "unknown"
+
+
+def test_services_control_ok(monkeypatch):
+    seen = []
+
+    def fake_run(cmd, timeout=30, **kw):
+        seen.append(cmd)
+        return _cp(0)
+
+    monkeypatch.setattr(core_services.process, "run", fake_run)
+    res = core_services.control("transmission-daemon", "restart")
+    assert res == {"ok": True, "unit": "transmission-daemon",
+                   "action": "restart"}
+    assert seen == [["systemctl", "restart", "transmission-daemon"]]
+
+
+def test_services_control_error_passthrough(monkeypatch):
+    monkeypatch.setattr(core_services.process, "run",
+                        lambda cmd, timeout=30, **kw: _cp(1, "", "no uid"))
+    res = core_services.control("x.service", "stop")
+    assert res == {"ok": False, "error": "no uid"}
+
+
+def test_services_control_timeout(monkeypatch):
+    def fake_run(cmd, timeout=30, **kw):
+        raise subprocess.TimeoutExpired(cmd, timeout)
+
+    monkeypatch.setattr(core_services.process, "run", fake_run)
+    res = core_services.control("x.service", "start")
+    assert res["ok"] is False
+    assert res["timeout"] is True
+    assert "ожидания" in res["error"]
+
+
+def test_services_control_bad_action():
+    with pytest.raises(ValueError):
+        core_services.control("x.service", "format-disk")
+
+
+def test_services_health(monkeypatch):
+    monkeypatch.setattr(
+        core_services.process, "out",
+        lambda cmd, timeout=5, **kw: "active" if "is-active" in cmd
+        else "enabled")
+    h = core_services.health("ssh")
+    assert h["ok"] is True
+    assert h["active"] == "active"
+
+    monkeypatch.setattr(
+        core_services.process, "out",
+        lambda cmd, timeout=5, **kw: "inactive" if "is-active" in cmd
+        else "disabled")
+    assert core_services.health("ssh")["ok"] is False
+
+
+def test_services_logs(monkeypatch):
+    monkeypatch.setattr(core_services.process, "out",
+                        lambda cmd, timeout=5, **kw: "line1\nline2")
+    assert core_services.logs("ssh", lines=10) == "line1\nline2"
+
+
+def test_service_action_route_shape(client, monkeypatch):
+    """Роут /api/service/<...>/action: JSON-контракт 1.1 сохранён."""
+    monkeypatch.setattr(core_services.process, "run",
+                        lambda cmd, timeout=30, **kw: _cp(1, "", "denied"))
+    r = client.post("/api/service/transmission/restart")
+    assert r.status_code in (500, 504)
+    d = r.get_json()
+    assert d["ok"] is False
+    assert "error" in d
+
+    monkeypatch.setattr(core_services.process, "run",
+                        lambda cmd, timeout=30, **kw: _cp(0))
+    r = client.post("/api/service/transmission/restart")
+    assert r.status_code == 200
+    assert r.get_json() == {"ok": True, "service": "transmission-daemon",
+                            "action": "restart"}
+
+    r = client.post("/api/service/transmission/nonsense")
+    assert r.status_code == 400
+
+
+def test_service_action_route_auth_required():
+    c = app.app.test_client()  # без сессии
+    r = c.post("/api/service/transmission/restart")
+    assert r.status_code in (302, 401, 403)
+
+
+# --- core.config ----------------------------------------------------------
+
+def test_config_roundtrip(tmp_path):
+    p = str(tmp_path / "settings.json")
+    core_config.clear_cache(p)
+    assert core_config.load(p) == {}
+    data = {"web": {"flask_port": 8080}}
+    assert core_config.save(data, p) is True
+    assert core_config.load(p) == data
+    assert core_config.get("web", "flask_port", path=p) == 8080
+    assert core_config.get("web", "nope", "dflt", path=p) == "dflt"
+    assert core_config.get("no-such", "k", "dflt", path=p) == "dflt"
+
+
+def test_config_non_dict_section(tmp_path):
+    p = str(tmp_path / "s.json")
+    core_config.save({"web": 5}, p)
+    assert core_config.get("web", "port", "dflt", path=p) == "dflt"
+
+
+def test_config_corrupt_and_list(tmp_path):
+    p1 = tmp_path / "bad.json"
+    p1.write_text("{oops", encoding="utf-8")
+    core_config.clear_cache(str(p1))
+    assert core_config.load(str(p1)) == {}
+
+    p2 = tmp_path / "list.json"
+    p2.write_text("[1, 2]", encoding="utf-8")
+    core_config.clear_cache(str(p2))
+    assert core_config.load(str(p2)) == {}
+
+
+def test_system_routes_settings_delegation(monkeypatch):
+    """modules/system_routes.load_settings → core.config.load (единый кэш)."""
+    import modules.system_routes as sr
+
+    monkeypatch.setattr(
+        core_config, "load",
+        lambda path=None: {"__path__": path})
+    assert sr.load_settings() == {"__path__": sr.SETTINGS_PATH}
+
+
+# --- core.network ---------------------------------------------------------
+
+def test_network_physical_ifaces_tree(tmp_path):
+    base = tmp_path / "net"
+    (base / "eth0").mkdir(parents=True)
+    (base / "eth0" / "device").touch()
+    (base / "wlan0" / "wireless").mkdir(parents=True)
+    (base / "lo").mkdir()
+    (base / "docker0").mkdir()
+    assert core_network.physical_ifaces(str(base)) == (
+        ["eth0"], ["wlan0"])
+
+
+def test_network_physical_ifaces_source_missing(tmp_path):
+    assert core_network.physical_ifaces(str(tmp_path / "nope")) is None
+
+
+def test_capabilities_delegates_to_network_contract(monkeypatch):
+    from core import capabilities as caps_mod
+
+    monkeypatch.setattr(
+        core_network, "physical_ifaces",
+        lambda base="/sys/class/net": (["eth9"], []))
+    assert caps_mod._net_ifaces() == (["eth9"], [])
+
+
+# --- core.storage ---------------------------------------------------------
+
+def test_storage_lsblk_df_via_process(monkeypatch):
+    seen = []
+
+    class R:
+        stdout = "NAME SIZE\n"
+
+    def fake_run(cmd, timeout=30, **kw):
+        seen.append(cmd)
+        return R()
+
+    monkeypatch.setattr(core_storage.process, "run", fake_run)
+    assert core_storage.lsblk_text() == "NAME SIZE\n"
+    assert core_storage.df_text() == "NAME SIZE\n"
+    assert seen[0][0] == "lsblk"
+    assert seen[1][:2] == ["df", "-h"]
+
+
+def test_storage_smart_report_contract(monkeypatch):
+    assert core_storage.smart_report(None) == "диск не обнаружен"
+
+    seen = []
+
+    class R:
+        stdout = "TEMP 40C"
+
+    def fake_run(cmd, timeout=30, **kw):
+        seen.append(cmd)
+        return R()
+
+    monkeypatch.setattr(core_storage.process, "run", fake_run)
+    assert core_storage.smart_report("sda") == "TEMP 40C"
+    assert seen == [["smartctl", "-a", "/dev/sda"]]
+
+    def boom(cmd, timeout=30, **kw):
+        raise FileNotFoundError("smartctl")
+
+    monkeypatch.setattr(core_storage.process, "run", boom)
+    assert core_storage.smart_report("sda") == "smartctl не установлен"
+
+
+def test_api_disks_shape(client):
+    """GET /api/disks после переноса на core.storage: старый контракт."""
+    r = client.get("/api/disks")
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["ok"] is True
+    for key in ("lsblk", "df", "smart"):
+        assert key in d, key
+    assert isinstance(d["lsblk"], str)
+    assert isinstance(d["df"], str)

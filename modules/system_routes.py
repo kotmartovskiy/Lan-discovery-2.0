@@ -7,9 +7,10 @@ from core.hardware import (
     detect_platform, emmc_device, hdd_device, thermal_temp,
 )
 from core import samba_guest
+from core.config import SETTINGS_PATH
+from core import config as core_config, services as core_services, storage as core_storage
 
 DB = "/opt/lan-discovery/devices.db"
-SETTINGS_PATH = "/etc/lan-discovery/settings.json"
 DB_BACKUP_DIR = "/srv/backup-db"
 DB_BACKUP_PATTERN = "devices_*.db"
 DISK_REPLACE_SCRIPT = "/opt/lan-discovery/disk_replace.py"
@@ -24,7 +25,6 @@ SERVICE_ACTIONS = {
     "smb": "smbd"
 }
 
-_settings_cache = {"data": None, "ts": 0}
 _about_cache = {"data": None, "ts": 0}
 _disk_sizes = {"hdd": None, "sd": None}
 _boot_device = None
@@ -38,17 +38,8 @@ _network_config_cache = {"data": None, "ts": 0}
 
 
 def load_settings():
-    now = time.time()
-    if _settings_cache["data"] is not None and now - _settings_cache["ts"] < 10:
-        return _settings_cache["data"]
-    try:
-        with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        _settings_cache["data"] = data
-        _settings_cache["ts"] = now
-        return data
-    except Exception:
-        return {}
+    # PHASE 2.0-2: единый источник core.config (кэш 10 с на путь)
+    return core_config.load(SETTINGS_PATH)
 
 
 def _cfg(section, key, default=None):
@@ -678,9 +669,9 @@ def about_data():
     ]
 
     def _check_service(svc):
-        active = _cmd(["systemctl", "is-active", svc])
-        enabled = _cmd(["systemctl", "is-enabled", svc])
-        return {"name": svc, "active": active or "unknown", "enabled": enabled or "unknown"}
+        # PHASE 2.0-2: core.services.status вместо пары systemctl-вызовов
+        st = core_services.status(svc)
+        return {"name": svc, "active": st["active"], "enabled": st["enabled"]}
 
     with ThreadPoolExecutor(max_workers=5) as pool:
         service_results = list(pool.map(_check_service, service_names))
@@ -1213,49 +1204,24 @@ def register_routes(app):
                 "error": "Недопустимая операция"
             }, 400
 
+        # PHASE 2.0-2: core.services.control вместо прямого systemctl
         try:
-
-            result = subprocess.run(
-                [
-                    "systemctl",
-                    systemctl_action,
-                    service_name
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=15
-            )
-
-            if result.returncode != 0:
-
-                return {
-                    "ok": False,
-                    "error": (
-                        result.stderr.strip()
-                        or "systemctl завершился с ошибкой"
-                    )
-                }, 500
-
-            return {
-                "ok": True,
-                "service": service_name,
-                "action": systemctl_action
-            }
-
-        except subprocess.TimeoutExpired:
-
-            return {
-                "ok": False,
-                "error": "Превышено время ожидания"
-            }, 504
-
+            res = core_services.control(service_name, systemctl_action,
+                                        timeout=15)
         except Exception as e:
+            return {"ok": False, "error": str(e)}, 500
 
+        if not res.get("ok"):
             return {
                 "ok": False,
-                "error": str(e)
-            }, 500
+                "error": res.get("error") or "systemctl завершился с ошибкой"
+            }, (504 if res.get("timeout") else 500)
+
+        return {
+            "ok": True,
+            "service": service_name,
+            "action": systemctl_action
+        }
 
     @app.route("/api/samba/guest", methods=["GET"])
     @login_required
@@ -2363,27 +2329,11 @@ def register_routes(app):
     @login_required
     def api_disks():
         try:
-            lsblk = subprocess.run(
-                ["lsblk", "-o", "NAME,SIZE,TYPE,MOUNTPOINT,FSTYPE,MODEL"],
-                capture_output=True, text=True, timeout=10
-            ).stdout
-            df = subprocess.run(
-                ["df", "-h"],
-                capture_output=True, text=True, timeout=10
-            ).stdout
-            smart = ""
-            _smart_dev = hdd_device()
-            if not _smart_dev:
-                smart = "диск не обнаружен"
-            else:
-                try:
-                    r = subprocess.run(
-                        ["smartctl", "-a", "/dev/" + _smart_dev],
-                        capture_output=True, text=True, timeout=10
-                    )
-                    smart = r.stdout or r.stderr
-                except Exception:
-                    smart = "smartctl не установлен"
+            # PHASE 2.0-2: read-only контракт core.storage вместо прямых
+            # lsblk/df/smartctl (старый контракт ответа сохранён)
+            lsblk = core_storage.lsblk_text()
+            df = core_storage.df_text()
+            smart = core_storage.smart_report(hdd_device())
             return {"ok": True, "lsblk": lsblk, "df": df, "smart": smart}
         except Exception as e:
             return {"ok": False, "error": str(e)}
