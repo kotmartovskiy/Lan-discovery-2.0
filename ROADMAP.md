@@ -31,7 +31,7 @@
 | **2.0-12** | Events 2.0 (§16) | namespace-имена `device./network./storage./camera./job./module./system.` (`NAMESPACE_EVENTS`, строгие для emit), фасад `events.emit/subscribe` (fan-out подписчикам, ошибки не роняют писателя), dual-read `list_events` (legacy⇄namespace), потребители: jobs `job.started/completed/failed/cancelled`, `wait()` = терминальный+финализирован (read-after-wait) | **DONE (02.10.2026)** |
 | **2.0-13** | Automation (§17) | `core/automation.py`: правила Event→Rule→Action (`automation_rules`, ensure-таблица), матчинг dual-read + cooldown + guard от петель, реестр действий (`log`/`event`, расширение модулями), engine на `events.subscribe` + `automation.start()` в app, CRUD API `/api/automation/rules*`, минимальный UI `/automation` (nav Система, admin), тесты | **DONE (02.10.2026)** |
 | **2.0-14** | Config & Secrets (§20–21) | классы конфигов в docstring `core/config` + единый справочник путей (`SETTINGS_PATH`/`MODULES_STATE_PATH`/`ROLES_STATE_PATH`, потребители module_loader/roles/module_catalog); `core/secrets.py`: `get/set/delete/keys` (kv.json, Fernet at rest, 0600) + crypto перенесён из core_routes (compat-алиасы), токен каталога → secrets с fallback на settings; тесты | **DONE (02.10.2026)** |
-| **2.0-15** | Module contract v2 (§19, §24) | uniform module context (`register_routes(app, ctx)`), миграция модулей по одному, builtin-манифесты → v2 (version/capabilities) | pending |
+| **2.0-15** | Module contract v2 (§19, §24) | uniform module context (`register_routes(app, ctx)`), миграция модулей по одному, builtin-манифесты → v2 (version/capabilities) | **DONE (02.10.2026)** |
 | **2.0-16** | System rollback (§26) | preflight→backup→apply→verify→rollback для apt/системных изменений (app-level rollback уже в update.sh) | pending |
 | **2.0-17** | Appliance smoke test (§27) | интеграционная цепочка install→…→failure→rollback (на стенде; важнее мелких UI-тестов) | pending |
 | **2.0-18** | Installer 2.0 (§25) | preflight + hardware detection + health check, ARM/x86_64/минимальные установки, без платы-специфики | pending |
@@ -576,3 +576,36 @@
   legacy HMAC + wrong key, fallback/приоритет токена, справочник путей).
   Локально 357 passed (2 pre-existing Windows-фейла, 3 Linux-skip);
   CI — после push (ожидание 362).
+
+
+### 02.10.2026 — PHASE 2.0-15: Module contract v2 — **DONE**
+
+- app.py (assembly root): блок Uniform module context — ctx =
+  SimpleNamespace(login_required/admin_required/can_edit,
+  get_current_user/get_current_username, page_data, _cmd, _cfg, DB,
+  GAMES_DIR, _SERVICE_START, panel_name, check_internet_cached,
+  weather_current) + ctx.service_state после import system_routes;
+  все 12 вызовов register_*(app, ctx); register_auth перенесён после
+  сборки ctx.
+- Модули: единая сигнатура register_routes(app, ctx) во всех 12
+  (auth, module_manager, devices, jobs, automation, weather, system,
+  network, media, monitoring, inventory, core) — деструктуризация
+  имен в начале вместо параметров; ленивые from app import в
+  обработчках (devices ×4, weather, monitoring, inventory, system ×3,
+  core ×2, auth) заменены на ctx-замыкания; module_manager больше не
+  импортирует get_current_user из auth; core_routes: page_data
+  стала ctx-заменой (модульная делегация удалена, внешних
+  вызывающих не было), SETTINGS_PATH → core.config; system_routes:
+  APP_VERSION → core.version (убран __import__("app")).
+- Инверсии modules→app = 0 (было ×9+): inventory/monitor/
+  devices._current_subnet читают настройки через core.config.get
+  (стиль _cfg, единый кэш 10 с).
+- Манифесты: 33 builtin module.json → version 2.0.0 (+ capabilities
+  у 6 hardware-зависимых: camera/radio/wifianalyzer/disks/sys-emmc/
+  player); валидация validate_manifest чистая; шаблон /modules
+  показывает v2.0.0 вместо Unknown.
+- Тесты: +3 (tests/unit/test_module_contract.py: uniform-сигнатура
+  всех register_routes, version+validate 33 манифестов, capabilities);
+  test_module_status обновлён под version-бейджи. Локально 360
+  passed (2 pre-existing Windows-фейла, 3 Linux-skip); CI после push
+  (ожидание 365).
