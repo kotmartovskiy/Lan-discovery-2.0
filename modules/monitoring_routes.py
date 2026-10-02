@@ -5,8 +5,10 @@ from flask import render_template, jsonify
 _monitoring_cache = {"data": None, "ts": 0}
 
 
-def register_routes(app):
-    from app import login_required, page_data, _cfg
+def register_routes(app, ctx):
+    login_required = ctx.login_required
+    page_data = ctx.page_data
+    _cfg = ctx._cfg
     from modules.monitor import get_system_overview, get_netdata_stats_for_host
 
     @app.route("/monitoring")

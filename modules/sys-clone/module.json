@@ -1,5 +1,6 @@
 {
   "id": "sys-clone",
+  "version": "2.0.0",
   "name": "Замена HDD / Клонирование",
   "description": "Клонирование eMMC на SD-карту и проверка подключения диска",
   "builtin": true,

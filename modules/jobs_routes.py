@@ -21,7 +21,9 @@ log = logging.getLogger("lan-discovery")
 _retention_started = False
 
 
-def register_routes(app, login_required, admin_required):
+def register_routes(app, ctx):
+    login_required = ctx.login_required
+    admin_required = ctx.admin_required
     from core.db import DB
     jobs.manager.configure(db_path=DB)
 

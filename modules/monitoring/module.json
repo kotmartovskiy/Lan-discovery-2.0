@@ -1,16 +1,30 @@
 {
   "id": "monitoring",
+  "version": "2.0.0",
   "name": "Мониторинг",
   "description": "Статус хостов, CPU/память/диск/сеть через Netdata, история и оповещения",
   "builtin": true,
   "type": "tab",
   "help": true,
   "url": "/monitoring",
-  "prefixes": ["/monitoring", "/api/monitoring"],
-  "tab": {"title": "Мониторинг", "order": 30, "group": "Мониторинг"},
+  "prefixes": [
+    "/monitoring",
+    "/api/monitoring"
+  ],
+  "tab": {
+    "title": "Мониторинг",
+    "order": 30,
+    "group": "Мониторинг"
+  },
   "deps": {
-    "apt": ["netdata"],
-    "services": ["netdata"],
-    "ports": [19999]
+    "apt": [
+      "netdata"
+    ],
+    "services": [
+      "netdata"
+    ],
+    "ports": [
+      19999
+    ]
   }
 }

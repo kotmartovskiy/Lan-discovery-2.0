@@ -7,10 +7,11 @@
 from flask import jsonify, render_template, request
 
 
-def register_routes(app):
+def register_routes(app, ctx):
     from core import automation
     from core.db import get_db
-    from modules.auth import login_required, can_edit
+    login_required = ctx.login_required
+    can_edit = ctx.can_edit
 
     @app.route("/automation")
     @login_required

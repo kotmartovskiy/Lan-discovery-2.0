@@ -1,10 +1,15 @@
 {
   "id": "curr-crypto",
+  "version": "2.0.0",
   "name": "Криптовалюта",
   "description": "Таблица курсов криптовалют на вкладке «Курсы валют и металлов»",
   "builtin": true,
   "type": "block",
-  "block": {"slot": "currencies", "order": 20, "title": "Криптовалюта"},
+  "block": {
+    "slot": "currencies",
+    "order": 20,
+    "title": "Криптовалюта"
+  },
   "help": true,
   "prefixes": []
 }

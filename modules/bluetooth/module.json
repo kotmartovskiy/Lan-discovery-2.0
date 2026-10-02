@@ -1,11 +1,25 @@
 {
   "id": "bluetooth",
+  "version": "2.0.0",
   "name": "Bluetooth",
   "description": "Менеджер Bluetooth: поиск, сопряжение, подключение устройств",
   "builtin": true,
   "type": "app",
   "help": true,
-  "prefixes": ["/apps/bluetooth", "/api/bluetooth"],
-  "app": {"title": "Bluetooth", "icon": "📶", "category": "Система и сеть", "order": 60},
-  "deps": {"apt": ["bluez"], "ports": []}
+  "prefixes": [
+    "/apps/bluetooth",
+    "/api/bluetooth"
+  ],
+  "app": {
+    "title": "Bluetooth",
+    "icon": "📶",
+    "category": "Система и сеть",
+    "order": 60
+  },
+  "deps": {
+    "apt": [
+      "bluez"
+    ],
+    "ports": []
+  }
 }

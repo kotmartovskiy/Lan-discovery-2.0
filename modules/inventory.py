@@ -392,7 +392,7 @@ def _row_to_dict(row):
 def scan_all_devices():
     init_inventory_db()
 
-    from app import _cfg
+    from core.config import get as _cfg
     subnet = _cfg("network", "subnet", "192.168.3.0/24")
 
     try:

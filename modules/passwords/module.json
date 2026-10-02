@@ -1,11 +1,23 @@
 {
   "id": "passwords",
+  "version": "2.0.0",
   "name": "Пароли",
   "description": "Генератор безопасных паролей и зашифрованное хранилище",
   "builtin": true,
   "type": "app",
   "help": true,
-  "prefixes": ["/apps/passwords", "/api/secrets"],
-  "app": {"title": "Пароли", "icon": "🔐", "category": "Утилиты", "order": 70},
-  "deps": {"apt": [], "ports": []}
+  "prefixes": [
+    "/apps/passwords",
+    "/api/secrets"
+  ],
+  "app": {
+    "title": "Пароли",
+    "icon": "🔐",
+    "category": "Утилиты",
+    "order": 70
+  },
+  "deps": {
+    "apt": [],
+    "ports": []
+  }
 }

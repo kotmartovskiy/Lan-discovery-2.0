@@ -1,5 +1,6 @@
 {
   "id": "sys-iptv",
+  "version": "2.0.0",
   "name": "IPTV",
   "description": "Автообновление IPTV-плейлистов: список, добавление, вкл/выкл",
   "builtin": true,

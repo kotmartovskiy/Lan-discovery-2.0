@@ -1,11 +1,25 @@
 {
   "id": "camera",
+  "version": "2.0.0",
+  "capabilities": [
+    "camera"
+  ],
   "name": "Камеры",
   "description": "IP-камеры: RTSP/HTTP-потоки, сетка просмотра, старт/стоп всех",
   "builtin": true,
   "type": "app",
   "help": true,
-  "prefixes": ["/api/cameras"],
-  "app": {"title": "Камеры", "icon": "📷", "category": "Медиа", "order": 30},
-  "deps": {"apt": [], "ports": []}
+  "prefixes": [
+    "/api/cameras"
+  ],
+  "app": {
+    "title": "Камеры",
+    "icon": "📷",
+    "category": "Медиа",
+    "order": 30
+  },
+  "deps": {
+    "apt": [],
+    "ports": []
+  }
 }

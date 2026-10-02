@@ -1,5 +1,9 @@
 {
   "id": "sys-emmc",
+  "version": "2.0.0",
+  "capabilities": [
+    "storage"
+  ],
   "name": "eMMC Backup",
   "description": "Бэкап образа eMMC: статус, проверки, запуск",
   "builtin": true,

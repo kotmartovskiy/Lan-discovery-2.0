@@ -349,7 +349,7 @@ def get_system_overview():
 
     net_items = []
     try:
-        from app import _cfg
+        from core.config import get as _cfg
         traffic_ifaces = _cfg("network", "traffic_ifaces",
                               ["end0", "eth0", "wlan1", "wlan0"])
         for iface in traffic_ifaces:

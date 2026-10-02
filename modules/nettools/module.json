@@ -1,11 +1,23 @@
 {
   "id": "nettools",
+  "version": "2.0.0",
   "name": "Сетевые инструменты",
   "description": "Ping, DNS-резолвер, скан TCP-портов, traceroute",
   "builtin": true,
   "type": "app",
   "help": true,
-  "prefixes": ["/apps/nettools", "/api/nettools"],
-  "app": {"title": "Сеть", "icon": "🔌", "category": "Система и сеть", "order": 20},
-  "deps": {"apt": [], "ports": []}
+  "prefixes": [
+    "/apps/nettools",
+    "/api/nettools"
+  ],
+  "app": {
+    "title": "Сеть",
+    "icon": "🔌",
+    "category": "Система и сеть",
+    "order": 20
+  },
+  "deps": {
+    "apt": [],
+    "ports": []
+  }
 }

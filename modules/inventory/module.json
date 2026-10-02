@@ -1,15 +1,25 @@
 {
   "id": "inventory",
+  "version": "2.0.0",
   "name": "Инвентаризация",
   "description": "Поиск устройств в сети, определение ОС и сервисов (Nmap), инвентарные номера",
   "builtin": true,
   "type": "tab",
   "help": true,
   "url": "/inventory",
-  "prefixes": ["/inventory", "/api/inventory"],
-  "tab": {"title": "Инвентаризация", "order": 20, "group": "Устройства"},
+  "prefixes": [
+    "/inventory",
+    "/api/inventory"
+  ],
+  "tab": {
+    "title": "Инвентаризация",
+    "order": 20,
+    "group": "Устройства"
+  },
   "deps": {
-    "apt": ["nmap"],
+    "apt": [
+      "nmap"
+    ],
     "ports": []
   }
 }

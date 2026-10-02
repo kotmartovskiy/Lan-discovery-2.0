@@ -110,5 +110,6 @@ def test_modules_page_renders(client):
     # вычисляемые статусы вместо старых бейджей
     assert ("● активен" in html) or ("доступен" in html) or ("выключен" in html)
     assert ".badge-warn" in html  # semantic-стиль статусов требований
-    # манифесты без version → «Unknown» (STEP 8)
-    assert ">Unknown<" in html
+    # манифесты v2 несут version (PHASE 2.0-15) → «Unknown» не показывается
+    assert ">Unknown<" not in html
+    assert ">v2.0.0<" in html

@@ -95,7 +95,13 @@ def _spawn_bt_scan():
     return True
 
 
-def register_routes(app, login_required, admin_required, can_edit, _cmd, _cfg, page_data):
+def register_routes(app, ctx):
+    login_required = ctx.login_required
+    admin_required = ctx.admin_required
+    can_edit = ctx.can_edit
+    _cmd = ctx._cmd
+    _cfg = ctx._cfg
+    page_data = ctx.page_data
 
     @app.route("/api/network/config")
     @login_required

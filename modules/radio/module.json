@@ -1,11 +1,25 @@
 {
   "id": "radio",
+  "version": "2.0.0",
+  "capabilities": [
+    "radio"
+  ],
   "name": "Радио",
   "description": "Онлайн-радиостанции: плейлисты m3u, управление воспроизведением на сервере",
   "builtin": true,
   "type": "app",
   "help": true,
-  "prefixes": ["/api/radio"],
-  "app": {"title": "Радио", "icon": "📻", "category": "Медиа", "order": 10},
-  "deps": {"apt": [], "ports": []}
+  "prefixes": [
+    "/api/radio"
+  ],
+  "app": {
+    "title": "Радио",
+    "icon": "📻",
+    "category": "Медиа",
+    "order": 10
+  },
+  "deps": {
+    "apt": [],
+    "ports": []
+  }
 }

@@ -1,5 +1,6 @@
 {
   "id": "sys-db",
+  "version": "2.0.0",
   "name": "Backup БД",
   "description": "Бэкап базы данных панели devices.db и восстановление из копий",
   "builtin": true,

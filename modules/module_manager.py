@@ -152,10 +152,14 @@ def _catalog_install_job(ctx, mid, update):
     return {"module": mid, "update": bool(update)}
 
 
-def register_routes(app, login_required, admin_required, page_data):
+def register_routes(app, ctx):
+    login_required = ctx.login_required
+    admin_required = ctx.admin_required
+    page_data = ctx.page_data
+    get_current_user = ctx.get_current_user
+
     @app.context_processor
     def _inject_modules_context():
-        from modules.auth import get_current_user
         u = get_current_user()
         role = getattr(u, "role", "") if u else ""
         return {

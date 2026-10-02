@@ -1,11 +1,23 @@
 {
   "id": "filemanager",
+  "version": "2.0.0",
   "name": "Файловый менеджер",
   "description": "Двухпанельный файловый менеджер: просмотр, копирование, загрузка файлов",
   "builtin": true,
   "type": "app",
   "help": true,
-  "prefixes": ["/apps/filemanager", "/api/filemanager"],
-  "app": {"title": "Файлы", "icon": "📁", "category": "Утилиты", "order": 80},
-  "deps": {"apt": [], "ports": []}
+  "prefixes": [
+    "/apps/filemanager",
+    "/api/filemanager"
+  ],
+  "app": {
+    "title": "Файлы",
+    "icon": "📁",
+    "category": "Утилиты",
+    "order": 80
+  },
+  "deps": {
+    "apt": [],
+    "ports": []
+  }
 }

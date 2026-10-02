@@ -1,5 +1,6 @@
 {
   "id": "sys-users",
+  "version": "2.0.0",
   "name": "Пользователи",
   "description": "Пароли, включение/выключение пользователей и RPC-пароль Transmission",
   "builtin": true,

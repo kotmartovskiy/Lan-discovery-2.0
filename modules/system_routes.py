@@ -9,6 +9,7 @@ from core.hardware import (
 from core import samba_guest
 from core import jobs
 from core.config import SETTINGS_PATH
+from core.version import APP_VERSION
 from core import config as core_config, services as core_services, storage as core_storage
 
 DB = "/opt/lan-discovery/devices.db"
@@ -649,7 +650,7 @@ def about_data():
     data["software"] = {
         "python": platform.python_version(),
         "flask": getattr(__import__("flask"), "__version__", "unknown"),
-        "version": __import__("app", fromlist=["APP_VERSION"]).APP_VERSION,
+        "version": APP_VERSION,
         "app": "/opt/lan-discovery/app.py",
         "app_size": _human_size(app_size),
         "database": "/opt/lan-discovery/devices.db",
@@ -1143,8 +1144,12 @@ def _update_clone_state(**kwargs):
     return state
 
 
-def register_routes(app):
-    from modules.auth import login_required, admin_required
+def register_routes(app, ctx):
+    login_required = ctx.login_required
+    admin_required = ctx.admin_required
+    check_internet_cached = ctx.check_internet_cached
+    weather_current = ctx.weather_current
+    _SERVICE_START = ctx._SERVICE_START
 
     @app.context_processor
     def _inject_board_title():
@@ -1155,7 +1160,6 @@ def register_routes(app):
         if _page_data_cache["data"] is not None and now - _page_data_cache["ts"] < 10:
             return _page_data_cache["data"]
 
-        from app import check_internet_cached, weather_current
         data = {
             "internet": check_internet_cached(),
             "interval": int(_cfg("network", "scan_interval", 30) or 30),
@@ -1665,7 +1669,6 @@ def register_routes(app):
             pass
 
         try:
-            from app import check_internet_cached
             internet = bool(check_internet_cached())
         except Exception:
             internet = None
@@ -1759,8 +1762,6 @@ def register_routes(app):
             checks["cpu_temp"] = "ok (%.1f°C)" % temp
 
         status_code = 200 if ok else 503
-
-        from app import APP_VERSION, _SERVICE_START
         from modules.devices_routes import get_scan_status
 
         try:

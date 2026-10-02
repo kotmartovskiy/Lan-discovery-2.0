@@ -38,7 +38,7 @@ os.makedirs(SECRETS_DIR, exist_ok=True)
 # ==================== Core utility functions ====================
 
 def load_settings():
-    from app import SETTINGS_PATH
+    from core.config import SETTINGS_PATH
     now = time.time()
     if _settings_cache["data"] is not None and now - _settings_cache["ts"] < 10:
         return _settings_cache["data"]
@@ -53,7 +53,7 @@ def load_settings():
 
 
 def save_settings(data):
-    from app import SETTINGS_PATH
+    from core.config import SETTINGS_PATH
     try:
         with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
@@ -236,13 +236,7 @@ def get_currency_cached():
     return _currency_cache["data"] or {}, _currency_cache["recycling"] or {}
 
 
-# ==================== Internet / weather / page_data ====================
-
-def page_data():
-    """Делегируется app.page_data — единый источник (P1-8: нет дублей)."""
-    from app import page_data as _app_page_data
-    return _app_page_data()
-
+# ==================== Help / справка ====================
 
 def _help_facts():
     """Данные «эта панель» + накопители для templates/help.html.
@@ -379,9 +373,13 @@ def _help_facts():
 
 # ==================== Routes ====================
 
-def register_routes(app):
+def register_routes(app, ctx):
     from flask import render_template, request, redirect, url_for, jsonify, send_file
-    from app import login_required, admin_required, can_edit, GAMES_DIR
+    login_required = ctx.login_required
+    admin_required = ctx.admin_required
+    can_edit = ctx.can_edit
+    page_data = ctx.page_data
+    GAMES_DIR = ctx.GAMES_DIR
 
     # --- Games ---
 

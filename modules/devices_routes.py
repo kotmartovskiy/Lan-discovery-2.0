@@ -29,8 +29,12 @@ from core.db import (  # noqa: F401
     init_db_schema,
 )
 
-def register_routes(app):
-    from modules.auth import login_required, can_edit, admin_required
+def register_routes(app, ctx):
+    login_required = ctx.login_required
+    can_edit = ctx.can_edit
+    admin_required = ctx.admin_required
+    page_data = ctx.page_data
+    _cfg = ctx._cfg
 
     @app.route("/")
     @login_required
@@ -93,7 +97,6 @@ def register_routes(app):
                 )
             )
 
-        from app import page_data
         data = page_data()
 
         return render_template("devices.html",
@@ -129,7 +132,6 @@ def register_routes(app):
         finally:
             con.close()
 
-        from app import page_data
         data = page_data()
 
         return render_template("history.html",
@@ -194,7 +196,6 @@ def register_routes(app):
         except Exception:
             inventory = {}
 
-        from app import page_data
         data = page_data()
 
         return render_template("device.html",
@@ -335,7 +336,7 @@ def register_routes(app):
 
 
 def _current_subnet():
-    from app import _cfg
+    from core.config import get as _cfg
     return _cfg("network", "subnet", "192.168.3.0/24")
 
 

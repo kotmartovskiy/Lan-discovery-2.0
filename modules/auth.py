@@ -146,13 +146,12 @@ def _reset_rate_limit(ip):
     _login_attempts.pop(ip, None)
 
 
-def register_routes(app):
+def register_routes(app, ctx):
     from flask import request, redirect, url_for, render_template, session, jsonify
 
     def _panel_name():
         try:
-            from app import panel_name
-            return panel_name()
+            return ctx.panel_name()
         except Exception:
             return ""
 

@@ -646,7 +646,13 @@ def _alarm_scheduler():
 threading.Thread(target=_alarm_scheduler, daemon=True).start()
 
 
-def register_routes(app, login_required, admin_required, can_edit, _cmd, service_state, page_data):
+def register_routes(app, ctx):
+    login_required = ctx.login_required
+    admin_required = ctx.admin_required
+    can_edit = ctx.can_edit
+    _cmd = ctx._cmd
+    service_state = ctx.service_state
+    page_data = ctx.page_data
 
     @app.route("/system/iptv/add", methods=["POST"])
     @can_edit

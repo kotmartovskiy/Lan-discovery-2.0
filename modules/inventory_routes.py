@@ -24,8 +24,11 @@ def _spawn_inventory_scan():
     return True
 
 
-def register_routes(app):
-    from app import login_required, page_data, _cfg, DB
+def register_routes(app, ctx):
+    login_required = ctx.login_required
+    page_data = ctx.page_data
+    _cfg = ctx._cfg
+    DB = ctx.DB
 
     @app.route("/inventory")
     @login_required

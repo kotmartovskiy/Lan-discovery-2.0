@@ -1,11 +1,23 @@
 {
   "id": "notes",
+  "version": "2.0.0",
   "name": "Заметки",
   "description": "Markdown-заметки с двухпанельным редактором и хранением в БД",
   "builtin": true,
   "type": "app",
   "help": true,
-  "prefixes": ["/apps/notes", "/api/notes"],
-  "app": {"title": "Заметки", "icon": "📝", "category": "Утилиты", "order": 60},
-  "deps": {"apt": [], "ports": []}
+  "prefixes": [
+    "/apps/notes",
+    "/api/notes"
+  ],
+  "app": {
+    "title": "Заметки",
+    "icon": "📝",
+    "category": "Утилиты",
+    "order": 60
+  },
+  "deps": {
+    "apt": [],
+    "ports": []
+  }
 }

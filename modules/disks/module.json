@@ -1,11 +1,27 @@
 {
   "id": "disks",
+  "version": "2.0.0",
+  "capabilities": [
+    "storage"
+  ],
   "name": "Диски",
   "description": "Блочные устройства, S.M.A.R.T., подготовка и клонирование дисков",
   "builtin": true,
   "type": "app",
   "help": true,
-  "prefixes": ["/apps/disks", "/api/disks", "/api/disk"],
-  "app": {"title": "Диски", "icon": "💾", "category": "Система и сеть", "order": 40},
-  "deps": {"apt": [], "ports": []}
+  "prefixes": [
+    "/apps/disks",
+    "/api/disks",
+    "/api/disk"
+  ],
+  "app": {
+    "title": "Диски",
+    "icon": "💾",
+    "category": "Система и сеть",
+    "order": 40
+  },
+  "deps": {
+    "apt": [],
+    "ports": []
+  }
 }

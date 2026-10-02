@@ -383,8 +383,9 @@ def weather_hourly(date_str):
         return []
 
 
-def register_routes(app):
-    from modules.auth import login_required
+def register_routes(app, ctx):
+    login_required = ctx.login_required
+    page_data = ctx.page_data
 
     app.jinja_env.globals["wind_direction_name"] = wind_direction_name
     app.jinja_env.globals["weather_code_name"] = weather_code_name
@@ -394,8 +395,6 @@ def register_routes(app):
     @app.route("/weather")
     @login_required
     def weather():
-        from app import page_data
-
         data = page_data()
 
         current = weather_current()

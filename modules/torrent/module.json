@@ -1,17 +1,34 @@
 {
   "id": "torrent",
+  "version": "2.0.0",
   "name": "Торренты",
   "description": "Встроенный торрент-клиент Transmission: очередь, веб-интерфейс v4, папка /srv/downloads",
   "builtin": true,
   "type": "tab",
   "help": true,
   "url": "/torrent",
-  "prefixes": ["/torrent", "/api/transmission"],
-  "tab": {"title": "Торрент", "order": 40, "group": "Приложения"},
+  "prefixes": [
+    "/torrent",
+    "/api/transmission"
+  ],
+  "tab": {
+    "title": "Торрент",
+    "order": 40,
+    "group": "Приложения"
+  },
   "deps": {
-    "apt": ["transmission-daemon"],
-    "services": ["transmission-daemon"],
-    "dirs": ["/srv/downloads"],
-    "ports": [9091, 51413]
+    "apt": [
+      "transmission-daemon"
+    ],
+    "services": [
+      "transmission-daemon"
+    ],
+    "dirs": [
+      "/srv/downloads"
+    ],
+    "ports": [
+      9091,
+      51413
+    ]
   }
 }

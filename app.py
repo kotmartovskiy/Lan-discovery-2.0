@@ -347,18 +347,43 @@ def _inject_user():
 # ==================== Auth ====================
 
 from modules.auth import register_routes as register_auth_routes
-register_auth_routes(app)
-
-from modules.auth import login_required, admin_required, can_edit
+from modules.auth import (login_required, admin_required, can_edit,
+                          get_current_user, get_current_username)
 import app as _app_module
 _app_module.login_required = login_required
 _app_module.admin_required = admin_required
 _app_module.can_edit = can_edit
 
+# ==================== Uniform module context (PHASE 2.0-15, §19/§24) ========
+# Единая точка зависимостей: assembly root собирает всё, что нужно модулям;
+# контракт — единственная сигнатура register_routes(app, ctx); модули больше
+# не импортируют app (audit §O).
+
+from types import SimpleNamespace
+
+ctx = SimpleNamespace(
+    login_required=login_required,
+    admin_required=admin_required,
+    can_edit=can_edit,
+    get_current_user=get_current_user,
+    get_current_username=get_current_username,
+    page_data=page_data,
+    _cmd=_cmd,
+    _cfg=_cfg,
+    DB=DB,
+    GAMES_DIR=GAMES_DIR,
+    _SERVICE_START=_SERVICE_START,
+    panel_name=panel_name,
+    check_internet_cached=check_internet_cached,
+    weather_current=weather_current,
+)
+
+register_auth_routes(app, ctx)
+
 # ==================== Module system ====================
 
 from modules.module_manager import register_routes as register_module_manager_routes
-register_module_manager_routes(app, login_required, admin_required, page_data)
+register_module_manager_routes(app, ctx)
 
 # ==================== Devices ====================
 
@@ -367,22 +392,22 @@ from modules.devices_routes import (
     start_scan_thread,
     init_db_schema,
 )
-register_devices_routes(app)
+register_devices_routes(app, ctx)
 
 # ==================== Jobs (PHASE 2.0-3) ====================
 
 from modules.jobs_routes import register_routes as register_jobs_routes
-register_jobs_routes(app, login_required, admin_required)
+register_jobs_routes(app, ctx)
 
 # ==================== Automation (PHASE 2.0-13) ====================
 
 from modules.automation_routes import register_routes as register_automation_routes
-register_automation_routes(app)
+register_automation_routes(app, ctx)
 
 # ==================== Weather ====================
 
 from modules.weather_routes import register_routes as register_weather_routes
-register_weather_routes(app)
+register_weather_routes(app, ctx)
 
 # ==================== Currencies ====================
 
@@ -407,33 +432,34 @@ def update_recycling_background():
 # ==================== System ====================
 
 from modules.system_routes import register_routes as register_system_routes, service_state
-register_system_routes(app)
+ctx.service_state = service_state
+register_system_routes(app, ctx)
 
 # ==================== Network ====================
 
 from modules.network_routes import register_routes as register_network_routes
-register_network_routes(app, login_required, admin_required, can_edit, _cmd, _cfg, page_data)
+register_network_routes(app, ctx)
 
 # ==================== Media ====================
 
 from modules.media_routes import register_routes as register_media_routes
-register_media_routes(app, login_required, admin_required, can_edit, _cmd, service_state, page_data)
+register_media_routes(app, ctx)
 
 # ==================== Monitor ====================
 
 from modules.monitoring_routes import register_routes as register_monitoring_routes
-register_monitoring_routes(app)
+register_monitoring_routes(app, ctx)
 
 # ==================== Inventory ====================
 
 from modules.inventory import init_inventory_db
 from modules.inventory_routes import register_routes as register_inventory_routes
-register_inventory_routes(app)
+register_inventory_routes(app, ctx)
 
 # ==================== Core routes ====================
 
 from modules.core_routes import register_routes as register_core_routes
-register_core_routes(app)
+register_core_routes(app, ctx)
 
 
 # ==================== Background tasks ====================

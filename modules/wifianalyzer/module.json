@@ -1,11 +1,26 @@
 {
   "id": "wifianalyzer",
+  "version": "2.0.0",
+  "capabilities": [
+    "network"
+  ],
   "name": "Wi-Fi анализатор",
   "description": "Скан Wi-Fi-сетей: каналы, уровень сигнала (RSSI), шум",
   "builtin": true,
   "type": "app",
   "help": true,
-  "prefixes": ["/apps/wifianalyzer", "/api/wifi"],
-  "app": {"title": "Wi-Fi", "icon": "📡", "category": "Система и сеть", "order": 30},
-  "deps": {"apt": [], "ports": []}
+  "prefixes": [
+    "/apps/wifianalyzer",
+    "/api/wifi"
+  ],
+  "app": {
+    "title": "Wi-Fi",
+    "icon": "📡",
+    "category": "Система и сеть",
+    "order": 30
+  },
+  "deps": {
+    "apt": [],
+    "ports": []
+  }
 }

@@ -1,11 +1,22 @@
 {
   "id": "terminal",
+  "version": "2.0.0",
   "name": "Терминал",
   "description": "Веб-терминал с доступом к командной строке сервера (только admin)",
   "builtin": true,
   "type": "app",
   "help": true,
-  "prefixes": ["/apps/terminal"],
-  "app": {"title": "Терминал", "icon": "💻", "category": "Система и сеть", "order": 10},
-  "deps": {"apt": [], "ports": []}
+  "prefixes": [
+    "/apps/terminal"
+  ],
+  "app": {
+    "title": "Терминал",
+    "icon": "💻",
+    "category": "Система и сеть",
+    "order": 10
+  },
+  "deps": {
+    "apt": [],
+    "ports": []
+  }
 }

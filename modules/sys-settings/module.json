@@ -1,5 +1,6 @@
 {
   "id": "sys-settings",
+  "version": "2.0.0",
   "name": "Настройки",
   "description": "Сеть, местоположение и предупреждения погоды",
   "builtin": true,

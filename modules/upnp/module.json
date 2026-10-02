@@ -1,11 +1,23 @@
 {
   "id": "upnp",
+  "version": "2.0.0",
   "name": "UPnP",
   "description": "UPnP Control Point: рендереры и медиасерверы, управление воспроизведением",
   "builtin": true,
   "type": "app",
   "help": true,
-  "prefixes": ["/apps/upnp", "/api/upnp"],
-  "app": {"title": "UPnP", "icon": "📡", "category": "Система и сеть", "order": 80},
-  "deps": {"apt": [], "ports": []}
+  "prefixes": [
+    "/apps/upnp",
+    "/api/upnp"
+  ],
+  "app": {
+    "title": "UPnP",
+    "icon": "📡",
+    "category": "Система и сеть",
+    "order": 80
+  },
+  "deps": {
+    "apt": [],
+    "ports": []
+  }
 }

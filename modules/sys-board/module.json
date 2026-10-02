@@ -1,5 +1,6 @@
 {
   "id": "sys-board",
+  "version": "2.0.0",
   "name": "X96 Max",
   "description": "Статус платы, uptime, температура и управление сервисами",
   "builtin": true,

@@ -1,5 +1,6 @@
 {
   "id": "sys-network",
+  "version": "2.0.0",
   "name": "Сеть",
   "description": "Интернет, зона RU, провайдер и проверка тестовых адресов",
   "builtin": true,
