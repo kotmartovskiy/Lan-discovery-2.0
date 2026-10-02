@@ -14,6 +14,8 @@ from html import escape as _html_escape
 
 sys.path.insert(0, "/opt/lan-discovery")
 
+from core import storage as core_storage
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
@@ -25,7 +27,7 @@ DB = "/opt/lan-discovery/devices.db"
 SETTINGS_PATH = "/etc/lan-discovery/settings.json"
 USERS_PATH = "/etc/lan-discovery/users.json"
 IPTV_CONFIG = "/etc/lan-discovery/iptv-playlists.json"
-IPTV_DIR = "/srv/media/IPTV"
+IPTV_DIR = core_storage.path("media", "IPTV")
 IPTV_UPDATE_STATUS = "/etc/lan-discovery/iptv-update-status.json"
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "games")
 TRANSMISSION_CONF = "/etc/transmission-daemon/settings.json"

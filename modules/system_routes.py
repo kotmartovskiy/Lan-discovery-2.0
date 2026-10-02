@@ -12,11 +12,11 @@ from core.config import SETTINGS_PATH
 from core import config as core_config, services as core_services, storage as core_storage
 
 DB = "/opt/lan-discovery/devices.db"
-DB_BACKUP_DIR = "/srv/backup-db"
+DB_BACKUP_DIR = core_storage.DB_BACKUP_DIR
 DB_BACKUP_PATTERN = "devices_*.db"
 DISK_REPLACE_SCRIPT = "/opt/lan-discovery/disk_replace.py"
 CLONE_STATE_FILE = "/tmp/lan-discovery-clone.json"
-IPTV_DIR = "/srv/media/IPTV"
+IPTV_DIR = core_storage.path("media", "IPTV")
 IPTV_UPDATE_STATUS = "/etc/lan-discovery/iptv-update-status.json"
 NETWORK_CONFIG = "/etc/lan-discovery/network.json"
 
@@ -1108,49 +1108,6 @@ def _clone_dd_alive():
     return False
 
 
-def _dd_progress_watcher(proc):
-    dev = None
-    try:
-        with open("/proc/%d/cmdline" % proc.pid, "rb") as f:
-            cmd = f.read().replace(b"\0", b" ").decode("utf-8", "replace")
-        m = re.search(r"of=/dev/(mmcblk\d+|sd[a-z])", cmd)
-        if m:
-            dev = m.group(1)
-    except Exception:
-        dev = None
-    if not dev:
-        dev = emmc_device()
-    if not dev:
-        return
-    try:
-        with open(f"/sys/block/{dev}/size", "r", encoding="utf-8") as f:
-            total = int(f.read().strip()) * 512
-    except Exception:
-        return
-
-    if not total:
-        return
-
-    while proc.poll() is None:
-        try:
-            rchar = 0
-            with open("/proc/%d/io" % proc.pid, "r", encoding="utf-8") as f:
-                for line in f:
-                    if line.startswith("rchar:"):
-                        rchar = int(line.split()[1])
-                        break
-            if not _load_clone_state().get("running"):
-                break
-            percent = 5 + int(90 * min(rchar, total) / total)
-            _update_clone_state(
-                percent=percent,
-                text="Копирование eMMC... %d%%" % percent
-            )
-        except Exception:
-            pass
-        time.sleep(3)
-
-
 def _load_clone_state():
     try:
         with open(CLONE_STATE_FILE, "r") as f:
@@ -1867,7 +1824,7 @@ def register_routes(app):
             _boot_device = boot_device
         boot_device = _boot_device
 
-        backup_file = "/srv/backup-system/emmc.img.zst"
+        backup_file = core_storage.EMMC_BACKUP_PATH
 
         def _get_backup_state():
             return service_state("backup-emmc.service")
@@ -2067,7 +2024,7 @@ def register_routes(app):
                 "--property=Type=oneshot",
                 "/usr/bin/zstd",
                 "-t",
-                "/srv/backup-system/emmc.img.zst"
+                core_storage.EMMC_BACKUP_PATH
             ]
         )
 
@@ -2140,7 +2097,7 @@ def register_routes(app):
 
         return jsonify({
             "emmc_running": service_state("backup-emmc.service") in ("active", "activating"),
-            "emmc_ok": backup_file_status("/srv/backup-system/emmc.img.zst") == "ok",
+            "emmc_ok": backup_file_status(core_storage.EMMC_BACKUP_PATH) == "ok",
             "emmc_allowed": emmc_allowed,
             "emmc_reason": emmc_reason,
             "db_running": db_backup_running(),
@@ -2278,24 +2235,18 @@ def register_routes(app):
         sd_dev = "/dev/" + sd_name
         _update_clone_state(running=True, ok=False, error=None, percent=0, started=time.time(), text="Подготовка...")
         def do_clone():
+            # dd + прогресс перенесены в core.storage (PHASE 2.0-7)
             try:
-                _cmd(["sync"], timeout=10)
-                _update_clone_state(percent=5, text="Копирование eMMC...")
-                cmd = ["dd", "if=/dev/" + emmc_name, "of=" + sd_dev, "bs=4M", "status=progress"]
-                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                watcher = threading.Thread(
-                    target=_dd_progress_watcher,
-                    args=(proc,),
-                    daemon=True
+                res = core_storage.clone_disk(
+                    "/dev/" + emmc_name,
+                    sd_dev,
+                    on_progress=lambda p, t: _update_clone_state(percent=p, text=t),
+                    should_continue=lambda: bool(_load_clone_state().get("running")),
                 )
-                watcher.start()
-                _, stderr = proc.communicate(timeout=3600)
-                watcher.join(timeout=10)
-                if proc.returncode == 0:
-                    _cmd(["sync"], timeout=30)
+                if res["ok"]:
                     _update_clone_state(running=False, ok=True, percent=100, text="Готово!")
                 else:
-                    _update_clone_state(running=False, error=stderr[:200] if stderr else "Ошибка dd")
+                    _update_clone_state(running=False, error=res["error"])
             except Exception as e:
                 _update_clone_state(running=False, error=str(e))
         t = threading.Thread(target=do_clone, daemon=True)

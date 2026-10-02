@@ -10,13 +10,14 @@ from datetime import datetime
 
 from flask import request, redirect, url_for, jsonify, render_template
 
+from core import storage
 
 IPTV_CONFIG = "/etc/lan-discovery/iptv-playlists.json"
-IPTV_DIR = "/srv/media/IPTV"
+IPTV_DIR = storage.path("media", "IPTV")
 IPTV_UPDATE_STATUS = "/etc/lan-discovery/iptv-update-status.json"
 ALARM_FILE = "/etc/lan-discovery/alarms.json"
-MEDIA_DIR = "/srv/media"
-PLAYLISTS_DIR = "/srv/media/playlists"
+MEDIA_DIR = storage.path("media")
+PLAYLISTS_DIR = storage.path("media", "playlists")
 AUDIO_EXTS = {".mp3", ".flac", ".wav", ".ogg", ".m4a", ".aac", ".wma", ".opus", ".aiff"}
 CAMERAS_CONFIG = "/etc/lan-discovery/cameras.json"
 TRANSMISSION_URL = "http://localhost:9091/transmission/rpc"
