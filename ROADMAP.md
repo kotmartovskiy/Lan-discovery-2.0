@@ -35,7 +35,7 @@
 | **2.0-16** | System rollback (§26) | preflight→backup→apply→verify→rollback для apt/системных изменений (app-level rollback уже в update.sh) | **DONE (02.10.2026)** |
 | **2.0-17** | Appliance smoke test (§27) | интеграционная цепочка install→…→failure→rollback (на стенде; важнее мелких UI-тестов) | **DONE (03.10.2026)** |
 | **2.0-18** | Installer 2.0 (§25) | preflight + hardware detection + health check, ARM/x86_64/минимальные установки, без платы-специфики | **DONE (03.10.2026)** |
-| **2.0-19** | UI 2.0 shell (§22–24) | Application Shell → Navigation → Module Page, разделы HOME…ADMIN, dashboard-ответы, единые диалоги/уведомления/иконки | pending |
+| **2.0-19** | UI 2.0 shell (§22–24) | Application Shell → Navigation → Module Page, разделы HOME…ADMIN, dashboard-ответы, единые диалоги/уведомления/иконки | **DONE (03.10.2026)** |
 | **2.0-20** | Portability (§30) | Orange Pi, X96 Max, x86_64 — через capabilities, hardware-specific в Hardware Detection | pending |
 | **2.0-21** | Release (§33 Ph.10, §34) | v2.0.0 + guides + документация §29 (CORE_API/MODULES/CAPABILITIES/…) + demo + release notes | pending |
 
@@ -689,3 +689,33 @@
 - Тесты: +3 (tests/unit/test_installer.py). Локально 373 passed
   (2 pre-existing Windows-фейла, 3 Linux-skip); CI после push
   (ожидание 378).
+### 03.10.2026 — PHASE 2.0-19: UI 2.0 shell — **DONE**
+
+- Модель разделов §22 в core/module_loader: SECTIONS (HOME, NETWORK,
+  MONITORING, STORAGE, APPLICATIONS, HARDWARE, SYSTEM, ADMIN) +
+  section-поле у всех пунктов CORE_NAV (включая новый «Главная») +
+  GROUP_TO_SECTION для модульных вкладок (tab.section — аддитивный
+  override, §32); nav_items()/active_section()/nav_sections(),
+  nav_groups(admin, section) — фильтр по разделу (без section — все
+  группы, совместимость тестов §32).
+- Application Shell в base.html: строка разделов (иконки, aria-
+  current, responsive overflow-x) над доменными вкладками; tabs
+  показывают только пункты активного раздела (shell_groups в
+  context_processor + nav_sections/active_section).
+- HOME = dashboard: новый роут "/" (core_routes.home_page) и
+  templates/dashboard.html — 6 ответов §22 (всё ли нормально / что
+  происходит / устройства / jobs / проблемы / предупреждения) через
+  клиентский фетч /api/dashboard + /api/jobs с loading/error states
+  (§23); devices переехал на /devices, после /login → "/" (HOME);
+  /device/<ip> → секция NETWORK.
+- STORAGE: роут "/"-уровня /storage (core_routes.storage_page) на
+  read-only контрактах core.storage (roots/lsblk/df) — третий
+  потребитель storage core; пустое состояние без lsblk/df (§23).
+- §23 компоненты: window.toast() (toast-root, aria-live) +
+  window.confirmDialog() (<dialog>); 3 legacy alert() в base.html
+  заменены на toast (unified notifications); единые иконки разделов.
+- Тесты: +12 (tests/unit/test_shell_20.py: модель §22, активные
+  секции/группы, dashboard 6 ответов, /devices, /storage, компоненты);
+  правки responsive/a11y под /devices (2 места). Локально 385 passed
+  (2 pre-existing Windows-фейла, 3 Linux-skip); CI после push
+  (ожидание 390).
