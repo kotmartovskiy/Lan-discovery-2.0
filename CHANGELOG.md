@@ -8,6 +8,15 @@
 ## [2.0.0] — не выпущена (в разработке)
 
 ### Добавлено
+- **Capabilities 2.0 (PHASE 2.0-1):** `core/capabilities.py` — новые
+  группы `network`/`hardware`/`radio`/`camera`/`media`/`service`
+  (18 capability), в `storage` — `local`/`removable`/`smart`; только
+  read-only пробы (sysfs/proc/dev/PATH): источник недоступен →
+  unknown/unverified, пустой поиск → absent/detected, прочитанное
+  содержимое → value+measured; SDR — по подтверждённым USB ID,
+  subghz при живом SPI → unknown, docker CLI без сокета → unknown;
+  `TOOL_PROBES` += `hostapd`, `docker`; UI `/capabilities` — секции
+  групп (макрос `cap_row`); `/api/capabilities` аддитивно; +20 тестов.
 - **Основа 2.0 (PHASE 2.0-0, 01.10.2026):** репозиторий выделен из
   `Lan-discovery-1.1` с полной историей (remote `upstream-11` для
   cherry-pick); `docs/Спецификация-2.0.md` — входное ТЗ (Universal

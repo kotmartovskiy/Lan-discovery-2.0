@@ -17,7 +17,7 @@
 | Фаза | Название | Состав | Статус |
 |---|---|---|---|
 | **2.0-0** | Foundation | репозиторий 2.0 (клон 1.1, remote `upstream-11`), архив спецификации, архитектурный аудит 1.1, этот ROADMAP, `APP_VERSION=2.0.0`, AGENTS под новый репо | **DONE (01.10.2026)** |
-| **2.0-1** | Capabilities 2.0 | таксономия `network.* / storage.* / hardware.* / radio.* / camera.* / media.* / service.*` поверх `core/capabilities.py` (модель present/absent/unknown × measured/detected/unverified сохраняется); расширение `collect()`; `/api/capabilities` аддитивно; UI `/capabilities` с группировкой; тесты compat-чеков модулей от новых capability | pending |
+| **2.0-1** | Capabilities 2.0 | таксономия `network.* / storage.* / hardware.* / radio.* / camera.* / media.* / service.*` поверх `core/capabilities.py` (модель present/absent/unknown × measured/detected/unverified сохраняется); расширение `collect()`; `/api/capabilities` аддитивно; UI `/capabilities` с группировкой; тесты compat-чеков модулей от новых capability | **DONE (01.10.2026)** |
 | **2.0-2** | Core skeleton + инвентаризация | `core/services.py` (status/start/stop/restart/enable/disable/logs/health), `core/process.py` (безопасный запуск команд), `core/config.py` (settings без зависимости от app); таблица-инвентаризация всех вызовов `subprocess`/`systemctl` (18/13 файлов) с планом переноса; контракты `core/network.py`/`core/storage.py` read-only; первый перенос (1–2 вызова) с тестом | pending |
 | **2.0-3** | Jobs subsystem | `core/jobs.py`: manager + worker-треды, состояния queued/running/completed/failed/cancelled, поля id/type/status/progress/started_at/finished_at/logs/result/error/cancelable; sqlite-таблица `jobs` (retention как у events); `GET /api/jobs` + `POST /api/jobs/<id>/cancel`; UI-виджет активных jobs; миграция на jobs: module install/update, backup/restore БД, network scan | pending |
 | **2.0-4** | Module manifest 2.0 + permissions + trust | схема v2 (capabilities/dependencies/conflicts/services/configuration/role_support + publisher/sha256/min_core_version/max_core_version) — back-compat v1; сетка прав (network/storage/services/process/camera/usb/gpio/serial) в манифесте и UI-запрос при установке; catalog: SHA-256 тарболла из index, trusted sources, core-compat check; без PKI/sandbox (спека §11–12) | pending |
@@ -63,3 +63,27 @@
   работу 1.1 и 2.0.
 - `APP_VERSION` → `2.0.0`, `CHANGELOG.md` → раздел `## [2.0.0]`,
   README — «2.0 (в разработке)».
+
+### 01.10.2026 — PHASE 2.0-1: Capabilities 2.0 — **DONE**
+
+- `core/capabilities.py` — таксономия 2.0 (все пробы read-only,
+  sysfs/proc/dev/PATH): группы `network` (ethernet/wifi/wifi_ap/
+  multiple_interfaces), `hardware` (usb/gpio/uart/rs485/i2c/spi/onewire),
+  `radio` (sdr/subghz), `camera` (usb/ip), `media` (audio/video),
+  `service` (systemd/docker); в `storage` добавлены `local`/`removable`/
+  `smart`. Старые ключи 1.1 — без изменений (аддитивность §5).
+- Правила честности (§0): корень источника недоступен → unknown/unverified;
+  поиск выполнен и пуст → absent/detected; содержимое прочитано →
+  value + measured. SDR — только подтверждённые USB ID (rtl-sdr/hackrf/
+  airspy); subghz при живом SPI → unknown (CC1101 не исключить);
+  docker CLI без сокета → unknown; `camera.ip` — только по конфигу панели
+  (сеть не сканируем); `wifi_ap` требует Wi-Fi-интерфейса + hostapd/конфиг.
+- `TOOL_PROBES` += `hostapd`, `docker` (аддитивно для `/api/health`).
+- UI `/capabilities`: макрос `cap_row`, секции шести групп; `/api/capabilities`
+  — роуты без изменений (аддитивный JSON).
+- Тесты `tests/unit/test_capabilities.py`: таксономия + инварианты
+  достоверности, ~20 новых кейсов (wifi_ap-логика, sdr/subghz/docker/
+  camera.ip/audio/storage.local, `_glob`); `compute_status()` не менялся —
+  manifest `hardware.storage` может требовать `storage.local` бесплатно.
+- Локально (Windows): `collect()` без падений, инварианты чистые,
+  рендер шаблона ок; CI unit — прогнан после push этой фазы.
