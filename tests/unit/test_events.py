@@ -1,10 +1,21 @@
 # -*- coding: utf-8 -*-
-"""Unit: event engine (PHASE 7 / P5-27)."""
+"""Unit: event engine (PHASE 7 / P5-27 + 2.0-12 §16)."""
 import json
 from datetime import datetime, timedelta
 
-from core.events import (EVENT_SEVERITY, add_event, cleanup_old_events,
-                         event_to_dict, list_events, now_ts)
+import pytest
+
+import core.events as ev
+from core.events import (EVENT_SEVERITY, NAMESPACE_EVENTS, add_event,
+                         cleanup_old_events, emit, event_to_dict,
+                         list_events, now_ts, subscribe)
+
+
+@pytest.fixture(autouse=True)
+def _clean_subscribers():
+    """глобальный список подписчиков не течёт между тестами."""
+    yield
+    ev._SUBSCRIBERS.clear()
 
 
 def test_now_ts_format():
@@ -111,3 +122,99 @@ def test_metadata_json_roundtrip(events_con):
     assert d["metadata"] == {"list": [1, 2], "с": "юникод"}
     raw = events_con.execute("SELECT metadata FROM events").fetchone()[0]
     assert json.loads(raw) == d["metadata"]
+
+
+# --- PHASE 2.0-12: namespace-имена, emit/subscribe, dual-read (§16) --------
+
+def test_namespace_events_registered():
+    assert NAMESPACE_EVENTS["device.online"] == "info"
+    assert NAMESPACE_EVENTS["job.failed"] == "critical"
+    assert NAMESPACE_EVENTS["system.error"] == "critical"
+    # namespace-имена видит и старый add_event (severity из той же карты)
+    assert EVENT_SEVERITY["device.offline"] == "warning"
+
+
+def test_emit_strict_name(events_con):
+    with pytest.raises(ValueError):
+        emit("not-a-namespace", con=events_con)
+
+
+def test_emit_persists_strict_name(events_con):
+    payload = emit("job.completed", con=events_con, ip="10.0.0.5",
+                   source="jobs", metadata={"job_id": "a1"})
+    events_con.commit()
+    assert payload["severity"] == "info"
+    d = event_to_dict(list_events(events_con, ip="10.0.0.5")[0])
+    assert d["event"] == "job.completed"
+    assert d["severity"] == "info"
+    assert d["source"] == "jobs"
+    assert d["metadata"] == {"job_id": "a1"}
+
+
+def test_emit_severity_defaults(events_con):
+    assert emit("system.error", con=events_con, ip="10.0.0.6")[
+        "severity"] == "critical"
+    assert emit("device.offline", con=events_con, ip="10.0.0.6")[
+        "severity"] == "warning"
+    # явный severity перебивает канонический
+    assert emit("job.failed", con=events_con, ip="10.0.0.6",
+                severity="warning")["severity"] == "warning"
+    events_con.commit()
+    sev = [r[6] for r in
+           list_events(events_con, ip="10.0.0.6")]
+    assert sev == ["warning", "warning", "critical"]  # новые первыми
+
+
+def test_emit_subscribe_unsubscribe(events_con):
+    seen = []
+    unsub = subscribe(lambda p: seen.append(p["name"]))
+    emit("camera.motion", con=events_con, ip="10.0.0.8")
+    events_con.commit()
+    assert seen == ["camera.motion"]
+    # payload полон для Automation (§17)
+    unsub()
+    emit("camera.motion", con=events_con, ip="10.0.0.8")
+    events_con.commit()
+    assert seen == ["camera.motion"]
+
+
+def test_emit_payload_shape(events_con):
+    got = []
+    subscribe(got.append)
+    emit("network.link_down", con=events_con, ip="10.0.0.7",
+         source="monitoring", metadata={"iface": "eth0"})
+    events_con.commit()
+    p = got[0]
+    assert set(p) == {"name", "ip", "hostname", "mac", "severity",
+                      "source", "metadata", "timestamp"}
+    assert p["name"] == "network.link_down"
+    assert p["severity"] == "warning"
+    assert p["metadata"] == {"iface": "eth0"}
+
+
+def test_emit_survives_broken_subscriber(events_con):
+    def boom(p):
+        raise RuntimeError("boom")
+
+    subscribe(boom)
+    emit("system.warning", con=events_con, ip="10.0.0.9")
+    events_con.commit()
+    # событие записано несмотря на сломанного подписчика
+    assert list_events(events_con, ip="10.0.0.9")[0][5] == "system.warning"
+
+
+def test_list_events_dual_read_aliases(events_con):
+    add_event(events_con, "10.0.0.1", event="ONLINE")
+    add_event(events_con, "10.0.0.2", event="device.online")
+    add_event(events_con, "10.0.0.3", event="OFFLINE")
+    events_con.commit()
+    # legacy-фильтр видит namespace-события и наоборот (и только свои)
+    assert len(list_events(events_con, event="ONLINE")) == 2
+    assert len(list_events(events_con, event="device.online")) == 2
+    assert len(list_events(events_con, event="OFFLINE")) == 1
+    assert len(list_events(events_con, event="device.offline")) == 1
+    # события без алиаса не смешиваются
+    add_event(events_con, "10.0.0.4", event="job.started")
+    events_con.commit()
+    assert len(list_events(events_con, event="job.started")) == 1
+    assert len(list_events(events_con, event="ONLINE")) == 2

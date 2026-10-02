@@ -37,7 +37,12 @@ def client(monkeypatch):
 
 @pytest.fixture()
 def jobs_db(tmp_path, monkeypatch):
-    """Глобальный manager на изолированной sqlite + чистое состояние."""
+    """Глобальный manager на изолированной sqlite + чистое состояние.
+
+    PHASE 2.0-12: события job.* пишутся в core.db.DB — патчим и его,
+    чтобы emit() шёл в tmp, а не в /opt (Windows-окружение).
+    """
+    from core import db as core_db
     m = core_jobs.manager
     db = str(tmp_path / "jobs.db")
     monkeypatch.setattr(m, "_db_path_cfg", db)
@@ -45,6 +50,8 @@ def jobs_db(tmp_path, monkeypatch):
     monkeypatch.setattr(m, "_jobs", {})
     monkeypatch.setattr(m, "_events", {})
     monkeypatch.setattr(m, "_retention_cfg", 0)
+    monkeypatch.setattr(core_db, "DB", str(tmp_path / "events.db"))
+    monkeypatch.setattr(core_db, "_init_done", False)
     return db
 
 
@@ -432,3 +439,57 @@ def test_widget_markup_present():
     assert 'id="jobs-widget"' in html
     assert "/api/jobs?limit=" in html
     assert "data-job-cancel" in html
+
+
+# --- события §16 (PHASE 2.0-12): потребитель job.* ------------------------
+
+def test_job_emits_namespace_events(jobs_db):
+    """job.started/completed пишутся в events (namespace §16)."""
+    from core import db as core_db
+
+    jid = core_jobs.submit("t-ns", lambda ctx: {"ok": 1})
+    assert core_jobs.wait(jid, timeout=5) == "completed"
+    con = sqlite3.connect(core_db.DB)
+    try:
+        rows = [r[0] for r in con.execute(
+            "SELECT event FROM events ORDER BY id")]
+        meta = con.execute(
+            "SELECT metadata FROM events WHERE event='job.completed'"
+        ).fetchone()[0]
+    finally:
+        con.close()
+    assert rows == ["job.started", "job.completed"]
+    assert '"job_type": "t-ns"' in meta
+
+
+def test_job_failed_emits_critical(jobs_db):
+    from core import db as core_db
+
+    def boom(ctx):
+        raise RuntimeError("boom")
+
+    jid = core_jobs.submit("t-fail", boom)
+    assert core_jobs.wait(jid, timeout=5) == "failed"
+    con = sqlite3.connect(core_db.DB)
+    try:
+        rows = {r[0]: r[1] for r in con.execute(
+            "SELECT event, severity FROM events ORDER BY id")}
+    finally:
+        con.close()
+    assert rows.get("job.failed") == "critical"
+    assert "job.completed" not in rows
+
+
+def test_job_emit_subscriber(jobs_db):
+    """Фундамент Automation (§17): подписчик видит жизненный цикл."""
+    from core import events as core_events
+
+    seen = []
+    unsub = core_events.subscribe(lambda p: seen.append(p["name"]))
+    try:
+        jid = core_jobs.submit("t-sub", lambda ctx: None)
+        assert core_jobs.wait(jid, timeout=5) == "completed"
+    finally:
+        unsub()
+    assert "job.started" in seen
+    assert "job.completed" in seen

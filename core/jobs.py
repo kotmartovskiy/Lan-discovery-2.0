@@ -151,6 +151,9 @@ class Job:
         self.cancelable = bool(cancelable)
         self._fn = None
         self._manager = manager
+        # финализация = persist + job.* событие выполнены; wait() возвращает
+        # терминальный статус ТОЛЬКО после неё (read-after-wait, §16)
+        self._finalized = False
 
     def add_log(self, msg):
         self.logs.append(str(msg))
@@ -223,6 +226,8 @@ def _row_to_job(row):
     j.result = _parse_json(row[9], None)
     j.error = row[10]
     j.cancelable = bool(row[11])
+    # строка в БД уже persisted — финализирована
+    j._finalized = True
     return j
 
 
@@ -354,6 +359,19 @@ class JobManager:
         threading.Thread(target=_run, daemon=True,
                          name="lan-jobs-cleanup").start()
 
+    # --- события §16 (PHASE 2.0-12) -----------------------------------------
+
+    def _emit_job(self, name, job):
+        """job.* namespace-событие: best-effort, не роняет задачу."""
+        from core import events as core_events
+        meta = {"job_id": job.id, "job_type": job.type}
+        if job.error:
+            meta["error"] = job.error
+        try:
+            core_events.emit(name, source="jobs", metadata=meta)
+        except Exception as e:
+            log.error("JOBS emit %s %s: %s", name, job.id, e)
+
     # --- submit / workers ---------------------------------------------------
 
     def submit(self, job_type, fn, *, cancelable=False, meta=None):
@@ -406,6 +424,7 @@ class JobManager:
             job.started_at = now_ts()
             event = self._events.get(jid)
         self._persist(job)
+        self._emit_job("job.started", job)
 
         ctx = JobContext(job, event)
         try:
@@ -432,6 +451,13 @@ class JobManager:
         # persist до ev.set(): wait() возвращает управление только когда
         # строка уже в sqlite (read-after-wait не видит status=running)
         self._persist(job)
+        self._emit_job(
+            {"completed": "job.completed", "failed": "job.failed",
+             "cancelled": "job.cancelled"}.get(job.status, "job.completed"),
+            job,
+        )
+        with self._lock:
+            job._finalized = True
         if ev:
             ev.set()
 
@@ -451,6 +477,8 @@ class JobManager:
                 job.finished_at = now_ts()
                 ev = self._events.get(jid)
                 self._persist(job)
+                self._emit_job("job.cancelled", job)
+                job._finalized = True
                 if ev:
                     ev.set()
                 return {"ok": True, "status": "cancelled"}
@@ -521,14 +549,19 @@ class JobManager:
         return out[:limit]
 
     def wait(self, jid, timeout=10.0, interval=0.02):
-        """Дождаться терминального статуса; None — таймаут/не найдено."""
+        """Дождаться терминального статуса; None — таймаут/не найдено.
+
+        Терминальный статус возвращается только после финализации
+        (persist + job.* событие) — read-after-wait видит строку в sqlite
+        и события в events (§16).
+        """
         deadline = time.time() + timeout
         while True:
             with self._lock:
                 job = self._jobs.get(jid)
                 if job is None:
                     return None
-                if job.status in TERMINAL:
+                if job.status in TERMINAL and job._finalized:
                     return job.status
                 if time.time() >= deadline:
                     return None
