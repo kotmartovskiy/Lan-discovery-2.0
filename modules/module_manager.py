@@ -18,6 +18,7 @@ import urllib.parse
 from flask import jsonify, redirect, render_template, request
 
 from core import jobs
+from core import manifest as manifest_mod
 from core.module_catalog import (
     CatalogError,
     catalog_module_ids,
@@ -197,6 +198,8 @@ def register_routes(app, login_required, admin_required, page_data):
             local_ids={m["id"] for m in discover_modules()},
             cat_ok=request.args.get("ok") or "",
             cat_err=request.args.get("err") or "",
+            perm_text=manifest_mod.install_confirm_text,
+            perm_info=manifest_mod.permission_info,
             **page_data(),
         )
 

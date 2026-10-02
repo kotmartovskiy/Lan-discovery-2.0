@@ -66,6 +66,11 @@
       {% if cm.id in local_ids and cm.id not in catalog_ids %}<span class="badge badge-none">уже есть локально</span>{% endif %}
     </div>
     <p class="mod-desc">{{ cm.description }}</p>
+    {% if cm.permissions %}<div class="mod-deps">
+      {% for p in cm.permissions %}{% set pi = perm_info(p) %}
+      <span title="{{ (p ~ ' — ' ~ pi[1]) if pi else p }}">{{ pi[0] if pi else p }}</span>
+      {% endfor %}
+    </div>{% endif %}
     <div class="mod-actions">
       {% if cm.id in catalog_ids %}
       <form method="post" action="/modules/{{ cm.id }}/catalog/update">
@@ -78,7 +83,9 @@
         <button>Удалить</button>
       </form>
       {% elif cm.id not in local_ids %}
-      <form method="post" action="/modules/{{ cm.id }}/catalog/install">
+      {% set cct = perm_text(cm) %}
+      <form method="post" action="/modules/{{ cm.id }}/catalog/install"
+            {% if cct %}onsubmit='return confirm({{ cct|tojson }})'{% endif %}>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="primary">Установить</button>
       </form>
@@ -124,7 +131,9 @@
     {% for p in hw.get('arch') or [] %}<span>hw arch: {{ p }}</span>{% endfor %}
     {% for p in hw.get('tools') or [] %}<span>hw tool: {{ p }}</span>{% endfor %}
     {% for p in hw.get('storage') or [] %}<span>hw storage: {{ p }}</span>{% endfor %}
-    {% for p in it.m.permissions or [] %}<span>perm: {{ p }}</span>{% endfor %}
+    {% for p in it.m.permissions or [] %}{% set pi = perm_info(p) %}
+    <span title="{{ (p ~ ' — ' ~ pi[1]) if pi else p }}">{{ pi[0] if pi else p }}{% if pi %} ({{ p }}){% endif %}</span>
+    {% endfor %}
   </div>
   {% endif %}
   {% if it.last %}
@@ -136,7 +145,9 @@
   {% endif %}
   <div class="mod-actions">
     {% if (deps.get('apt') or deps.get('pip') or deps.get('services') or deps.get('dirs')) %}
-    <form method="post" action="/modules/{{ it.m.id }}/install">
+    {% set mct = perm_text(it.m) %}
+    <form method="post" action="/modules/{{ it.m.id }}/install"
+          {% if mct %}onsubmit='return confirm({{ mct|tojson }})'{% endif %}>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="primary">Установить зависимости</button>
     </form>
