@@ -18,7 +18,7 @@
 |---|---|---|---|
 | **2.0-0** | Foundation | репозиторий 2.0 (клон 1.1, remote `upstream-11`), архив спецификации, архитектурный аудит 1.1, этот ROADMAP, `APP_VERSION=2.0.0`, AGENTS под новый репо | **DONE (01.10.2026)** |
 | **2.0-1** | Capabilities 2.0 | таксономия `network.* / storage.* / hardware.* / radio.* / camera.* / media.* / service.*` поверх `core/capabilities.py` (модель present/absent/unknown × measured/detected/unverified сохраняется); расширение `collect()`; `/api/capabilities` аддитивно; UI `/capabilities` с группировкой; тесты compat-чеков модулей от новых capability | **DONE (01.10.2026)** |
-| **2.0-2** | Core skeleton + инвентаризация | `core/services.py` (status/start/stop/restart/enable/disable/logs/health), `core/process.py` (безопасный запуск команд), `core/config.py` (settings без зависимости от app); таблица-инвентаризация всех вызовов `subprocess`/`systemctl` (18/13 файлов) с планом переноса; контракты `core/network.py`/`core/storage.py` read-only; первый перенос (1–2 вызова) с тестом | pending |
+| **2.0-2** | Core skeleton + инвентаризация | `core/services.py` (status/start/stop/restart/enable/disable/logs/health), `core/process.py` (безопасный запуск команд), `core/config.py` (settings без зависимости от app); таблица-инвентаризация всех вызовов `subprocess`/`systemctl` (18/13 файлов) с планом переноса; контракты `core/network.py`/`core/storage.py` read-only; первый перенос (1–2 вызова) с тестом | **DONE (01.10.2026)** |
 | **2.0-3** | Jobs subsystem | `core/jobs.py`: manager + worker-треды, состояния queued/running/completed/failed/cancelled, поля id/type/status/progress/started_at/finished_at/logs/result/error/cancelable; sqlite-таблица `jobs` (retention как у events); `GET /api/jobs` + `POST /api/jobs/<id>/cancel`; UI-виджет активных jobs; миграция на jobs: module install/update, backup/restore БД, network scan | pending |
 | **2.0-4** | Module manifest 2.0 + permissions + trust | схема v2 (capabilities/dependencies/conflicts/services/configuration/role_support + publisher/sha256/min_core_version/max_core_version) — back-compat v1; сетка прав (network/storage/services/process/camera/usb/gpio/serial) в манифесте и UI-запрос при установке; catalog: SHA-256 тарболла из index, trusted sources, core-compat check; без PKI/sandbox (спека §11–12) | pending |
 | **2.0-5** | Roles 2.0 | `roles/<id>.json` манифесты (required_modules/optional_modules/capabilities/hardware_requirements/dependencies/conflicts/recommended_configuration/security_profile); загрузчик в `core/roles.py`, compat через `compute_status()`/capabilities; роли-примеры: Network Gateway, Home Server, Remote Site, Industrial Gateway, Network Diagnostic Box, Camera Gateway (SDR — ждём хвост спеки); apply/API не ломаем (ALWAYS_ON сохраняется) | pending |
@@ -87,3 +87,36 @@
   manifest `hardware.storage` может требовать `storage.local` бесплатно.
 - Локально (Windows): `collect()` без падений, инварианты чистые,
   рендер шаблона ок; CI unit — прогнан после push этой фазы.
+
+### 01.10.2026 — PHASE 2.0-2: Core skeleton + инвентаризация — **DONE**
+
+- `core/process.py` — единственная точка запуска команд: `run()`
+  (список аргументов, timeout, utf-8, CompletedProcess) и `out()`
+  («stdout.strip() или ""», стиль `_cmd`).
+- `core/services.py` — facade systemd (спека §8): `status/control/
+  start/stop/restart/enable/disable/health/logs`; ответы — словари без
+  исключений (кроме `ValueError` на неверный action), таймаут →
+  `{"ok": False, "timeout": True}`.
+- `core/config.py` — единый источник `settings.json` (путь, кэш 10 с,
+  атомарный `save`, `get` в стиле `_cfg`) без зависимости от app.
+- Контракты read-only: `core/network.py:physical_ifaces()` (спека §5,
+  транзакционность — в 2.0-6), `core/storage.py:lsblk_text/df_text/
+  smart_report()` (спека §6, полный Storage Core — в 2.0-7).
+- **Инвентаризация** `docs/Инвентаризация-core-2.0.md`: 71 прямой вызов
+  в 13 файлах (11 runtime + remote_edit/restore_server), systemctl — в
+  9 py-файлах; план переноса по файлам и фазам (2.0-3 — обёртки и
+  status/journalctl; 2.0-6 — nettools/wifi; 2.0-7 — clone; вне core —
+  recovery/dev/Popen-проигрыватели).
+- **Первый перенос (5 точек, с тестами)** — все JSON-контракты роутов
+  сохранены: `_check_service` → `core.services.status`;
+  `/api/service/<svc>/<action>` → `core.services.control` (400/500/504
+  как раньше); `/api/disks` → `core.storage.*`;
+  `capabilities._net_ifaces` → `core.network.physical_ifaces` (убрано
+  дублирование sysfs из 1.1); `system_routes.load_settings` →
+  `core.config.load`.
+- Тесты: `tests/unit/test_core_layer.py` — 20 кейсов (процесс:
+  реальный запуск/таймаут/shell; services: status/control/timeout/health/
+  роут-контракты; config: roundtrip/corrupt/delegation; network: fake
+  sysfs-дерево; storage: контракт + `/api/disks`).
+- Локальный смоук (Windows): все модули без исключений (`unknown`/
+  `absent` при отсутствии systemctl/sysfs), инварианты `collect()` чистые.

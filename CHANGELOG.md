@@ -8,6 +8,16 @@
 ## [2.0.0] — не выпущена (в разработке)
 
 ### Добавлено
+- **Core skeleton (PHASE 2.0-2):** `core/process.py` (единый запуск
+  команд: timeout, utf-8, `run`/`out`), `core/services.py` (facade
+  systemd: status/control/health/logs — таймаут и ошибки без исключений),
+  `core/config.py` (settings.json без app: кэш 10 с, атомарная запись);
+  read-only-контракты `core/network.py` (`physical_ifaces`) и
+  `core/storage.py` (`lsblk_text`/`df_text`/`smart_report`);
+  `docs/Инвентаризация-core-2.0.md` — 71 вызов/13 файлов + план
+  переноса; первый перенос 5 точек (статус служб, `/api/service/…`,
+  `/api/disks`, сетевые интерфейсы capabilities, чтение settings) без
+  изменения JSON-контрактов; +20 тестов (`test_core_layer.py`).
 - **Capabilities 2.0 (PHASE 2.0-1):** `core/capabilities.py` — новые
   группы `network`/`hardware`/`radio`/`camera`/`media`/`service`
   (18 capability), в `storage` — `local`/`removable`/`smart`; только
