@@ -40,9 +40,10 @@ def test_priority_tables_col_scope(client, devices_db):
     html = client.get("/history").get_data(as_text=True)
     assert html.count('<th scope="col">') == 6
     assert "<th>" not in html
-    home = client.get("/").get_data(as_text=True)
-    assert home.count('<th scope="col">') >= 6
-    assert "<th>" not in home
+    # 2.0-19: devices переехал на /devices (HOME = dashboard §22)
+    devices = client.get("/devices").get_data(as_text=True)
+    assert devices.count('<th scope="col">') >= 6
+    assert "<th>" not in devices
 
 
 def test_style_a11y_rules():

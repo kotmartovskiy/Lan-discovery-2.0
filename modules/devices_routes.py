@@ -36,7 +36,7 @@ def register_routes(app, ctx):
     page_data = ctx.page_data
     _cfg = ctx._cfg
 
-    @app.route("/")
+    @app.route("/devices")
     @login_required
     def index():
 

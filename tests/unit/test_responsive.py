@@ -37,7 +37,8 @@ def test_login_template_has_viewport():
 
 
 def test_priority_pages_table_wrap(client, devices_db):
-    for path in ("/", "/history"):
+    # 2.0-19: devices переехал на /devices (HOME = dashboard §22)
+    for path in ("/devices", "/history"):
         html = client.get(path).get_data(as_text=True)
         assert 'class="table-wrap"' in html, "нет table-wrap на %s" % path
 

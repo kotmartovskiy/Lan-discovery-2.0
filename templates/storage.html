@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="page-title">Хранилище</h1>
+<p class="info">Раздел STORAGE: корни Storage Core (§7) и состояние дисков.</p>
+
+<div class="dash-grid">
+
+  <section class="dash-card" aria-labelledby="st-roots-h">
+    <h2 id="st-roots-h" class="dash-card-h">Корни</h2>
+    <ul class="dash-list">
+    {% for name, path in storage.roots.items() %}
+      <li><strong>{{ name }}</strong> — <code>{{ path }}</code></li>
+    {% endfor %}
+    </ul>
+  </section>
+
+  <section class="dash-card" aria-labelledby="st-df-h">
+    <h2 id="st-df-h" class="dash-card-h">Заполненность (df)</h2>
+    {% if storage.df %}
+    <pre class="table-pre">{{ storage.df }}</pre>
+    {% else %}
+    <p class="dash-sub">{{ storage.df_error or "Данные недоступны на этой системе" }}</p>
+    {% endif %}
+  </section>
+
+  <section class="dash-card" aria-labelledby="st-lsblk-h">
+    <h2 id="st-lsblk-h" class="dash-card-h">Диски и монтирования</h2>
+    {% if storage.lsblk %}
+    <pre class="table-pre">{{ storage.lsblk }}</pre>
+    {% else %}
+    <p class="dash-sub">{{ storage.lsblk_error or "lsblk недоступен на этой системе" }}</p>
+    {% endif %}
+  </section>
+
+</div>
+{% endblock %}

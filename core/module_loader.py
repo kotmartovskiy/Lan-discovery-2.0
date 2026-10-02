@@ -46,18 +46,46 @@ MODULES_DIR = os.path.join(_CORE_DIR, "modules")
 # runtime state (§20): путь — единый справочник core.config
 STATE_PATH = config.MODULES_STATE_PATH
 
-# Ядро: всегда в навигации, не выключается. group — доменная группа (STEP 3).
+# Разделы Application Shell (Спецификация §22): HOME…ADMIN.
+# (key, имя, иконка, url раздела); url — первый пункт раздела.
+SECTIONS = [
+    ("home", "HOME", "🏠", "/"),
+    ("network", "NETWORK", "🌐", "/devices"),
+    ("monitoring", "MONITORING", "📊", "/history"),
+    ("storage", "STORAGE", "💾", "/storage"),
+    ("applications", "APPLICATIONS", "🧩", "/apps"),
+    ("hardware", "HARDWARE", "🔧", "/capabilities"),
+    ("system", "SYSTEM", "⚙️", "/system"),
+    ("admin", "ADMIN", "🛡", "/modules"),
+]
+SECTION_ORDER = [s[0] for s in SECTIONS]
+
+# Старые доменные группы → разделы (для модульных вкладок без tab.section;
+# §32: поле tab.section в манифесте — аддитивный override).
+GROUP_TO_SECTION = {
+    "Устройства": "network",
+    "Мониторинг": "monitoring",
+    "Приложения": "applications",
+    "Система": "system",
+    "Помощь": "system",
+    "Прочее": "system",
+}
+
+# Ядро: всегда в навигации, не выключается. group — доменная группа (STEP 3),
+# section — раздел Application Shell (§22).
 CORE_NAV = [
-    {"page": "devices", "title": "Устройства", "url": "/", "order": 10, "group": "Устройства"},
-    {"page": "history", "title": "История", "url": "/history", "order": 35, "group": "Мониторинг"},
-    {"page": "apps", "title": "Приложения", "url": "/apps", "order": 70, "group": "Приложения"},
-    {"page": "system", "title": "Система", "url": "/system", "order": 80, "group": "Система"},
-    {"page": "capabilities", "title": "Возможности", "url": "/capabilities", "order": 82, "group": "Система"},
-    {"page": "roles", "title": "Роли", "url": "/roles", "order": 84, "group": "Система", "admin": True},
-    {"page": "modules", "title": "Модули", "url": "/modules", "order": 85, "group": "Система", "admin": True},
-    {"page": "automation", "title": "Automation", "url": "/automation", "order": 86, "group": "Система", "admin": True},
-    {"page": "about", "title": "О системе", "url": "/about", "order": 90, "group": "Система"},
-    {"page": "help", "title": "Справка", "url": "/help", "order": 100, "group": "Помощь"},
+    {"page": "home", "title": "Главная", "url": "/", "order": 5, "group": "HOME", "section": "home"},
+    {"page": "devices", "title": "Устройства", "url": "/devices", "order": 10, "group": "Устройства", "section": "network"},
+    {"page": "history", "title": "История", "url": "/history", "order": 35, "group": "Мониторинг", "section": "monitoring"},
+    {"page": "apps", "title": "Приложения", "url": "/apps", "order": 70, "group": "Приложения", "section": "applications"},
+    {"page": "storage", "title": "Хранилище", "url": "/storage", "order": 75, "group": "Приложения", "section": "storage"},
+    {"page": "system", "title": "Система", "url": "/system", "order": 80, "group": "Система", "section": "system"},
+    {"page": "capabilities", "title": "Возможности", "url": "/capabilities", "order": 82, "group": "Система", "section": "hardware"},
+    {"page": "roles", "title": "Роли", "url": "/roles", "order": 84, "group": "Система", "section": "admin", "admin": True},
+    {"page": "modules", "title": "Модули", "url": "/modules", "order": 85, "group": "Система", "section": "admin", "admin": True},
+    {"page": "automation", "title": "Automation", "url": "/automation", "order": 86, "group": "Система", "section": "admin", "admin": True},
+    {"page": "about", "title": "О системе", "url": "/about", "order": 90, "group": "Система", "section": "system"},
+    {"page": "help", "title": "Справка", "url": "/help", "order": 100, "group": "Помощь", "section": "system"},
 ]
 
 # Порядок доменных групп в шапке (пункты без known-группы уходят в «Прочее» в конец).
@@ -332,6 +360,14 @@ def modules_with_status():
     return rows
 
 
+def section_for(item):
+    """Раздел Application Shell (§22) для пункта навигации."""
+    sec = item.get("section")
+    if sec in SECTION_ORDER:
+        return sec
+    return GROUP_TO_SECTION.get(item.get("group") or "", "system")
+
+
 def nav_items():
     items = list(CORE_NAV)
     for m in discover_modules():
@@ -344,15 +380,23 @@ def nav_items():
                 "url": m.get("url", "/"),
                 "order": int(tab.get("order", 500)),
                 "group": tab.get("group") or "Прочее",
+                "section": tab.get("section"),
                 "module": m["id"],
             })
-    return sorted(items, key=lambda x: x["order"])
+    out = []
+    for it in items:
+        it = dict(it)
+        it["section"] = section_for(it)
+        out.append(it)
+    return sorted(out, key=lambda x: x["order"])
 
 
-def nav_groups(admin=False):
+def nav_groups(admin=False, section=None):
     """Доменные группы навигации: [{name, entries}] (порядок — NAV_GROUP_ORDER).
 
     admin=False скрывает пункты с флагом admin (например, «Модули»).
+    section — только пункты этого раздела Application Shell (§22);
+    None — все группы (совместимость: тесты и страницы вне разделов).
     Ключ entries, а не items: в Jinja словарь с ключом "items" конфликтует
     с методом dict.items (attempts lookup атрибута первым).
     """
@@ -360,11 +404,54 @@ def nav_groups(admin=False):
     for it in nav_items():
         if it.get("admin") and not admin:
             continue
+        if section is not None and it.get("section") != section:
+            continue
         buckets.setdefault(it.get("group") or "Прочее", []).append(it)
     out = [{"name": name, "entries": buckets.pop(name)}
            for name in NAV_GROUP_ORDER if buckets.get(name)]
     out += [{"name": name, "entries": entries} for name, entries in sorted(buckets.items())]
     return out
+
+
+def nav_sections(admin=False, path="/"):
+    """Разделы Application Shell (§22): [{key, name, icon, url, active}].
+
+    Разделы без пунктов (нет страниц) не показываются; активный раздел
+    определяется по пути запроса (active_section).
+    """
+    items = [it for it in nav_items()
+             if not (it.get("admin") and not admin)]
+    active = active_section(path, items=items)
+    out = []
+    for key, name, icon, url in SECTIONS:
+        sec_items = [it for it in items if it.get("section") == key]
+        if not sec_items:
+            continue
+        out.append({
+            "key": key,
+            "name": name,
+            "icon": icon,
+            "url": url,
+            "active": key == active,
+        })
+    return out
+
+
+def active_section(path, items=None):
+    """Ключ раздела (§22) активного по пути запроса ('' — вне разделов)."""
+    if path == "/":
+        return "home"
+    if items is None:
+        items = nav_items()
+    for it in items:
+        url = it["url"]
+        if url == "/" and path == "/":
+            return it.get("section") or ""
+        elif path == url or path.startswith(url + "/"):
+            return it.get("section") or ""
+    if path.startswith("/device"):  # /device/<ip> живёт в NETWORK
+        return "network"
+    return ""
 
 
 def active_page(path):
@@ -378,6 +465,8 @@ def active_page(path):
                 return it["page"]
         elif path == url or path.startswith(url + "/"):
             return it["page"]
+    if path.startswith("/device/"):
+        return "devices"
     return ""
 
 

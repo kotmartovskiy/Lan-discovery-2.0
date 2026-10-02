@@ -59,8 +59,16 @@
 <circle cx="50" cy="30" r="3" fill="#ffcc02"/>
 </svg>LAN Discovery{% if panel_name %} <span style="font-size:0.5em;font-weight:normal;opacity:0.7;">({{ panel_name }})</span>{% endif %}</h1>
 
+<nav class="sections" aria-label="Разделы приложения">
+{% for s in nav_sections %}
+<a href="{{ s.url }}" class="section{{ ' active' if s.active else '' }}"{% if s.active %} aria-current="page"{% endif %}>
+<span class="section-ico" aria-hidden="true">{{ s.icon }}</span>{{ s.name }}
+</a>
+{% endfor %}
+</nav>
+
 <nav class="tabs" aria-label="Разделы панели">
-{% for g in nav_groups %}
+{% for g in shell_groups %}
 <span class="nav-group">
 <span class="nav-group-label">{{ g.name }}</span>
 <span class="nav-group-items">
@@ -703,7 +711,7 @@ function diskPowerOff() {
                 "</div></div>";
         })
         .catch(() => {
-            alert("Команда на выключение отправлена. Отключите кабель питания вручную.");
+            toast("Команда на выключение отправлена. Отключите кабель питания вручную.", "info", 8000);
         });
 }
 
@@ -896,9 +904,10 @@ async function controlService(service, action) {
 
     } catch (error) {
 
-        alert(
+        toast(
             "Не удалось выполнить операцию: " +
-            error.message
+            error.message,
+            "error"
         );
     }
 }
@@ -1009,9 +1018,10 @@ async function toggleSambaGuest() {
 
     } catch (error) {
 
-        alert(
+        toast(
             "Не удалось изменить гостевой доступ: " +
-            error.message
+            error.message,
+            "error"
         );
     }
 }
@@ -1771,6 +1781,46 @@ CPU --°C · RAM --% · eMMC --% · HDD --% · ↓ -- · ↑ --
     poll();
     setInterval(poll, 4000);
 })();
+</script>
+
+<!-- Единые уведомления и диалоги (Спецификация §23) -->
+<div id="toast-root" class="toast-root" role="status" aria-live="polite"></div>
+<dialog id="confirm-dialog" class="confirm-dialog">
+<form method="dialog">
+<h3 id="confirm-dialog-title">Подтверждение</h3>
+<p id="confirm-dialog-text"></p>
+<div class="confirm-actions">
+<button value="cancel" class="btn">Отмена</button>
+<button value="ok" class="btn btn-primary">OK</button>
+</div>
+</form>
+</dialog>
+<script>
+window.toast = function (msg, type, ttl) {
+    var root = document.getElementById("toast-root");
+    if (!root) return;
+    var el = document.createElement("div");
+    el.className = "toast toast-" + (type || "info");
+    el.textContent = msg;
+    root.appendChild(el);
+    setTimeout(function () { el.classList.add("toast-out"); }, ttl || 5000);
+    setTimeout(function () { el.remove(); }, (ttl || 5000) + 500);
+};
+window.confirmDialog = function (text, title) {
+    var dlg = document.getElementById("confirm-dialog");
+    if (!dlg || typeof dlg.showModal !== "function") {
+        return Promise.resolve(window.confirm(text));
+    }
+    document.getElementById("confirm-dialog-title").textContent = title || "Подтверждение";
+    document.getElementById("confirm-dialog-text").textContent = text;
+    return new Promise(function (resolve) {
+        dlg.addEventListener("close", function handler() {
+            dlg.removeEventListener("close", handler);
+            resolve(dlg.returnValue === "ok");
+        });
+        dlg.showModal();
+    });
+};
 </script>
 
 </body>

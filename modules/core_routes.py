@@ -401,6 +401,33 @@ def register_routes(app, ctx):
     def apps_page():
         return render_template("apps.html", **page_data())
 
+    # --- HOME (§22): dashboard Application Shell ---
+
+    @app.route("/")
+    @login_required
+    def home_page():
+        return render_template("dashboard.html", **page_data())
+
+    # --- STORAGE (§22): read-only контракты core.storage ---
+
+    @app.route("/storage")
+    @login_required
+    def storage_page():
+        from core import storage as core_storage
+        data = {"roots": core_storage.ROOTS, "lsblk": "", "df": "",
+                "lsblk_error": "", "df_error": ""}
+        try:
+            out = core_storage.lsblk_text()
+            data["lsblk"] = out.strip()
+        except Exception as e:
+            data["lsblk_error"] = str(e)
+        try:
+            out = core_storage.df_text()
+            data["df"] = out.strip()
+        except Exception as e:
+            data["df_error"] = str(e)
+        return render_template("storage.html", storage=data, **page_data())
+
     # --- App pages ---
 
     @app.route("/torrent")

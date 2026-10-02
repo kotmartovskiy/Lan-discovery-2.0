@@ -179,7 +179,7 @@ def register_routes(app, ctx):
                     u["password_hash"] = _hash(password)
                     users[username] = u
                     save_users(users)
-                return redirect(url_for("index"))
+                return redirect("/")  # HOME (§22) — dashboard
             error = "Неверное имя пользователя или пароль"
         return render_template("login.html", error=error,
                                panel_name=_panel_name())

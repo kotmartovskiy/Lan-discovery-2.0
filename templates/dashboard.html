@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="page-title">Главная</h1>
+<p class="info">Dashboard раздела HOME — быстрый ответ на вопросы §22.</p>
+
+<div class="dash-grid" id="dash" data-state="loading" aria-live="polite">
+
+  <section class="dash-card" id="dash-status" aria-labelledby="dash-status-h">
+    <h2 id="dash-status-h" class="dash-card-h">Всё ли нормально?</h2>
+    <p class="dash-state">Загрузка…</p>
+  </section>
+
+  <section class="dash-card" id="dash-now" aria-labelledby="dash-now-h">
+    <h2 id="dash-now-h" class="dash-card-h">Что сейчас происходит?</h2>
+    <p class="dash-state">Загрузка…</p>
+  </section>
+
+  <section class="dash-card" id="dash-devices" aria-labelledby="dash-devices-h">
+    <h2 id="dash-devices-h" class="dash-card-h">Какие устройства подключены?</h2>
+    <p class="dash-state">Загрузка…</p>
+  </section>
+
+  <section class="dash-card" id="dash-jobs" aria-labelledby="dash-jobs-h">
+    <h2 id="dash-jobs-h" class="dash-card-h">Какие jobs выполняются?</h2>
+    <p class="dash-state">Загрузка…</p>
+  </section>
+
+  <section class="dash-card" id="dash-problems" aria-labelledby="dash-problems-h">
+    <h2 id="dash-problems-h" class="dash-card-h">Есть ли проблемы?</h2>
+    <p class="dash-state">Загрузка…</p>
+  </section>
+
+  <section class="dash-card" id="dash-warnings" aria-labelledby="dash-warnings-h">
+    <h2 id="dash-warnings-h" class="dash-card-h">Есть ли предупреждения?</h2>
+    <p class="dash-state">Загрузка…</p>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  var dash = document.getElementById("dash");
+  if (!dash) return;
+  var LIM = 5;
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function ok(id, html) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.querySelector(".dash-state").remove();
+    el.insertAdjacentHTML("beforeend", html);
+  }
+  function fail(msg) {
+    dash.setAttribute("data-state", "error");
+    dash.querySelectorAll(".dash-state").forEach(function (el) {
+      el.textContent = msg;
+      el.classList.add("dash-error");
+    });
+  }
+  function levelClass(level) {
+    if (level === "critical") return "lv-critical";
+    if (level === "warning") return "lv-warning";
+    return "lv-info";
+  }
+
+  function render(data, jobs) {
+    var h = data.health || {};
+    var warns = h.warnings || [];
+    var overall = warns.some(function (w) { return w.level === "critical"; })
+      ? "Есть критические проблемы" : (warns.length ? "Есть предупреждения" : "Всё в порядке");
+    ok("dash-status",
+      '<p class="dash-big ' + (warns.length ? "bad" : "good") + '">' + esc(overall) + '</p>' +
+      '<p class="dash-sub">Интернет: ' +
+      (data.internet == null ? "?" : (data.internet ? "есть" : "нет")) +
+      ' · проверено в ' + esc(data.checked_at || "?") + '</p>' +
+      '<p><a href="/system">Система →</a></p>');
+
+    var active = (jobs.active || 0);
+    var lastEv = (data.events || [])[0];
+    ok("dash-now",
+      '<p class="dash-big">' + active + ' активных ' + (active === 1 ? "задача" : "задачи") + '</p>' +
+      '<p class="dash-sub">' + (lastEv
+        ? esc(lastEv.event + " " + (lastEv.ip || "")) + " · " + esc(lastEv.timestamp || "")
+        : "событий нет") + '</p>');
+
+    var dv = data.devices || {};
+    ok("dash-devices",
+      '<p class="dash-big"><span class="online">' + (dv.online || 0) + '</span> / ' +
+      (dv.total || 0) + ' онлайн</p>' +
+      '<p><a href="/devices">Устройства →</a></p>');
+
+    var items = (jobs.jobs || []).filter(function (j) {
+      return j.status === "running" || j.status === "queued";
+    }).slice(0, LIM);
+    ok("dash-jobs", items.length
+      ? '<ul class="dash-list">' + items.map(function (j) {
+          return '<li><code>' + esc(j.type) + '</code> — ' + esc(j.status) + '</li>';
+        }).join("") + '</ul>'
+      : '<p class="dash-sub">Активных задач нет</p>');
+
+    var alerts = (data.alerts || []).slice(0, LIM);
+    ok("dash-problems", alerts.length
+      ? '<ul class="dash-list">' + alerts.map(function (a) {
+          return '<li class="' + levelClass(a.level) + '">' + esc(a.text) + '</li>';
+        }).join("") + '</ul>'
+      : '<p class="dash-sub good">Проблем не найдено</p>');
+
+    ok("dash-warnings", warns.length
+      ? '<ul class="dash-list">' + warns.slice(0, LIM).map(function (w) {
+          return '<li class="' + levelClass(w.level) + '">' + esc(w.text || w) + '</li>';
+        }).join("") + '</ul>'
+      : '<p class="dash-sub good">Предупреждений нет</p>');
+
+    dash.setAttribute("data-state", "ready");
+  }
+
+  Promise.all([
+    fetch("/api/dashboard", {credentials: "same-origin"}),
+    fetch("/api/jobs?limit=10", {credentials: "same-origin"})
+  ]).then(function (rs) {
+    if (!rs[0].ok || !rs[1].ok) throw new Error("http");
+    return Promise.all([rs[0].json(), rs[1].json()]);
+  }).then(function (j) {
+    render(j[0], j[1]);
+  }).catch(function () {
+    fail("Не удалось загрузить dashboard — обновите страницу");
+  });
+})();
+</script>
+{% endblock %}

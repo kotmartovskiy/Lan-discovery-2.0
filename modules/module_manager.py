@@ -38,6 +38,8 @@ from core.module_loader import (
     modules_with_status,
     nav_groups,
     nav_items,
+    nav_sections,
+    active_section,
     active_page,
     record_install_result,
     set_module_status,
@@ -172,12 +174,18 @@ def register_routes(app, ctx):
     def _inject_modules_context():
         u = get_current_user()
         role = getattr(u, "role", "") if u else ""
+        admin = role == "admin"
+        path = request.path
+        active = active_section(path)
         return {
             "nav_items": nav_items(),
-            "nav_groups": nav_groups(admin=(role == "admin")),
+            "nav_groups": nav_groups(admin=admin),
+            "nav_sections": nav_sections(admin=admin, path=path),
+            "active_section": active,
+            "shell_groups": nav_groups(admin=admin, section=active) if active else nav_groups(admin=admin),
             "help_sections": help_sections(),
             "desktop_categories": desktop_categories(),
-            "page": active_page(request.path),
+            "page": active_page(path),
         }
 
     @app.before_request
