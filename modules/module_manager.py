@@ -19,6 +19,7 @@ from flask import jsonify, redirect, render_template, request
 
 from core import jobs
 from core import manifest as manifest_mod
+from core import syschange
 from core.module_catalog import (
     CatalogError,
     catalog_module_ids,
@@ -72,11 +73,18 @@ def _install_manifest(m, ctx=None):
         if ctx:
             ctx.check_cancel()
             ctx.progress(15)
-        ok, out = _run(["apt-get", "install", "-y"] + pkgs)
-        _step("apt install " + " ".join(pkgs) + ": " + ("OK" if ok else "FAIL"))
-        if not ok:
+        # §26: preflight→backup→apply→verify (+rollback при сбое)
+        try:
+            syschange.run(
+                [{"type": "apt_install", "packages": pkgs}],
+                run_cmd=_run,
+                log=_step,
+            )
+            _step("apt install " + " ".join(pkgs) + ": OK")
+        except syschange.SystemChangeError as e:
             ok_all = False
-            _step(out[-1500:])
+            _step("apt install " + " ".join(pkgs) + ": FAIL")
+            _step(str(e)[-1500:])
 
     pypkgs = deps.get("pip") or []
     if pypkgs:
