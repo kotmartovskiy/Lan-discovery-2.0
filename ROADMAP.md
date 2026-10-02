@@ -26,7 +26,7 @@
 | **2.0-7** | Storage Core | `core/storage.py`: корни `/srv/media|data|backup`, disks/partitions/mounts/SMART (lsblk/smartctl уже в TOOL_PROBES), shares/backup targets; `storage.path()` для модулей; миграция констант модулей (IPTV_DIR/MEDIA_DIR/PLAYLISTS_DIR и др.) | **DONE (02.10.2026)** |
 | **2.0-8** | Хвост спецификации | §15–37 получен 02.10.2026 → `docs/Спецификация-2.0.md` дополнен (§0–37 целиком) | **DONE (02.10.2026)** |
 | **2.0-9** | Architecture Audit (спека §37 Phase 0) | обход репо (core/loader/catalog/capabilities/roles/discovery/network/storage/installer/update/recovery/tests), dependency graph, `docs/2.0/ARCHITECTURE_AUDIT.md` (A–O) → план фаз по §33 | **DONE (02.10.2026)** |
-| **2.0-10** | Core independence (§19, §34) | `core/version` (APP_VERSION — единый источник), `core/db` (схема+миграции, владение данными), удалить инверсии `core→app/modules` (8 точек: `_cfg`, `APP_VERSION`, `get_db/DB`), compat-reexport из devices_routes | pending |
+| **2.0-10** | Core independence (§19, §34) | `core/version` (APP_VERSION — единый источник), `core/db` (схема+миграции, владение данными), удалить инверсии `core→app/modules` (8 точек: `_cfg`, `APP_VERSION`, `get_db/DB`), compat-reexport из devices_routes | **DONE (02.10.2026)** |
 | **2.0-11** | Device identity (§15) | device_id + ip_history + composite fingerprint; миграция devices PK через compat-адаптеры (§32), события не ломать | pending |
 | **2.0-12** | Events 2.0 (§16) | именованные события `device./network./storage./job./module./system.`, фасад `events.emit/subscribe`, dual-read совместимость, эмиттеры из jobs/module-manager | pending |
 | **2.0-13** | Automation (§17) | правила Event → Rule → Action, хранение, минимальный UI/API, компактный appliance engine (не HA-клон) | pending |
@@ -442,3 +442,30 @@
   она снимает инверсии и даёт core/db+core/version опорой для
   identity/events/automation). Порядок и границы фаз фиксирует аудит;
   каждая фаза — один контракт, тесты зелёные, аддитивность §32.
+### 02.10.2026 — PHASE 2.0-10: Core independence — **DONE**
+
+- core/version.py — единственный источник `APP_VERSION=2.0.0` (§34):
+  app.py реэкспортирует (тесты/health), module_catalog и module_loader
+  импортируют core.version напрямую (было `from app import APP_VERSION`).
+- core/db.py — владение схемой sqlite (§19): DB-путь, SCHEMA_VERSION,
+  миграции _migration_v1/v2 + MIGRATIONS (PRAGMA user_version),
+  _ensure_extra_tables (9 серверных таблиц + jobs), _retention_days
+  (через core.config), init_db_schema, get_db — перенесено из
+  modules/devices_routes без изменения поведения (перенос строк,
+  компиляция, тесты миграций).
+- **Инверсии core→app/modules = 0** (было 8): discovery/events/jobs
+  (get_db, DB, _cfg) → core.db/core.config; module_loader/catalog
+  → core.version. `rg 'from app import|from modules' core/` — пусто.
+- app.DB / devices_routes.DB / init_db_schema / get_db — реэкспорт
+  (compat §32): inventory_routes (`from app import DB`), app-роуты,
+  conftest и тесты продолжают работать; тесты миграций/фикстура devices_db
+  переведены на прямой импорт `core.db` (патчи DB/_init_done теперь
+  бьют в владельца схемы), retention-тест патчит `core.config.load`.
+- `_cfg_net`/`retention_loop`/`_resolve_retention` читают настройки
+  через `core.config.get` (семантика идентична app._cfg: тот же файл,
+  TTL 10 с); потребители, патчащие `d._cfg_net`/`self._retention_cfg`,
+  не тронуты.
+- modules→app (9) и uniform register-контекст — остаются на 2.0-15
+  (граница фазы: только core-инверсии, без контракта модулей).
+- Тесты: 319 passed локально (2 pre-existing Windows-фейла, 3 Linux-skip);
+  CI — после push (ожидание 324).

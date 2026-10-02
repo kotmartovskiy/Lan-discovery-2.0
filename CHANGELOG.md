@@ -8,6 +8,7 @@
 ## [2.0.0] — не выпущена (в разработке)
 
 ### Добавлено
+- **Core independence (PHASE 2.0-10):** ``core/version.py`` — единственный источник ``APP_VERSION`` (§34); ``core/db.py`` — владение схемой sqlite (миграции/ensure/init/get_db перенесены из devices_routes); инверсии ``core→app/modules`` устранены (0 из 8: get_db/DB/_cfg/APP_VERSION → core.db/core.config/core.version), старые импорты работают через compat-реэкспорт (§32); retention/настройки core — через ``core.config``.
 - **Переносы Инвентаризации (внефазно, 02.10.2026):** `app._cmd`/`check_internet`, `core_routes._cmd`, `monitor._cmd`, dpkg-query batch, nmap `run_scan`, samba `smbcontrol`/`testparm`/`systemctl reload` (в `ACTIONS` добавлен `reload`), bluetoothctl `_bt_cmd` — все на `core.process`/`core.services` без смены семантики; удалены мёртвые `subprocess`-импорты. Остальные строки Инвентаризации — по мере потребителей.
 - **Storage Core (PHASE 2.0-7):** `core/storage.py` — корни `ROOTS`
   (`/srv/media|/srv/data|/srv/backup`) + `path()` (posixpath, неизвестный
