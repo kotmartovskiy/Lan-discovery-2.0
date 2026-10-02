@@ -19,7 +19,7 @@
 | **2.0-0** | Foundation | репозиторий 2.0 (клон 1.1, remote `upstream-11`), архив спецификации, архитектурный аудит 1.1, этот ROADMAP, `APP_VERSION=2.0.0`, AGENTS под новый репо | **DONE (01.10.2026)** |
 | **2.0-1** | Capabilities 2.0 | таксономия `network.* / storage.* / hardware.* / radio.* / camera.* / media.* / service.*` поверх `core/capabilities.py` (модель present/absent/unknown × measured/detected/unverified сохраняется); расширение `collect()`; `/api/capabilities` аддитивно; UI `/capabilities` с группировкой; тесты compat-чеков модулей от новых capability | **DONE (01.10.2026)** |
 | **2.0-2** | Core skeleton + инвентаризация | `core/services.py` (status/start/stop/restart/enable/disable/logs/health), `core/process.py` (безопасный запуск команд), `core/config.py` (settings без зависимости от app); таблица-инвентаризация всех вызовов `subprocess`/`systemctl` (18/13 файлов) с планом переноса; контракты `core/network.py`/`core/storage.py` read-only; первый перенос (1–2 вызова) с тестом | **DONE (01.10.2026)** |
-| **2.0-3** | Jobs subsystem | `core/jobs.py`: manager + worker-треды, состояния queued/running/completed/failed/cancelled, поля id/type/status/progress/started_at/finished_at/logs/result/error/cancelable; sqlite-таблица `jobs` (retention как у events); `GET /api/jobs` + `POST /api/jobs/<id>/cancel`; UI-виджет активных jobs; миграция на jobs: module install/update, backup/restore БД, network scan | pending |
+| **2.0-3** | Jobs subsystem | `core/jobs.py`: manager + worker-треды, состояния queued/running/completed/failed/cancelled, поля id/type/status/progress/started_at/finished_at/logs/result/error/cancelable; sqlite-таблица `jobs` (retention как у events); `GET /api/jobs` + `POST /api/jobs/<id>/cancel`; UI-виджет активных jobs; миграция на jobs: module install/update, backup/restore БД, network scan | **DONE (02.10.2026)** |
 | **2.0-4** | Module manifest 2.0 + permissions + trust | схема v2 (capabilities/dependencies/conflicts/services/configuration/role_support + publisher/sha256/min_core_version/max_core_version) — back-compat v1; сетка прав (network/storage/services/process/camera/usb/gpio/serial) в манифесте и UI-запрос при установке; catalog: SHA-256 тарболла из index, trusted sources, core-compat check; без PKI/sandbox (спека §11–12) | pending |
 | **2.0-5** | Roles 2.0 | `roles/<id>.json` манифесты (required_modules/optional_modules/capabilities/hardware_requirements/dependencies/conflicts/recommended_configuration/security_profile); загрузчик в `core/roles.py`, compat через `compute_status()`/capabilities; роли-примеры: Network Gateway, Home Server, Remote Site, Industrial Gateway, Network Diagnostic Box, Camera Gateway (SDR — ждём хвост спеки); apply/API не ломаем (ALWAYS_ON сохраняется) | pending |
 | **2.0-6** | Network Core (транзакционный) | `core/network.py`: объекты interfaces/addresses/routes/firewall/…; каркас Prepare→Apply→Verify→Commit/Rollback; UI-warning «This operation may disconnect the current session»; авто-rollback; первый перенос: sys-network-операции; DHCP/DNS/VPN/AP/bridge — по мере модулей-потребителей | pending |
@@ -120,3 +120,58 @@
   sysfs-дерево; storage: контракт + `/api/disks`).
 - Локальный смоук (Windows): все модули без исключений (`unknown`/
   `absent` при отсутствии systemctl/sysfs), инварианты `collect()` чистые.
+
+### 02.10.2026 — PHASE 2.0-3: Jobs subsystem — **DONE**
+
+- `core/jobs.py` — менеджер задач (Архитектура §3.3/§5): пул
+  worker-тредов (2, daemon, ленивый старт) + очередь; состояния
+  `queued → running → completed|failed|cancelled`; поля id/type/meta/
+  status/progress/queued_at/started_at/finished_at/logs/result/error/
+  cancelable; module-API `init/submit/get/list/cancel/wait`.
+- Хранение — sqlite-таблица `jobs` в devices.db: DDL (`JOBS_DDL`) живёт
+  в `core/jobs.py`, `ensure_jobs_table()` вызывается из
+  `_ensure_extra_tables`; персист best-effort при каждом изменении
+  (память авторитетна, БД — история для `GET /api/jobs` после рестарта).
+- Retention как у events (`events.retention_days`): `cleanup_old_jobs`
+  в `init_db_schema` + ежесуточный `retention_loop` (daemon-тред).
+- Recover: `recover_interrupted()` в `init_db_schema` и при первом
+  обращении менеджера — queued/running, оборванные рестартом панели, →
+  failed («прервано перезапуском панели»).
+- Отмена cooperative: задача зовёт `ctx.check_cancel()` между шагами;
+  queued-задача отменяется мгновенно; не-cancelable → `ok:false`
+  (HTTP 409). Честность: nmap/apt прервать изнутри нельзя —
+  `network-scan`/`module-catalog-*` cancelable=false, `module-install`
+  cancelable=true (между шагами).
+- API — новые URL (аддитивно к 1.1): `GET /api/jobs` (limit/status +
+  active), `GET /api/jobs/<id>` (для поллинга), `POST /api/jobs/<id>/
+  cancel` (admin).
+- UI — виджет в `base.html` (правый нижний угол): poll `/api/jobs` 4 с,
+  progress-бары, «отменить» (admin, Jinja-гейт), строка-итог на 6 с
+  после завершения; CSRF-заголовок как у остальных POST.
+- Миграции:
+  - `POST /modules/<mid>/install` → job `module-install` (cancelable):
+    `_install_manifest(m, ctx)` — лог/прогресс/отмена между шагами
+    apt/pip/dirs/services; `record_install_result`/`set_module_status` —
+    внутри задачи; каталог install/update → job `module-catalog-install/
+    update` (CatalogError теперь в job.failed, а не в redirect err).
+  - `POST /api/scan` → job `network-scan`: ответ `{ok, job}` (аддитивно;
+    devices/stats/subnet — в job.result; nmap-ошибка — failed вместо
+    503); `templates/devices.html` ждёт завершения через
+    `GET /api/jobs/<id>` перед reload; фоновый `scan_loop` — тредом
+    как был, мигрируем только ручной скан.
+  - `POST /system/db-backup` → job `db-backup`: `systemctl start`
+    с ожиданием oneshot вместо Popen; `/api/backup-status` и JS-поллинг
+    не менялись (аддитивно добавлен `job` в ответ).
+  - **db-restore НЕ мигрирован**: внутри — `systemctl stop
+    lan-discovery` убивает процесс-исполнитель задачи; нужен внешний
+    executor (решение/ТЗ отдельно).
+- Тесты `tests/unit/test_jobs.py` — 25 кейсов: lifecycle/failed,
+  cancel queued/running/not-cancelable/terminal/unknown, persist в
+  sqlite, list (БД-история + память), recover, retention (в т.ч.
+  days=0), роуты (shape/get/404/cancel/auth/bad-status), миграции
+  install/catalog/scan/db-backup, контракт widget-разметки.
+- Локально (Windows): 25/25 новых + полный юнит-набор 234 passed
+  (2 фейла `test_api_disks_shape`/`test_help_facts_structure` —
+  pre-existing, падают и на чистом HEAD `2542f55`: нет lsblk и
+  linux-специфики); py_compile всех правок, рантайм-смоук core.jobs,
+  Jinja-парс шаблонов — чисто; unit CI — после push этой фазы.

@@ -34,20 +34,28 @@ call)|os.system|os.popen` в `*.py` без `venv/`.
 
 ## 3. Остальные вызовы: план переноса
 
+**Статус PHASE 2.0-3 (02.10.2026):** фаза 2.0-3 по ROADMAP была
+«Jobs subsystem» — мигрированы **запуски** длинных операций (install/
+catalog-install → job, ручной scan → job, `system_routes` бэкапы → job,
+см. строку `2055–2138`). **Обёртки `core.process`/`core.services`
+(строки ниже с прежней фазой «2.0-3») в этой фазе не делались** —
+переносятся по одной точке в последующих фазах по мере потребителей
+(столбец «Фаза/статус» → «отложено»).
+
 | Файл | Строк | Что делает | Целевое ядро | Фаза/статус |
 |---|---|---|---|---|
-| `app.py` | 91, 129 | `_cmd`-обёртка; `ping` проверки интернета | `core.process` | 2.0-3 |
-| `core/discovery.py` | 152 | `run_scan` — хост-скан (ping/arp) | `core.process`; позже `core.network` | 2.0-3 / 2.0-6 |
-| `core/module_loader.py` | 181 | dpkg-batch: неустановленные apt-пакеты | `core.process` | 2.0-3 |
-| `core/samba_guest.py` | 159, 189 (+157) | `systemctl reload smbd` / `smbcontrol` | `core.services` | 2.0-3 |
-| `modules/core_routes.py` | 79 | локальный `_cmd`-хелпер | `core.process.out` | 2.0-3 |
-| `modules/inventory.py` | 14, 275, 289, 399 | `_cmd` + HTTP-скан устройств | `core.process` | 2.0-3 |
-| `modules/media_routes.py` | 126, 226–309, 386–543, 635–821, 1228, 1380–1431 | статус IPTV (journalctl); Popen mpv/радио/плеер/будильник; curl UPnP/DLNA; `systemctl restart transmission` | journalctl → `core.services.logs`; curl → `core.process`; **Popen-проигрыватели — вне core** (длинноживущие процессы самой панели) | 2.0-3 (частично) |
-| `modules/module_manager.py` | 48 (+85) | `_run`-обёртка (apt/git/install); `systemctl enable --now` | `core.process` / `core.services` | 2.0-3 |
-| `modules/monitor.py` | 18 | `_cmd` | `core.process.out` | 2.0-3 |
-| `modules/network_routes.py` | 62, 172–275 | bluetoothctl; nettools ping/dns/traceroute; `iw` wifi-scan | nettools → `core.process`; wifi-scan → `core.network` | 2.0-3 / 2.0-6 |
-| `modules/system_routes.py` | 61 (хелпер), 700–836, 1045, 1555, 1644–1655 | статусы бэкапов/IPTV/служб/таймеров/health: `is-active`/`journalctl`/`list-timers` | `core.services` (`status`/`logs`) | 2.0-3 |
-| `modules/system_routes.py` | 2055–2138 | запуск бэкапов/restore юнитов (`Popen start …`) | Jobs API (`core.jobs`) — запуск станет job'ом | 2.0-3 |
+| `app.py` | 91, 129 | `_cmd`-обёртка; `ping` проверки интернета | `core.process` | отложено |
+| `core/discovery.py` | 152 | `run_scan` — хост-скан (ping/arp) | `core.process`; позже `core.network` | отложено / 2.0-6 |
+| `core/module_loader.py` | 181 | dpkg-batch: неустановленные apt-пакеты | `core.process` | отложено |
+| `core/samba_guest.py` | 159, 189 (+157) | `systemctl reload smbd` / `smbcontrol` | `core.services` | отложено |
+| `modules/core_routes.py` | 79 | локальный `_cmd`-хелпер | `core.process.out` | отложено |
+| `modules/inventory.py` | 14, 275, 289, 399 | `_cmd` + HTTP-скан устройств | `core.process` | отложено |
+| `modules/media_routes.py` | 126, 226–309, 386–543, 635–821, 1228, 1380–1431 | статус IPTV (journalctl); Popen mpv/радио/плеер/будильник; curl UPnP/DLNA; `systemctl restart transmission` | journalctl → `core.services.logs`; curl → `core.process`; **Popen-проигрыватели — вне core** (длинноживущие процессы самой панели) | отложено (частично) |
+| `modules/module_manager.py` | 48 (+85) | `_run`-обёртка (apt/git/install); `systemctl enable --now` | `core.process` / `core.services` | отложено |
+| `modules/monitor.py` | 18 | `_cmd` | `core.process.out` | отложено |
+| `modules/network_routes.py` | 62, 172–275 | bluetoothctl; nettools ping/dns/traceroute; `iw` wifi-scan | nettools → `core.process`; wifi-scan → `core.network` | отложено / 2.0-6 |
+| `modules/system_routes.py` | 61 (хелпер), 700–836, 1045, 1555, 1644–1655 | статусы бэкапов/IPTV/служб/таймеров/health: `is-active`/`journalctl`/`list-timers` | `core.services` (`status`/`logs`) | отложено |
+| `modules/system_routes.py` | 2055–2138 | запуск бэкапов/restore юнитов (`Popen start …`) | Jobs API (`core.jobs`) — запуск стал job'ом | **DONE 2.0-3** (db-backup → job; restore — вне jobs: `systemctl stop lan-discovery` убивает процесс-исполнитель, ROADMAP §3) |
 | `modules/system_routes.py` | 2294 | `do_clone` — клонирование диска (dd/ddrescue) | `core.storage` | 2.0-7 |
 | `remote_edit.py` | 54 | dev-скрипт диагностики по ssh | — | **вне core** (только разработка) |
 | `restore_server.py` | 130–245 | автономный recovery-сервер: systemctl юнитов, восстановление БД/eMMC | — | **вне core** (работает при убитой панели, без core/venv-зависимостей) |

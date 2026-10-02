@@ -8,6 +8,18 @@
 ## [2.0.0] — не выпущена (в разработке)
 
 ### Добавлено
+- **Jobs subsystem (PHASE 2.0-3):** `core/jobs.py` — фоновые задачи
+  (queued/running/completed/failed/cancelled): пул worker-тредов,
+  cooperative-отмена (`ctx.check_cancel()`), логи/прогресс/результат;
+  sqlite-таблица `jobs` в devices.db (retention как у events,
+  recover после рестарта); новые роуты `GET /api/jobs`,
+  `GET /api/jobs/<id>`, `POST /api/jobs/<id>/cancel` (аддитивно);
+  виджет активных задач в UI (progress + отмена); на jobs мигрированы
+  установка модулей (deps + каталог), ручной network scan (`{ok, job}`
+  вместо синхронного ответа, JS ждёт завершения) и backup БД
+  (systemctl с ожиданием вместо Popen); db-restore остался
+  синхронным (рестарт панели убивает исполнителя задачи);
+  +25 тестов (`test_jobs.py`).
 - **Core skeleton (PHASE 2.0-2):** `core/process.py` (единый запуск
   команд: timeout, utf-8, `run`/`out`), `core/services.py` (facade
   systemd: status/control/health/logs — таймаут и ошибки без исключений),
