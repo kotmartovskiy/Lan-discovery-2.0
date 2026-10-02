@@ -6,6 +6,11 @@ import pytest
 
 import modules.weather_routes as wr
 
+# Снапшот времени: тесты и ридер видят одно «сейчас» — нет гонки на
+# границе суток (флэк CI: вставки считались от одного now(), фильтр
+# прогноза — от другого).
+_NOW = datetime.now()
+
 
 @pytest.fixture()
 def wdb(devices_db, monkeypatch):
@@ -16,6 +21,15 @@ def wdb(devices_db, monkeypatch):
         lambda: {"weather": {"region_name": "Иваново",
                              "region_code": "ivanovo"}}
     )
+
+    class _Frozen(datetime):
+        """datetime с замороженным now(); strptime/конструктор — как есть."""
+
+        @classmethod
+        def now(cls, tz=None):
+            return _NOW
+
+    monkeypatch.setattr(wr, "datetime", _Frozen)
     return devices_db
 
 
@@ -26,16 +40,16 @@ def _insert_forecast(db, date, code=0):
         "INSERT OR REPLACE INTO weather_forecast "
         "(forecast_date, weather_code, temp_min, temp_max, fetched_at) "
         "VALUES (?, ?, 1.0, 2.0, ?)",
-        (date, code, datetime.now().isoformat(timespec="minutes")),
+        (date, code, _NOW.isoformat(timespec="minutes")),
     )
     con.commit()
     con.close()
 
 
 def test_forecast_excludes_past_dates(wdb):
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = _NOW.strftime("%Y-%m-%d")
     for delta in (-3, -1, 0, 1, 2, 8):
-        _insert_forecast(wdb, (datetime.now() + timedelta(days=delta))
+        _insert_forecast(wdb, (_NOW + timedelta(days=delta))
                          .strftime("%Y-%m-%d"))
 
     rows = wr.weather_forecast()
@@ -48,7 +62,7 @@ def test_forecast_excludes_past_dates(wdb):
 
 def test_forecast_limit_seven(wdb):
     for delta in range(9):
-        _insert_forecast(wdb, (datetime.now() + timedelta(days=delta))
+        _insert_forecast(wdb, (_NOW + timedelta(days=delta))
                          .strftime("%Y-%m-%d"))
 
     rows = wr.weather_forecast()
@@ -69,7 +83,7 @@ def _insert_weather_alert(db, fetched_at, alert="Туман"):
 
 
 def test_weather_alert_fresh_shown(wdb):
-    fresh = (datetime.now() - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M")
+    fresh = (_NOW - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M")
     _insert_weather_alert(wdb, fresh)
     assert wr.weather_alerts() == [
         (fresh, "Иваново", "Туман", "ближайшие 24 часа")
@@ -77,13 +91,13 @@ def test_weather_alert_fresh_shown(wdb):
 
 
 def test_weather_alert_stale_hidden(wdb):
-    stale = (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%dT%H:%M")
+    stale = (_NOW - timedelta(days=3)).strftime("%Y-%m-%dT%H:%M")
     _insert_weather_alert(wdb, stale)
     assert wr.weather_alerts() == []
 
 
 def test_weather_alert_empty_hidden(wdb):
-    fresh = datetime.now().strftime("%Y-%m-%dT%H:%M")
+    fresh = _NOW.strftime("%Y-%m-%dT%H:%M")
     _insert_weather_alert(wdb, fresh, alert=None)
     assert wr.weather_alerts() == []
 
@@ -96,7 +110,7 @@ def _set_mchs(db, published_at, text):
         "INSERT INTO mchs_alerts (id, fetched_at, published_at, title, text, "
         "source_url) VALUES (1, ?, ?, 'Предупреждение', ?, "
         "'https://37.mchs.gov.ru/x')",
-        (datetime.now().isoformat(timespec="minutes"), published_at, text),
+        (_NOW.isoformat(timespec="minutes"), published_at, text),
     )
     con.commit()
     con.close()
@@ -109,13 +123,13 @@ def test_mchs_expired_text_hidden(wdb):
 
 
 def test_mchs_old_without_expiry_hidden(wdb):
-    old = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d %H:%M")
+    old = (_NOW - timedelta(days=5)).strftime("%Y-%m-%d %H:%M")
     _set_mchs(wdb, old, "Гроза, ливень, град")
     assert wr.mchs_alerts() == []
 
 
 def test_mchs_recent_without_expiry_shown(wdb):
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    now_str = _NOW.strftime("%Y-%m-%d %H:%M")
     _set_mchs(wdb, now_str, "Гроза, ливень, град")
     assert len(wr.mchs_alerts()) == 1
 
@@ -123,8 +137,8 @@ def test_mchs_recent_without_expiry_shown(wdb):
 def test_mchs_future_expiry_shown_regardless_of_age(wdb):
     months = ["января", "февраля", "марта", "апреля", "мая", "июня",
               "июля", "августа", "сентября", "октября", "ноября", "декабря"]
-    future = datetime.now() + timedelta(days=1)
-    old = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d %H:%M")
+    future = _NOW + timedelta(days=1)
+    old = (_NOW - timedelta(days=5)).strftime("%Y-%m-%d %H:%M")
     text = "Действует до 09:00 %d %s %d года" % (
         future.day, months[future.month - 1], future.year)
     _set_mchs(wdb, old, text)
