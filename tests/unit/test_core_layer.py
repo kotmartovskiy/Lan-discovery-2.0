@@ -16,6 +16,15 @@ from core import services as core_services
 from core import storage as core_storage
 
 
+@pytest.fixture(autouse=True)
+def _csrf_off():
+    """POST-контрактные тесты без CSRF-токена (паттерн test_roles)."""
+    old = app.app.config["WTF_CSRF_ENABLED"]
+    app.app.config["WTF_CSRF_ENABLED"] = False
+    yield
+    app.app.config["WTF_CSRF_ENABLED"] = old
+
+
 @pytest.fixture()
 def client(monkeypatch):
     app.app.config["TESTING"] = True
