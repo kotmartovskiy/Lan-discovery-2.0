@@ -21,6 +21,15 @@
 .role-mod.warn { background:rgba(255,184,77,0.12); color:var(--warn); border-color:rgba(255,184,77,0.4); }
 .role-mod.ok { background:#0e2233; color:#8ab4f8; border-color:#1f4b6e; }
 .role-mod.always::after { content:" ★"; color:var(--warn); }
+.role-mod.conflict::after { content:" ✕"; color:#e57373; }
+.role-badge.warn { background:rgba(255,184,77,0.12); color:var(--warn); border:1px solid rgba(255,184,77,0.4); }
+.role-badge.prof { background:#0e2233; color:#8ab4f8; border:1px solid #1f4b6e; }
+.role-blockers { font-size:12px; color:#e57373; background:rgba(229,115,115,0.08); border:1px solid #5d2e2e; border-radius:5px; padding:6px 8px; margin-bottom:8px; }
+.role-blockers div::before { content:"● "; }
+.role-miss { font-size:12px; color:#999; margin-bottom:6px; }
+.role-miss b { color:var(--warn); font-weight:600; }
+.role-cfg { font-size:12px; color:#888; margin-bottom:8px; }
+.role-cfg code { color:#8ab4f8; }
 .role-actions { display:flex; gap:8px; }
 .role-actions button { font-size:13px; padding:4px 12px; border-radius:5px; border:1px solid #444; background:#1c1c1c; color:#eee; cursor:pointer; }
 .role-actions button:hover { border-color:#8ab4f8; }
@@ -28,12 +37,14 @@
 </style>
 
 <p class="role-note">
-Роль — профиль использования устройства: именованный набор модулей. Применение
-включает модули роли и <strong>выключает остальные</strong>; базовые модули
-панели (настройки, пользователи, сеть, питание, плата, резервные копии БД)
-всегда остаются включёнными — они помечены ★. Совместимость каждого модуля
-профиля с системой (железо, зависимости) проверяется автоматически:
-несовместимые и без нужного железа модули при применении <strong>пропускаются</strong>,
+Роль — сценарий устройства: манифест <code>roles/&lt;id&gt;.json</code> с
+обязательными (<strong>required</strong>) и желательными (<strong>optional</strong>)
+модулями, требованиями к среде (железо, возможности, зависимости) и конфликтами.
+Применение включает модули роли и <strong>выключает остальные</strong>; базовые
+модули панели (настройки, пользователи, сеть, питание, плата, резервные копии БД)
+всегда остаются включёнными — они помечены ★. Конфликтные модули помечены ✕
+и выключаются. Роль с блокерами (не подходит по железу/возможностям) не
+применяется; несовместимые модули при применении <strong>пропускаются</strong>,
 а не включаются. Изменения действуют после обновления страницы.
 </p>
 
@@ -45,24 +56,50 @@
 <div class="role-card{{ ' active' if r.id == ov.active else '' }}">
   <div class="role-head">
     <strong>{{ r.name }}</strong><code>{{ r.id }}</code>
-    {% if r.id == ov.active %}<span class="role-badge on">● активна</span>{% endif %}
+    {% if r.security_profile %}<span class="role-badge prof"
+          title="security_profile манифеста роли (пока бейдж, без enforcement)">{{ r.security_profile }}</span>{% endif %}
+    {% if r.id == ov.active %}<span class="role-badge on">● активна</span>
+    {% elif not r.ready %}<span class="role-badge warn"
+          title="роль не подходит этой системе — apply откажет">не готова</span>{% endif %}
   </div>
   <p class="role-desc">{{ r.description }}</p>
+  {% if r.blockers %}
+  <div class="role-blockers" title="блокеры — роль нельзя применить на этой системе">
+    {% for b in r.blockers %}<div>{{ b }}</div>{% endfor %}
+  </div>
+  {% endif %}
   <div class="role-mods">
     {% for mod in r.modules %}
     {% set cls = 'active' if mod.status == 'active' else
                  ('disabled' if mod.status in ('disabled', 'incompatible', 'error') else
                  ('warn' if mod.status in ('requires-dependency', 'requires-hardware') else
                  ('ok' if mod.status == 'available' else ''))) %}
-    <span class="role-mod {{ cls }}{{ ' always' if mod.always_on }}"
-          title="{{ 'всегда включён' if mod.always_on else mod.status }}">{{ mod.name }}</span>
+    {% set rtype = {'required': 'обязательный модуль роли',
+                    'optional': 'желательный модуль роли',
+                    'conflict': 'конфликт роли — выключится',
+                    'always': 'базовый модуль панели'}.get(mod.role, mod.role) %}
+    <span class="role-mod {{ cls }}{{ ' always' if mod.always_on }}{{ ' conflict' if mod.role == 'conflict' }}"
+          title="{{ rtype }} — {{ mod.status }}">{{ mod.name }}</span>
     {% endfor %}
   </div>
+  {% if r.missing %}
+  <p class="role-miss"><b>нет в панели:</b> {{ r.missing | join(', ') }}
+    <span title="роль ссылается на модули, которых ещё нет в панели — честный missing, не ошибка">(будут доступны позже)</span></p>
+  {% endif %}
+  {% if r.not_installed %}
+  <p class="role-miss"><b>не установлены:</b> {{ r.not_installed | join(', ') }}</p>
+  {% endif %}
+  {% if r.recommended_configuration %}
+  <p class="role-cfg"><b>Рекомендуется:</b>
+    {% for k, v in r.recommended_configuration.items() %}<code>{{ k }}={{ v }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+    <span title="recommended_configuration манифеста роли — ориентир для администратора, автоматически не применяется">(подсказка)</span></p>
+  {% endif %}
   <div class="role-actions">
     <form method="post" action="/roles/{{ r.id }}/apply"
           onsubmit="return confirm('Применить роль «{{ r.name }}»? Модули вне роли будут выключены.');">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button class="primary">{{ 'Переприменить' if r.id == ov.active else 'Применить' }}</button>
+      <button class="primary"{{ ' disabled' if r.blockers else '' }}
+              title="{{ 'роль не подходит системе' if r.blockers else '' }}">{{ 'Переприменить' if r.id == ov.active else 'Применить' }}</button>
     </form>
   </div>
 </div>
@@ -71,7 +108,8 @@
 
 <p class="role-note" style="margin-top:14px;">
 Активная роль хранится в <code>/etc/lan-discovery/roles.json</code>,
-профили — в <code>core/roles.py</code> (PROFILES). Ручное включение/выключение
+манифесты ролей — в <code>roles/*.json</code> (валидация при загрузке:
+невалидные роли не показываются). Ручное включение/выключение
 модулей на странице «Модули» сохраняется до следующего применения роли.
 </p>
 
