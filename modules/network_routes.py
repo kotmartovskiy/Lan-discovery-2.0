@@ -8,6 +8,9 @@ import time
 
 from flask import request, jsonify, render_template
 
+from core import network as core_net
+from core import process as core_process
+
 NETWORK_CHECK_SCRIPT = "/opt/lan-discovery/network_check.py"
 NETWORK_CONFIG = "/etc/lan-discovery/network.json"
 
@@ -169,9 +172,9 @@ def register_routes(app, login_required, admin_required, can_edit, _cmd, _cfg, p
         if not _valid_host(host):
             return {"ok": False, "error": "Недопустимый хост"}, 400
         try:
-            r = subprocess.run(
+            r = core_process.run(
                 ["ping", "-c", "4", "-W", "3", host],
-                capture_output=True, text=True, timeout=20
+                timeout=20
             )
             return {"ok": True, "output": r.stdout or r.stderr}
         except Exception as e:
@@ -186,14 +189,14 @@ def register_routes(app, login_required, admin_required, can_edit, _cmd, _cfg, p
         if not _valid_host(host):
             return {"ok": False, "error": "Недопустимый хост"}, 400
         try:
-            r = subprocess.run(
+            r = core_process.run(
                 ["host", host],
-                capture_output=True, text=True, timeout=15
+                timeout=15
             )
             if r.returncode != 0:
-                r = subprocess.run(
+                r = core_process.run(
                     ["nslookup", host],
-                    capture_output=True, text=True, timeout=15
+                    timeout=15
                 )
             return {"ok": True, "output": r.stdout or r.stderr}
         except Exception as e:
@@ -247,14 +250,14 @@ def register_routes(app, login_required, admin_required, can_edit, _cmd, _cfg, p
         if not _valid_host(host):
             return {"ok": False, "error": "Недопустимый хост"}, 400
         try:
-            r = subprocess.run(
+            r = core_process.run(
                 ["tracepath", host],
-                capture_output=True, text=True, timeout=30
+                timeout=30
             )
             if r.returncode != 0:
-                r = subprocess.run(
+                r = core_process.run(
                     ["traceroute", "-m", "15", "-w", "2", host],
-                    capture_output=True, text=True, timeout=30
+                    timeout=30
                 )
             return {"ok": True, "output": r.stdout or r.stderr}
         except Exception as e:
@@ -268,61 +271,41 @@ def register_routes(app, login_required, admin_required, can_edit, _cmd, _cfg, p
     @app.route("/api/wifi/scan")
     @login_required
     def api_wifi_scan():
+        # перенос парсинга iw в core.network (PHASE 2.0-6), JSON-контракт прежний
         wifi_ifaces = _cfg("network", "wifi_ifaces", ["wlan1", "wlan0"])
+        return core_net.wifi_scan(wifi_ifaces)
+
+    @app.route("/api/network/info")
+    @login_required
+    def api_network_info():
+        """Read-only объекты Core Network Manager (спека §5)."""
+        interfaces = core_net.list_interfaces()
+        addresses = core_net.list_addresses()
+        routes = core_net.list_routes()
+        if interfaces is None or addresses is None or routes is None:
+            return {"ok": False,
+                    "error": "не удалось прочитать состояние сети",
+                    "interfaces": interfaces, "addresses": addresses,
+                    "routes": routes}
+        return {"ok": True, "interfaces": interfaces,
+                "addresses": addresses, "routes": routes}
+
+    @app.route("/api/network/address", methods=["POST"])
+    @admin_required
+    def api_network_address():
+        """Транзакционная смена/удаление адреса (спека §6, admin)."""
+        data = request.get_json(silent=True) or {}
+        action = data.get("action")
+        if action not in ("set", "del"):
+            return {"ok": False, "error": "неизвестное действие"}, 400
         try:
-            r = None
-            for wifi_iface in wifi_ifaces:
-                r = subprocess.run(
-                    ["iw", "dev", wifi_iface, "scan"],
-                    capture_output=True, text=True, timeout=15
-                )
-                if r.returncode == 0:
-                    break
-            output = r.stdout if r is not None else ""
-            networks = []
-            current = {}
-            for line in output.splitlines():
-                line = line.strip()
-                if line.startswith("BSS "):
-                    if current and current.get("ssid"):
-                        networks.append(current)
-                    bssid = line.split("(")[0].replace("BSS ", "")
-                    current = {"bssid": bssid, "ssid": "", "channel": 0, "frequency": 0, "signal": -100, "signal_pct": 0, "encryption": "", "bandwidth": "20MHz"}
-                elif line.startswith("SSID: "):
-                    current["ssid"] = line[6:]
-                elif line.startswith("freq: "):
-                    try:
-                        current["frequency"] = int(line[6:])
-                        freq = current["frequency"]
-                        if freq < 3000:
-                            ch = (freq - 2412) // 5 + 1
-                            if freq == 2484:
-                                ch = 14
-                            current["channel"] = ch
-                        else:
-                            current["channel"] = (freq - 5000) // 5
-                    except ValueError:
-                        pass
-                elif line.startswith("signal: "):
-                    try:
-                        sig_str = line[8:].split(" ")[0]
-                        current["signal"] = float(sig_str)
-                        current["signal_pct"] = max(0, min(100, int((float(sig_str) + 100) * 2)))
-                    except ValueError:
-                        pass
-                elif "RSN:" in line or "WPA:" in line:
-                    current["encryption"] = "WPA2" if "RSN:" in line else "WPA"
-                elif line.startswith("secondary channel"):
-                    if "above" in line or "below" in line:
-                        current["bandwidth"] = "40MHz"
-                elif "VHT" in line or "HE" in line:
-                    current["bandwidth"] = "80MHz+"
-            if current and current.get("ssid"):
-                networks.append(current)
-            networks.sort(key=lambda x: x["signal"], reverse=True)
-            return {"ok": True, "networks": networks}
-        except Exception as e:
-            return {"ok": False, "error": str(e)}
+            grace = int(data.get("insurance_grace", 20))
+        except (TypeError, ValueError):
+            grace = 20
+        grace = max(0, min(300, grace))
+        fn = core_net.set_address if action == "set" else core_net.del_address
+        return fn(data.get("iface", ""), data.get("cidr", ""),
+                  insurance_grace=grace)
 
     @app.route("/apps/wifianalyzer")
     @login_required
