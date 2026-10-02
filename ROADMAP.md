@@ -36,7 +36,7 @@
 | **2.0-17** | Appliance smoke test (§27) | интеграционная цепочка install→…→failure→rollback (на стенде; важнее мелких UI-тестов) | **DONE (03.10.2026)** |
 | **2.0-18** | Installer 2.0 (§25) | preflight + hardware detection + health check, ARM/x86_64/минимальные установки, без платы-специфики | **DONE (03.10.2026)** |
 | **2.0-19** | UI 2.0 shell (§22–24) | Application Shell → Navigation → Module Page, разделы HOME…ADMIN, dashboard-ответы, единые диалоги/уведомления/иконки | **DONE (03.10.2026)** |
-| **2.0-20** | Portability (§30) | Orange Pi, X96 Max, x86_64 — через capabilities, hardware-specific в Hardware Detection | pending |
+| **2.0-20** | Portability (§30) | Orange Pi, X96 Max, x86_64 — через capabilities, hardware-specific в Hardware Detection | **DONE (03.10.2026)** |
 | **2.0-21** | Release (§33 Ph.10, §34) | v2.0.0 + guides + документация §29 (CORE_API/MODULES/CAPABILITIES/…) + demo + release notes | pending |
 
 Статус фазы — только `pending` / `**DONE (дд.мм.гггг)**`; изменения
@@ -719,3 +719,28 @@
   правки responsive/a11y под /devices (2 места). Локально 385 passed
   (2 pre-existing Windows-фейла, 3 Linux-skip); CI после push
   (ожидание 390).
+
+### 03.10.2026 — PHASE 2.0-20: Portability — **DONE**
+
+- §30-аудит плато-специфики в коде панели (core/, modules/,
+  templates/, static/, app.py, install.sh): убраны имена плат и
+  вендоров. sys-board: module.json name/title «X96 Max» → «Плата»
+  (реальное имя платы и так рендерится из device-tree через
+  board_title()); справка hf.lan — плато-подписи → generic
+  («Основная панель», «Удалённый сервер», «Рабочая станция», …)
+  + гейт по network.subnet: список хостов показывается только если
+  primary в настроенной подсети, иначе таблица «Сетевые устройства»
+  скрыта; monitoring: дефолт hosts → [] + empty state в
+  monitoring.html (хосты — только из настроек); help.md модулей
+  (monitoring, wifianalyzer); докстринги (app.panel_name,
+  discovery._scan_enabled, system_routes.board_title, _help_facts).
+- Инвариант закреплён тестом tests/unit/test_portability.py:
+  grep-запрет 16 имён плат/вендоров в коде панели (tests/ и tools/ —
+  исключение как инвентарь репозитория), generic-манифест sys-board,
+  гейт hf.lan по subnet.
+- Физические стенды (Orange Pi / X96 Max / x86_64) в фазе не
+  использовались: инвариант §30 — «нет плато-ветвлений в коде» —
+  доказан кодом+тестами (§36); живой прогон на железе — при стенде
+  (N6, решение пользователя).
+- Локально 388 passed (2 pre-existing Windows-фейла, 3 Linux-skip);
+  CI после push (ожидание 393).
