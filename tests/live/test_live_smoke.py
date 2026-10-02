@@ -16,7 +16,7 @@ def test_health_shape(panel_url):
     assert resp.status_code == 200
     d = json.loads(resp.text)
     assert d["db"]["status"] == "ok"
-    assert d["db"]["user_version"] == 2
+    assert d["db"]["user_version"] in (2, 3)  # 2 = ветка 1.1, 3 = 2.0
     assert d["version"]
     assert set(d["platform"]) == {"board", "arch", "system", "emmc", "sd",
                                   "hdd", "thermal_zone"}

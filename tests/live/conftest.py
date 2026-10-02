@@ -27,7 +27,8 @@ def admin_session(panel_url):
     m = None
     import re
     m = re.search(r'name="csrf_token" value="([^"]+)"', r.text)
-    data = {"username": "admin", "password": "1234"}
+    data = {"username": "admin",
+            "password": os.environ.get("LAN_PANEL_PASS", "1234")}
     if m:
         data["csrf_token"] = m.group(1)
     r = s.post(panel_url + "/login", data=data, timeout=10,

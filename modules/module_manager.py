@@ -137,10 +137,12 @@ def _module_install_job(ctx, m, installed_before):
     ctx.progress(5)
     result = _install_manifest(m, ctx=ctx)
     record_install_result(mid, result)
+    if not result.get("ok"):
+        # §27: при сбое зависимостей (и rollback системных изменений)
+        # модуль НЕ помечаем установленным
+        raise RuntimeError("не все зависимости установились (см. лог)")
     if not installed_before:
         set_module_status(mid, installed=True, enabled=True)
-    if not result.get("ok"):
-        raise RuntimeError("не все зависимости установились (см. лог)")
     ctx.progress(100)
     ctx.log("Установка «%s»: готово" % mid)
     return {"module": mid, "ok": True}
