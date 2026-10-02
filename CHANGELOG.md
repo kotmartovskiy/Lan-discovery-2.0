@@ -8,6 +8,23 @@
 ## [2.0.0] — не выпущена (в разработке)
 
 ### Добавлено
+- **Module manifest 2.0 + permissions + trust (PHASE 2.0-4):**
+  `core/manifest.py` — сетка прав из 12 ключей спеки §11
+  (`network.read/configure`, `storage.read/write`, `services.read/control`,
+  `process.execute`, `camera.read/control`, `usb/gpio/serial.access`)
+  с подписями для UI, `validate_manifest()` (v1-манифесты валидны),
+  `core_version_ok()` (min/max_core_version против APP_VERSION),
+  текст UI-запроса прав при установке; `compute_status()` проверяет
+  min/max_core_version (→ incompatible), `capabilities` `group.key`
+  (→ requires-hardware) и модульные `dependencies` (→ requires-dependency);
+  каталог: SHA-256 тарболла из index.json (opt-in `require_sha256`),
+  opt-in `trusted_publishers` (fail-closed), сверка publisher index ↔
+  module.json и id, min/max_core_version до скачивания и после
+  распаковки, `entry.publisher`/`entry.sha256` в state; UI `/modules` —
+  confirm-запрос прав перед установкой (deps и catalog) + подписи прав
+  в карточках; schema-only: `conflicts/services/configuration/role_support`
+  (потребитель — Roles 2.0-5); +35 тестов
+  (`test_manifest_v2.py`, `test_module_catalog_trust.py`).
 - **Jobs subsystem (PHASE 2.0-3):** `core/jobs.py` — фоновые задачи
   (queued/running/completed/failed/cancelled): пул worker-тредов,
   cooperative-отмена (`ctx.check_cancel()`), логи/прогресс/результат;
@@ -49,6 +66,13 @@
   subprocess/systemctl, Jobs, Module manifest v2+permissions+trust,
   Roles v2, Network Core с транзакциями, Storage Core); `README` —
   статус «в разработке», боевые системы остаются на 1.1.
+
+### Исправлено
+- **Гонка `wait()` в jobs:** событие выставлялось до persist в sqlite —
+  `wait()` мог вернуться, пока строка в БД ещё `running` (read-after-wait
+  видел устаревший статус); persist теперь идёт до `ev.set()`
+  (`_run_one`, отмена queued-задачи); поймано ретраем
+  `test_job_persisted_to_sqlite` под нагрузкой.
 
 ## [1.1.0] — 01.10.2026
 

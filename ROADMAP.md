@@ -20,7 +20,7 @@
 | **2.0-1** | Capabilities 2.0 | таксономия `network.* / storage.* / hardware.* / radio.* / camera.* / media.* / service.*` поверх `core/capabilities.py` (модель present/absent/unknown × measured/detected/unverified сохраняется); расширение `collect()`; `/api/capabilities` аддитивно; UI `/capabilities` с группировкой; тесты compat-чеков модулей от новых capability | **DONE (01.10.2026)** |
 | **2.0-2** | Core skeleton + инвентаризация | `core/services.py` (status/start/stop/restart/enable/disable/logs/health), `core/process.py` (безопасный запуск команд), `core/config.py` (settings без зависимости от app); таблица-инвентаризация всех вызовов `subprocess`/`systemctl` (18/13 файлов) с планом переноса; контракты `core/network.py`/`core/storage.py` read-only; первый перенос (1–2 вызова) с тестом | **DONE (01.10.2026)** |
 | **2.0-3** | Jobs subsystem | `core/jobs.py`: manager + worker-треды, состояния queued/running/completed/failed/cancelled, поля id/type/status/progress/started_at/finished_at/logs/result/error/cancelable; sqlite-таблица `jobs` (retention как у events); `GET /api/jobs` + `POST /api/jobs/<id>/cancel`; UI-виджет активных jobs; миграция на jobs: module install/update, backup/restore БД, network scan | **DONE (02.10.2026)** |
-| **2.0-4** | Module manifest 2.0 + permissions + trust | схема v2 (capabilities/dependencies/conflicts/services/configuration/role_support + publisher/sha256/min_core_version/max_core_version) — back-compat v1; сетка прав (network/storage/services/process/camera/usb/gpio/serial) в манифесте и UI-запрос при установке; catalog: SHA-256 тарболла из index, trusted sources, core-compat check; без PKI/sandbox (спека §11–12) | pending |
+| **2.0-4** | Module manifest 2.0 + permissions + trust | схема v2 (capabilities/dependencies/conflicts/services/configuration/role_support + publisher/sha256/min_core_version/max_core_version) — back-compat v1; сетка прав (network/storage/services/process/camera/usb/gpio/serial) в манифесте и UI-запрос при установке; catalog: SHA-256 тарболла из index, trusted sources, core-compat check; без PKI/sandbox (спека §11–12) | **DONE (02.10.2026)** |
 | **2.0-5** | Roles 2.0 | `roles/<id>.json` манифесты (required_modules/optional_modules/capabilities/hardware_requirements/dependencies/conflicts/recommended_configuration/security_profile); загрузчик в `core/roles.py`, compat через `compute_status()`/capabilities; роли-примеры: Network Gateway, Home Server, Remote Site, Industrial Gateway, Network Diagnostic Box, Camera Gateway (SDR — ждём хвост спеки); apply/API не ломаем (ALWAYS_ON сохраняется) | pending |
 | **2.0-6** | Network Core (транзакционный) | `core/network.py`: объекты interfaces/addresses/routes/firewall/…; каркас Prepare→Apply→Verify→Commit/Rollback; UI-warning «This operation may disconnect the current session»; авто-rollback; первый перенос: sys-network-операции; DHCP/DNS/VPN/AP/bridge — по мере модулей-потребителей | pending |
 | **2.0-7** | Storage Core | `core/storage.py`: корни `/srv/media|data|backup`, disks/partitions/mounts/SMART (lsblk/smartctl уже в TOOL_PROBES), shares/backup targets; `storage.path()` для модулей; миграция констант модулей (IPTV_DIR/MEDIA_DIR/PLAYLISTS_DIR и др.) | pending |
@@ -175,3 +175,59 @@
   pre-existing, падают и на чистом HEAD `2542f55`: нет lsblk и
   linux-специфики); py_compile всех правок, рантайм-смоук core.jobs,
   Jinja-парс шаблонов — чисто; unit CI — после push этой фазы.
+
+### 02.10.2026 — PHASE 2.0-4: Module manifest 2.0 + permissions + trust — **DONE**
+
+- `core/manifest.py` — контракт манифеста 2.0 (спека §10–11): замкнутая
+  сетка прав из 12 ключей (`network.read/configure`, `storage.read/write`,
+  `services.read/control`, `process.execute`, `camera.read/control`,
+  `usb/gpio/serial.access`) — подписи+описания для UI;
+  `validate_manifest()` (проверяются только присутствующие поля —
+  v1-манифесты валидны); `parse_version`/`core_version_ok`
+  (подравнивание 1.2 ≈ 1.2.0); `install_confirm_text()` — текст
+  UI-запроса прав.
+- Права — строго по сетке: v1-примеры «admin/network» из docstring не
+  использовались ни в одном из 33 существующих `module.json` →
+  переопределяем семантику; валидация гоняется в catalog-путях и в
+  тестах, локальные манифесты на discover не роняем (не ломаем рабочие
+  каталоги опечатками).
+- `compute_status()` — аддитивно (старые манифесты ведут себя как
+  раньше): `min/max_core_version` против `APP_VERSION` → incompatible
+  (fail-closed на нечитаемой заявленной версии; ctx без app_version →
+  пропуск); `capabilities` вида `group.key` → requires-hardware (голые
+  группы не проверяем — не гадаем); `dependencies` (id модулей) →
+  requires-dependency, пока хоть одна не установлена или выключена;
+  приоритет incompatible → requires-hardware → requires-dependency
+  сохранён. `status_context()` отдаёт `app_version` (ленивый импорт app).
+- Trust каталога (спека §12): SHA-256 тарболла из `index.json` сверяется
+  всегда, когда там есть; `require_sha256` (settings) — opt-in
+  fail-closed для legacy-index; `trusted_publishers` — opt-in fail-closed
+  (непустой: чужой **или отсутствующий** publisher → отказ);
+  `min/max_core_version` — дважды: index до скачивания и module.json
+  после распаковки (авторитетно); publisher index ↔ module.json обязан
+  совпадать — identity должен быть и в самом манифесте (отказ даже без
+  trusted_publishers); id в module.json ↔ id из каталога. Результат
+  фиксируется в state: `entry.publisher`, `entry.sha256`.
+- **sha256 — не поле module.json**: манифест не может верифицировать сам
+  себя; контрольная сумма живёт в index.json (спека-дерево Module
+  читается как «версия манифеста хранит ожидаемый digest из index»).
+- UI: confirm-запрос прав перед установкой (deps-install и
+  catalog-install) — «Модуль «…» запрашивает права: … Продолжить?»
+  (`|tojson` в атрибуте onsubmit); подписи прав в карточках
+  (label + tooltip «key — описание»); catalog-карточка показывает
+  `permissions` из index, если он их отдаёт.
+- Schema-only (есть валидации, нет поведения — потребитель в Roles
+  2.0-5): `conflicts`, `services`, `configuration`, `role_support`;
+  `capabilities` голыми группами. Запрет одновременного включения
+  conflicts — не вводим (нужен потребитель-применяющий). Sandbox/PKI —
+  нет (спека §11–12: сначала permission model как контракт).
+- Тесты +35: `test_manifest_v2.py` (19: сетка/валидация/версии/статусы/
+  confirm, рендер /modules позитив+негатив),
+  `test_module_catalog_trust.py` (16: sha256 match/mismatch/require,
+  publishers fail-closed/allowed, min/max-core из index и манифеста,
+  битый JSON, id/publisher-mismatch, флаг update). Локально: 269 passed
+  (+2 pre-existing Windows-фейла); CI — после push.
+- Побочный фикс `core/jobs.py`: гонка persist ↔ `ev.set()` — `wait()`
+  возвращался до записи в sqlite (read-after-wait видел `running`,
+  поймано ретраем `test_job_persisted_to_sqlite`); persist теперь до
+  события (`_run_one`, отмена queued).
