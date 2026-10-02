@@ -32,7 +32,7 @@
 | **2.0-13** | Automation (§17) | `core/automation.py`: правила Event→Rule→Action (`automation_rules`, ensure-таблица), матчинг dual-read + cooldown + guard от петель, реестр действий (`log`/`event`, расширение модулями), engine на `events.subscribe` + `automation.start()` в app, CRUD API `/api/automation/rules*`, минимальный UI `/automation` (nav Система, admin), тесты | **DONE (02.10.2026)** |
 | **2.0-14** | Config & Secrets (§20–21) | классы конфигов в docstring `core/config` + единый справочник путей (`SETTINGS_PATH`/`MODULES_STATE_PATH`/`ROLES_STATE_PATH`, потребители module_loader/roles/module_catalog); `core/secrets.py`: `get/set/delete/keys` (kv.json, Fernet at rest, 0600) + crypto перенесён из core_routes (compat-алиасы), токен каталога → secrets с fallback на settings; тесты | **DONE (02.10.2026)** |
 | **2.0-15** | Module contract v2 (§19, §24) | uniform module context (`register_routes(app, ctx)`), миграция модулей по одному, builtin-манифесты → v2 (version/capabilities) | **DONE (02.10.2026)** |
-| **2.0-16** | System rollback (§26) | preflight→backup→apply→verify→rollback для apt/системных изменений (app-level rollback уже в update.sh) | pending |
+| **2.0-16** | System rollback (§26) | preflight→backup→apply→verify→rollback для apt/системных изменений (app-level rollback уже в update.sh) | **DONE (02.10.2026)** |
 | **2.0-17** | Appliance smoke test (§27) | интеграционная цепочка install→…→failure→rollback (на стенде; важнее мелких UI-тестов) | pending |
 | **2.0-18** | Installer 2.0 (§25) | preflight + hardware detection + health check, ARM/x86_64/минимальные установки, без платы-специфики | pending |
 | **2.0-19** | UI 2.0 shell (§22–24) | Application Shell → Navigation → Module Page, разделы HOME…ADMIN, dashboard-ответы, единые диалоги/уведомления/иконки | pending |
@@ -609,3 +609,25 @@
   test_module_status обновлён под version-бейджи. Локально 360
   passed (2 pre-existing Windows-фейла, 3 Linux-skip); CI после push
   (ожидание 365).
+
+
+### 02.10.2026 — PHASE 2.0-16: System rollback — **DONE**
+
+- core/syschange.py (§26): конвейер preflight→backup→apply→verify
+  →rollback для apt_install/file_write; run_cmd инжектируемый
+  (тесты/стенд), лог шагов → job; бэкапы в
+  /var/lib/lan-discovery/rollback/<id>/ (manifest.json, dpkg-до,
+  selections.txt, files/); публичный rollback(txn_dir) идемпотентен
+  (для ручного отката и смоука §27); SystemChangeError несёт .txn
+  (state: preflight-failed/backup-failed/rolled_back/rollback-failed).
+- Потребитель: apt-шаг module_manager._install_manifest переведён на
+  syschange.run (логи preflight/backup/apply/verify в job, сбой →
+  ok: false + откат частично установленных пакетов); format шагов
+  "apt install X: OK/FAIL" сохранён.
+- Разделение §26 соблюдено: application rollback — в update.sh;
+  здесь только system-level; docs это фиксируют.
+- Тесты: +9 (tests/unit/test_syschange.py, FakeApt: порядок шагов,
+  откат на preflight/apply/verify, снятие новых пакетов,
+  file_write+ручной rollback, потребитель ok/fail). Локально 369
+  passed (2 pre-existing Windows-фейла, 3 Linux-skip); CI после
+  push (ожидание 374).
