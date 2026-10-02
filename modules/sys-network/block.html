@@ -42,5 +42,81 @@
 <div id="net-host-result" style="margin-top:8px; font-size:13px; color:#888;"></div>
 </div>
 
+{% if current_user.role == 'admin' %}
+<div style="margin-top:16px; border-top:1px solid #333; padding-top:12px;">
+<div class="info-label" style="margin-bottom:6px;">Настройка интерфейса (Core Network)</div>
+<div style="color:#f59e0b; font-size:12px; margin-bottom:8px;">
+&#9888; Эта операция может разорвать текущее подключение (This operation may disconnect the current session).
+</div>
+<div class="info-row" style="display:flex; gap:6px; flex-wrap:wrap;">
+<select id="net-iface" style="padding:4px 6px; font-size:13px; max-width:160px;"></select>
+<input id="net-cidr" placeholder="192.168.3.10/24" style="padding:4px 6px; font-size:13px; width:150px;">
+<button type="button" onclick="netSetAddr()" style="padding:4px 10px; font-size:13px; background:#2563eb;">Применить</button>
+<button type="button" onclick="netDelAddr()" style="padding:4px 10px; font-size:13px;">Удалить</button>
+</div>
+<div id="net-addr-info" style="margin-top:8px; font-size:12px; color:#888;"></div>
+<div id="net-addr-result" style="margin-top:6px; font-size:13px;"></div>
+</div>
+<script>
+async function netLoadIfaces() {
+  try {
+    const r = await fetch("/api/network/info");
+    const d = await r.json();
+    const sel = document.getElementById("net-iface");
+    const info = document.getElementById("net-addr-info");
+    if (!d.ok || !d.interfaces) { info.textContent = d.error || "нет данных о сети"; return; }
+    sel.innerHTML = "";
+    for (const it of d.interfaces) {
+      if (it.type === "loopback") continue;
+      const o = document.createElement("option");
+      o.value = it.name;
+      o.textContent = it.name + " (" + it.state + ")";
+      sel.appendChild(o);
+    }
+    const addrs = (d.addresses || [])
+      .filter(a => a.family === "inet")
+      .map(a => a.iface + ": " + a.addr + "/" + a.prefixlen);
+    info.textContent = addrs.length ? "IPv4: " + addrs.join(", ") : "IPv4-адресов нет";
+  } catch (e) {
+    document.getElementById("net-addr-info").textContent = "нет данных о сети";
+  }
+}
+async function netAddr(action) {
+  const iface = document.getElementById("net-iface").value;
+  const cidr = document.getElementById("net-cidr").value.trim();
+  const out = document.getElementById("net-addr-result");
+  if (!iface || !cidr) { out.style.color = "#f87171"; out.textContent = "Укажите интерфейс и CIDR"; return; }
+  const warn = "Эта операция может разорвать текущее подключение (This operation may disconnect the current session).\n" +
+    (action === "set" ? "Применить" : "Удалить") + " " + cidr + " на " + iface + "?";
+  if (!confirm(warn)) return;
+  out.style.color = "#ccc"; out.textContent = "Выполняется транзакция (Prepare → Apply → Verify)…";
+  try {
+    const r = await fetch("/api/network/address", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({action: action, iface: iface, cidr: cidr, insurance_grace: 20})
+    });
+    const d = await r.json();
+    if (d.ok) {
+      out.style.color = "#4ade80";
+      out.textContent = "✓ Готово (" + d.phase + ")" +
+        (d.rolled_back ? "" : ", через 20 с — авто-проверка с откатом при обрыве");
+      netLoadIfaces();
+    } else {
+      out.style.color = "#f87171";
+      out.textContent = "✗ " + (d.error || "ошибка") +
+        (d.rolled_back ? " (изменения откачены)" : "");
+    }
+  } catch (e) {
+    out.style.color = "#f87171";
+    out.textContent = "✗ " + e;
+  }
+}
+function netSetAddr() { netAddr("set"); }
+function netDelAddr() { netAddr("del"); }
+netLoadIfaces();
+</script>
+{% endif %}
+
 </div>
 
