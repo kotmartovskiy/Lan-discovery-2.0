@@ -1,0 +1,12 @@
+{
+  "id": "network",
+  "name": "Сеть и наблюдение",
+  "description": "Инвентаризация, мониторинг, сетевые утилиты, Bluetooth.",
+  "required_modules": [
+    "inventory", "monitoring", "nettools",
+    "wifianalyzer", "bluetooth", "disks"
+  ],
+  "optional_modules": [],
+  "security_profile": "standard",
+  "recommended_configuration": {}
+}

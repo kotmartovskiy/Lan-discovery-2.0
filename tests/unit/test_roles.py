@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Unit: roles layer (STEP 9) — профили модулей, apply, API /api/roles."""
+"""Unit: roles layer 2.0 — манифесты roles/*.json, apply, API /api/roles."""
+import json
+import os
 import time
 
 import pytest
@@ -27,17 +29,44 @@ def client(monkeypatch):
     app.app.config["WTF_CSRF_ENABLED"] = old
 
 
+def _reset_cache(monkeypatch):
+    monkeypatch.setattr(roles, "_roles_cache", {"ts": 0.0, "data": None})
+
+
+def test_role_files_on_disk_valid():
+    assert roles.load_roles(), "роли не загрузились"
+    for rid, m in roles.load_roles().items():
+        assert roles.validate_role(m, rid) == [], rid
+    # legacy-профили 1.1 сохранены + 6 ролей из спеки §14 (SDR ждём)
+    assert {"default", "media", "network"} <= set(roles.load_roles())
+    assert {"network-gateway", "home-server", "remote-site",
+            "industrial-gateway", "network-diagnostic-box",
+            "camera-gateway"} <= set(roles.load_roles())
+    assert "sdr" not in roles.load_roles()  # хвост спеки ждём
+
+
 def test_profiles_reference_real_modules():
+    # legacy-профили обязаны ссылаться только на существующие модули;
+    # новые спека-роли могут ссылаться на будущие — это честно фиксирует
+    # roles_overview() в поле missing
     known = {m["id"] for m in discover_modules()}
-    for rid, p in roles.PROFILES.items():
-        if p["modules"] == "*":
+    ov = {r["id"]: r for r in roles.roles_overview()["roles"]}
+    for rid in ("default", "media", "network"):
+        m = roles.load_roles()[rid]
+        ids = m["required_modules"]
+        if ids == "*":
             continue
-        for mid in p["modules"]:
+        for mid in ids:
             assert mid in known, "роль %s ссылается на неизвестный %s" % (rid, mid)
+    for r in ov.values():
+        known_wanted = [i for i in r["required"] + r["optional"] if i != "*"]
+        assert set(r["missing"]) <= set(known_wanted)
+        for mid in r["missing"]:
+            assert mid not in known
 
 
 def test_always_on_in_every_profile():
-    for rid in roles.PROFILES:
+    for rid in roles.load_roles():
         targets = roles._targets(rid)
         for mid in roles.ALWAYS_ON:
             if mid in targets:
@@ -128,8 +157,9 @@ def test_apply_unknown_role():
 
 def test_roles_overview_shape():
     ov = roles.roles_overview()
-    assert ov["active"] in roles.PROFILES
-    assert [r["id"] for r in ov["roles"]] == list(roles.PROFILES.keys())
+    rids = set(roles.load_roles())
+    assert ov["active"] in rids
+    assert {r["id"] for r in ov["roles"]} == rids
     for r in ov["roles"]:
         mids = {m["id"] for m in r["modules"]}
         for mid in roles.ALWAYS_ON:
@@ -138,6 +168,15 @@ def test_roles_overview_shape():
             assert m["status"] in MODULE_STATUSES
             assert isinstance(m["always_on"], bool)
             assert isinstance(m["enabled"], bool)
+            assert m["role"] in ("required", "optional", "conflict", "always")
+        # контракт Roles 2.0 (аддитивно к 1.1)
+        for key in ("required", "optional", "missing", "not_installed",
+                    "conflicts", "blockers", "ready",
+                    "security_profile", "recommended_configuration"):
+            assert key in r, "%s без %s" % (r["id"], key)
+        assert isinstance(r["ready"], bool)
+        assert isinstance(r["blockers"], list)
+        assert isinstance(r["recommended_configuration"], dict)
 
 
 def test_api_roles(client):
@@ -145,7 +184,7 @@ def test_api_roles(client):
     assert r.status_code == 200
     d = r.get_json()
     assert "active" in d
-    assert len(d["roles"]) == len(roles.PROFILES)
+    assert len(d["roles"]) == len(roles.load_roles())
 
 
 def test_roles_page(client):
@@ -168,3 +207,127 @@ def test_nav_roles_admin_only():
     user_urls = {e["url"] for g in nav_groups(False) for e in g["entries"]}
     assert "/roles" in admin_urls
     assert "/roles" not in user_urls
+
+
+# --- Roles 2.0: валидация, загрузчик, blockers, conflicts -------------------
+
+def test_validate_role_ok_and_errors():
+    good = {"id": "x", "name": "X"}
+    assert roles.validate_role(good, "x") == []
+    assert any("не объект" in e for e in roles.validate_role(None))
+    assert any("не совпадает" in e for e in roles.validate_role(good, "y"))
+    assert any("name" in e for e in roles.validate_role({"id": "x"}))
+    e = roles.validate_role(
+        {"id": "x", "name": "X", "conflicts": ["sys-settings"]}, "x")
+    assert any("ALWAYS_ON" in x for x in e)
+    e = roles.validate_role(
+        {"id": "x", "name": "X", "optional_modules": ["*"]}, "x")
+    assert any("*" in x for x in e)
+    e = roles.validate_role(
+        {"id": "x", "name": "X", "capabilities": ["BAD"]}, "x")
+    assert any("capabilities" in x for x in e)
+    e = roles.validate_role(
+        {"id": "x", "name": "X", "required_modules": "nope",
+         "dependencies": [], "recommended_configuration": [],
+         "security_profile": 5}, "x")
+    assert len(e) >= 4
+
+
+def test_load_roles_skips_invalid(tmp_path, monkeypatch):
+    (tmp_path / "ok.json").write_text(
+        json.dumps({"id": "ok", "name": "Ok"}), encoding="utf-8")
+    (tmp_path / "bad.json").write_text(
+        json.dumps({"id": "bad", "conflicts": ["sys-db"]}), encoding="utf-8")
+    monkeypatch.setattr(roles, "ROLES_DIR", str(tmp_path))
+    _reset_cache(monkeypatch)
+    got = roles.load_roles(force=True)
+    assert "ok" in got and "bad" not in got
+
+
+def _role_dir(tmp_path, monkeypatch, role):
+    (tmp_path / ("%s.json" % role["id"])).write_text(
+        json.dumps(role), encoding="utf-8")
+    monkeypatch.setattr(roles, "ROLES_DIR", str(tmp_path))
+    _reset_cache(monkeypatch)
+    roles.load_roles(force=True)
+
+
+def test_role_blockers(tmp_path, monkeypatch):
+    _role_dir(tmp_path, monkeypatch, {
+        "id": "b", "name": "B",
+        "required_modules": ["monitoring"],
+        "capabilities": ["camera.usb0", "network"],
+        "hardware_requirements": {"arch": ["armv71"],
+                                  "tools": ["gpu-tool"]},
+        "dependencies": {"apt": ["nope-pkg"],
+                         "services": ["weird.service"]},
+    })
+    ctx = {"arch": "aarch64",
+           "caps": {"camera": {"usb0": {"state": "absent"}}, "tools": {}}}
+    monkeypatch.setattr(roles, "_missing_apt_packages", lambda p: ["nope-pkg"])
+    import core.services as svc
+    monkeypatch.setattr(
+        svc, "status",
+        lambda unit, timeout=5: {"unit": unit, "active": "unknown",
+                                 "enabled": "unknown"})
+    blockers = roles.role_blockers("b", ctx)
+    text = " ".join(blockers)
+    assert "архитектура" in text
+    assert "camera.usb0" in text
+    assert "gpu-tool" in text
+    assert "nope-pkg" in text
+    assert "нет возможности network" not in text  # голая группа — не гадаем
+    assert "weird.service" not in text           # active unknown — не гадаем
+    # совместимая система → blockers пуст
+    ok_ctx = {"arch": "armv71",
+              "caps": {"camera": {"usb0": {"state": "present"}},
+                       "tools": {"gpu-tool": {"state": "present"}}}}
+    monkeypatch.setattr(roles, "_missing_apt_packages", lambda p: [])
+    monkeypatch.setattr(
+        svc, "status",
+        lambda unit, timeout=5: {"unit": unit, "active": "active",
+                                 "enabled": "enabled"})
+    assert roles.role_blockers("b", ok_ctx) == []
+
+
+def test_apply_role_refused_when_blockers(tmp_path, monkeypatch):
+    _role_dir(tmp_path, monkeypatch, {
+        "id": "hw", "name": "HW",
+        "required_modules": ["monitoring"],
+        "hardware_requirements": {"arch": ["armv71"]},
+    })
+    monkeypatch.setattr(roles, "status_context",
+                        lambda: {"arch": "aarch64", "caps": {}})
+    res = roles.apply_role("hw")
+    assert res["ok"] is False
+    assert "не подходит" in res["error"]
+
+
+def test_targets_conflicts(tmp_path, monkeypatch):
+    _role_dir(tmp_path, monkeypatch, {
+        "id": "c", "name": "C",
+        "required_modules": ["monitoring"],
+        "conflicts": ["notes"],
+    })
+    t = roles._targets("c")
+    assert t["notes"] is False          # конфликт роли выключается
+    assert t["monitoring"] is True
+    for mid in roles.ALWAYS_ON:
+        if mid in t:
+            assert t[mid] is True
+
+
+def test_overview_conflict_and_role_flags(tmp_path, monkeypatch):
+    _role_dir(tmp_path, monkeypatch, {
+        "id": "c", "name": "C",
+        "required_modules": ["monitoring"],
+        "optional_modules": ["disks"],
+        "conflicts": ["notes"],
+    })
+    ov = roles.roles_overview()
+    r = next(x for x in ov["roles"] if x["id"] == "c")
+    byid = {m["id"]: m for m in r["modules"]}
+    assert byid["monitoring"]["role"] == "required"
+    assert byid["disks"]["role"] == "optional"
+    assert byid["notes"]["role"] == "conflict"
+    assert r["conflicts"] == ["notes"]

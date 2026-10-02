@@ -1,0 +1,19 @@
+{
+  "id": "home-server",
+  "name": "Home Server",
+  "description": "Домашний сервер: хранилище, Samba, DLNA, торренты, бэкапы, медиа, мониторинг (спека §14).",
+  "required_modules": [
+    "storage", "samba", "dlna", "torrent",
+    "backup", "media", "monitoring"
+  ],
+  "optional_modules": [],
+  "capabilities": [],
+  "hardware_requirements": {},
+  "dependencies": {},
+  "conflicts": [],
+  "recommended_configuration": {
+    "media_library": "/srv/media",
+    "backup_schedule": "nightly"
+  },
+  "security_profile": "standard"
+}

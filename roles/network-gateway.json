@@ -1,0 +1,18 @@
+{
+  "id": "network-gateway",
+  "name": "Network Gateway",
+  "description": "Шлюз сети: DHCP, DNS, firewall, NAT, VPN и мониторинг (спека §14).",
+  "required_modules": [
+    "network", "dhcp", "dns", "firewall", "nat", "vpn", "monitoring"
+  ],
+  "optional_modules": [],
+  "capabilities": ["network.ethernet"],
+  "hardware_requirements": {},
+  "dependencies": {},
+  "conflicts": [],
+  "recommended_configuration": {
+    "uplink": "eth0",
+    "dhcp_server": "enabled"
+  },
+  "security_profile": "standard"
+}

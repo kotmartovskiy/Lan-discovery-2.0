@@ -1,0 +1,14 @@
+{
+  "id": "media",
+  "name": "Медиацентр",
+  "description": "Торренты, DLNA/UPnP, плеер, радио, IPTV, загрузки.",
+  "required_modules": [
+    "torrent", "dlna", "player", "radio",
+    "downloads", "upnp", "sys-iptv"
+  ],
+  "optional_modules": [],
+  "security_profile": "standard",
+  "recommended_configuration": {
+    "media_library": "/srv/media"
+  }
+}

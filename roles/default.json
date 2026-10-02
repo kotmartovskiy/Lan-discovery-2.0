@@ -1,0 +1,9 @@
+{
+  "id": "default",
+  "name": "Полный",
+  "description": "Все модули панели включены (базовый профиль).",
+  "required_modules": "*",
+  "optional_modules": [],
+  "security_profile": "standard",
+  "recommended_configuration": {}
+}

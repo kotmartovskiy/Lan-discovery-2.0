@@ -1,0 +1,19 @@
+{
+  "id": "remote-site",
+  "name": "Remote Site",
+  "description": "Удалённый объект: VPN, мониторинг, камеры, бэкапы, watchdog, recovery и store-and-forward (спека §14).",
+  "required_modules": [
+    "vpn", "monitoring", "camera", "backup",
+    "watchdog", "recovery", "store-and-forward"
+  ],
+  "optional_modules": [],
+  "capabilities": [],
+  "hardware_requirements": {},
+  "dependencies": {},
+  "conflicts": [],
+  "recommended_configuration": {
+    "store_and_forward": true,
+    "telemetry_queue": "/var/lib/lan-discovery/queue"
+  },
+  "security_profile": "hardened"
+}

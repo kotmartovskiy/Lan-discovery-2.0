@@ -1,0 +1,19 @@
+{
+  "id": "network-diagnostic-box",
+  "name": "Network Diagnostic Box",
+  "description": "Диагностическая коробка: discovery, сетевая диагностика, path monitor, internet watchdog, blackbox (спека §14).",
+  "required_modules": [
+    "discovery", "network-diagnostics", "path-monitor",
+    "internet-watchdog", "blackbox"
+  ],
+  "optional_modules": [],
+  "capabilities": ["network.ethernet"],
+  "hardware_requirements": {},
+  "dependencies": {},
+  "conflicts": [],
+  "recommended_configuration": {
+    "blackbox_retention_days": 30,
+    "scan_targets": "subnet"
+  },
+  "security_profile": "standard"
+}

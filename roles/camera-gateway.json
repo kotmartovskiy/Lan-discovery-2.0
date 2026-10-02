@@ -1,0 +1,19 @@
+{
+  "id": "camera-gateway",
+  "name": "Camera Gateway",
+  "description": "Шлюз камер: camera discovery, RTSP, snapshot, motion detection, хранилище, NVR (спека §14).",
+  "required_modules": [
+    "camera-discovery", "rtsp", "snapshot",
+    "motion-detection", "storage", "nvr"
+  ],
+  "optional_modules": [],
+  "capabilities": [],
+  "hardware_requirements": {},
+  "dependencies": {},
+  "conflicts": [],
+  "recommended_configuration": {
+    "snapshot_interval_s": 60,
+    "storage_dir": "/srv/camera"
+  },
+  "security_profile": "standard"
+}

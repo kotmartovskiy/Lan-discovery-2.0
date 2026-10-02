@@ -1,0 +1,18 @@
+{
+  "id": "industrial-gateway",
+  "name": "Industrial Gateway",
+  "description": "Промышленный шлюз: RS-485, Modbus, MQTT, мониторинг, VPN, диагностика (спека §14).",
+  "required_modules": [
+    "rs485", "modbus", "mqtt", "monitoring", "vpn", "diagnostics"
+  ],
+  "optional_modules": [],
+  "capabilities": ["hardware.rs485"],
+  "hardware_requirements": {},
+  "dependencies": {},
+  "conflicts": [],
+  "recommended_configuration": {
+    "poll_interval_s": 10,
+    "mqtt_broker": "local"
+  },
+  "security_profile": "hardened"
+}
