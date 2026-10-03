@@ -66,6 +66,18 @@ def save_settings(data):
         pass
 
 
+def _session_cookie_name():
+    """Имя куки сессии.
+
+    Куки браузера не изолируются по порту: две панели на одном хосте
+    (боевая 1.1 и стенд 2.0) делили бы одну куку `session` и затирали
+    сессии друг друга → «The CSRF session token is missing». На стенде
+    задаётся settings.web.session_cookie (например, «session_ld20»);
+    дефолт «session» — поведение обычной установки не меняется.
+    """
+    return str(load_settings().get("web", {}).get("session_cookie") or "session")
+
+
 def _check_rate(action, cooldown=60):
     now = time.time()
     last = _rate_limits.get(action, 0)
@@ -241,6 +253,7 @@ csrf = CSRFProtect(app)
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = False  # панель работает по HTTP в LAN
+app.config["SESSION_COOKIE_NAME"] = _session_cookie_name()
 
 from core.module_loader import MODULES_DIR, block_items
 from jinja2 import ChoiceLoader, FileSystemLoader

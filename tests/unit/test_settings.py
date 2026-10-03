@@ -95,3 +95,23 @@ def test_system_page_has_scan_ifaces_form(client):
     assert "cfg-scan-iface" in html          # чекбоксы интерфейсов
     assert "cfg-scan-enabled" in html        # тумблер фонового скана
     assert "/api/network/ifaces" in html     # загрузка списка
+
+
+def test_session_cookie_name_from_settings(monkeypatch):
+    """settings.web.session_cookie → имя куки сессии.
+
+    Куки не изолируются по порту: стенд 2.0 рядом с 1.1 на одном хосте
+    делил бы куку `session` и затирал сессии боевой панели («The CSRF
+    session token is missing»). Без ключа — прежний дефолт «session».
+    """
+    monkeypatch.setattr(
+        app, "load_settings",
+        lambda: {"web": {"session_cookie": "session_ld20"}})
+    assert app._session_cookie_name() == "session_ld20"
+    monkeypatch.setattr(app, "load_settings", lambda: {"web": {}})
+    assert app._session_cookie_name() == "session"
+    monkeypatch.setattr(app, "load_settings", lambda: {})
+    assert app._session_cookie_name() == "session"
+    # конфиг приложения — непустая строка (имя куки установлено)
+    assert isinstance(app.app.config.get("SESSION_COOKIE_NAME"), str)
+    assert app.app.config.get("SESSION_COOKIE_NAME")
