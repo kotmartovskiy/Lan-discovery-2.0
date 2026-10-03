@@ -37,7 +37,7 @@
 | **2.0-18** | Installer 2.0 (§25) | preflight + hardware detection + health check, ARM/x86_64/минимальные установки, без платы-специфики | **DONE (03.10.2026)** |
 | **2.0-19** | UI 2.0 shell (§22–24) | Application Shell → Navigation → Module Page, разделы HOME…ADMIN, dashboard-ответы, единые диалоги/уведомления/иконки | **DONE (03.10.2026)** |
 | **2.0-20** | Portability (§30) | Orange Pi, X96 Max, x86_64 — через capabilities, hardware-specific в Hardware Detection | **DONE (03.10.2026)** |
-| **2.0-21** | Release (§33 Ph.10, §34) | v2.0.0 + guides + документация §29 (CORE_API/MODULES/CAPABILITIES/…) + demo + release notes | pending |
+| **2.0-21** | Release (§33 Ph.10, §34) | v2.0.0 + guides + документация §29 (CORE_API/MODULES/CAPABILITIES/…) + demo + release notes | **DONE (03.10.2026)** |
 
 Статус фазы — только `pending` / `**DONE (дд.мм.гггг)**`; изменения
 состава — с записью ниже (§3).
@@ -744,3 +744,43 @@
   (N6, решение пользователя).
 - Локально 388 passed (2 pre-existing Windows-фейла, 3 Linux-skip);
   CI после push (ожидание 393).
+
+### 03.10.2026 — PHASE 2.0-21: Release — **DONE**
+
+- Документация §29: 11 guides в docs/2.0 — ARCHITECTURE (целевая
+  модель, границы Core/Module/Role/UI, инварианты слоёв, потоки),
+  CORE_API (контракты всех subsystems core), MODULES (манифест v2,
+  uniform register_routes(app, ctx), жизненный цикл), CAPABILITIES
+  (11 групп, состояния/reliability, добавление hardware), ROLES
+  (roles/*.json, apply/role_blockers), NETWORK (net.transaction,
+  discovery/reconcile), STORAGE (ROOTS/path, потребители), JOBS
+  (контракт, события job.*, кто использует), SECURITY (secrets,
+  trust, syschange, границы), DEVELOPMENT (тесты/CI/процесс/
+  инварианты), PORTING (чек-лист нового устройства, запрет
+  if-board).
+- §33 Ph.10 guides: INSTALL (цепочка Installer §25, флаги, чистый
+  uninstall), UPGRADE (цикл update.sh бэкап→verify→авто-откат,
+  application vs system rollback, миграции PRAGMA user_version),
+  MIGRATION (1.1→2.0: что не меняется/меняется, порядок перехода,
+  откат на 1.1 с бэкапом devices.db). RELEASE_NOTES.md — draft
+  v2.0.0 (тег — по отдельному указанию; APP_VERSION=2.0.0 в
+  core/version.py, §34).
+- Demo mode §28: core/demo.py — API adapter (before_request
+  первым в очереди): GET/HEAD /api/* → фикстуры <dir>/api/*.json
+  (кэш 5 с), без фикстуры → безопасный {ok:false, demo:true} 404,
+  изменяющие методы → 403, без сессии → 401; включение —
+  settings.web.demo / LAN_DEMO=1, каталог — web.demo_dir /
+  LAN_DEMO_DIR; контекст demo_mode → плашка .demo-banner в base.html
+  (production HTML не копируется — §28). tools/make_demo.py
+  --fixtures <dir> — режим снимка только GET-API с той же
+  санитизацией (секреты/MAC/имена/подсеть), без HTML-этапов;
+  статичный демо-сайт сохранён (§28 «сохранить»).
+- Тесты: +7 (test_demo_adapter: fixture вместо реального роута,
+  безопасный 404, read-only 403, 401 без сессии, плашка, demo off,
+  загрузчик фикстур). Локально 395 passed; CI 400 passed
+  (run 37081602972). Документация-пара: ARCHITECTURE/CORE_API +
+  guides §29/Ph.10 (run 37080956726 — 393 passed).
+
+**ROADMAP 2.0-0…2.0-21 закрыт.** Остаток: тег `v2.0.0` и публикация
+Release — по отдельному указанию; живой прогон на платах — N6
+(стенд решает пользователь).
