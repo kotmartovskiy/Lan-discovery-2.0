@@ -102,7 +102,7 @@ def test_weather_alert_empty_hidden(wdb):
     assert wr.weather_alerts() == []
 
 
-def _set_mchs(db, published_at, text):
+def _set_mchs(db, published_at, text, fetched_at=None):
     import sqlite3
     con = sqlite3.connect(db)
     con.execute("DELETE FROM mchs_alerts")
@@ -110,7 +110,7 @@ def _set_mchs(db, published_at, text):
         "INSERT INTO mchs_alerts (id, fetched_at, published_at, title, text, "
         "source_url) VALUES (1, ?, ?, 'Предупреждение', ?, "
         "'https://37.mchs.gov.ru/x')",
-        (_NOW.isoformat(timespec="minutes"), published_at, text),
+        (fetched_at or _NOW.isoformat(timespec="minutes"), published_at, text),
     )
     con.commit()
     con.close()
@@ -143,3 +143,32 @@ def test_mchs_future_expiry_shown_regardless_of_age(wdb):
         future.day, months[future.month - 1], future.year)
     _set_mchs(wdb, old, text)
     assert len(wr.mchs_alerts()) == 1
+
+
+def test_weather_alert_status_shown_when_no_alert(wdb):
+    fresh = _NOW.strftime("%Y-%m-%dT%H:%M")
+    _insert_weather_alert(wdb, fresh, alert=None)
+    assert wr.weather_alerts() == []
+    status = wr.weather_alert_status()
+    assert status is not None
+    assert status[0] == fresh
+    assert status[1] == "Иваново"
+
+
+def test_weather_alert_status_stale_hidden(wdb):
+    stale = (_NOW - timedelta(days=3)).strftime("%Y-%m-%dT%H:%M")
+    _insert_weather_alert(wdb, stale, alert=None)
+    assert wr.weather_alert_status() is None
+
+
+def test_mchs_alert_status_fresh_even_if_article_expired(wdb):
+    _set_mchs(wdb, "2026-09-28 12:07",
+              "Действует до 09:00 28 сентября 2026 года")
+    assert wr.mchs_alerts() == []
+    assert wr.mchs_alert_status() is not None
+
+
+def test_mchs_alert_status_stale_hidden(wdb):
+    stale = (_NOW - timedelta(days=3)).isoformat(timespec="minutes")
+    _set_mchs(wdb, "2026-09-28 12:07", "x", fetched_at=stale)
+    assert wr.mchs_alert_status() is None

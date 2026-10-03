@@ -180,10 +180,11 @@
 {% endif %}
 
 
-{% if weather_alerts %}
+{% if weather_alert_status %}
 <h2>Метеопредупреждения</h2>
 
 <div class="info">
+{% if weather_alerts %}
 {% for alert in weather_alerts %}
 <div class="info-row">
 <span class="info-label">⚠️ {{ alert[2] }}</span>
@@ -191,13 +192,20 @@
 <span style="color:#888; margin-left:10px;">обновлено {{ alert[0][8:10] }}.{{ alert[0][5:7] }}.{{ alert[0][:4] }} {{ alert[0][11:] }}</span>
 </div>
 {% endfor %}
+{% else %}
+<div class="info-row">
+<span class="info-label">Активных предупреждений нет</span>
+<span style="color:#888; margin-left:10px;">{{ weather_alert_status[1] }} · {{ weather_alert_status[2] }} · обновлено {{ weather_alert_status[0][8:10] }}.{{ weather_alert_status[0][5:7] }}.{{ weather_alert_status[0][:4] }} {{ weather_alert_status[0][11:16] }} · источник: meteoinfo</span>
+</div>
+{% endif %}
 </div>
 {% endif %}
 
-{% if mchs_alerts %}
+{% if mchs_alert_status %}
 <h2>Экстренные предупреждения</h2>
 
 <div class="info">
+{% if mchs_alerts %}
 {% for alert in mchs_alerts %}
 <div class="info-row">
 <span class="info-label">🚨 МЧС России:</span>
@@ -215,6 +223,12 @@
 <a href="{{ alert[4] }}" target="_blank">Источник: МЧС России</a>
 </div>
 {% endfor %}
+{% else %}
+<div class="info-row">
+<span class="info-label">Активных предупреждений нет</span>
+<span style="color:#888; margin-left:10px;">обновлено {{ mchs_alert_status[0][8:10] }}.{{ mchs_alert_status[0][5:7] }}.{{ mchs_alert_status[0][:4] }} {{ mchs_alert_status[0][11:16] }} · источник: 37.mchs.gov.ru</span>
+</div>
+{% endif %}
 </div>
 {% endif %}
 
