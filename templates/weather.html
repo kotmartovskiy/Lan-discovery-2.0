@@ -94,12 +94,13 @@
 {% if h[0] in phours %}
 {% if h[1] is not none %}{% set ns.t_min = [ns.t_min, h[1]]|min %}{% set ns.t_max = [ns.t_max, h[1]]|max %}{% endif %}
 {% if h[3] is not none %}{% set ns.precip = ns.precip + h[3] %}{% endif %}
-{% if h[5] is not none %}{% set ns.wind = [ns.wind, h[5]]|max %}{% set ns.wind_dir = h[5] %}{% endif %}
+{% if h[5] is not none %}{% set ns.wind = [ns.wind, h[5]]|max %}{% endif %}{% if h[6] is not none %}{% set ns.wind_dir = h[6] %}{% endif %}
 {% if h[7] is not none %}{% set ns.cloud = ns.cloud + h[7] %}{% set ns.cnt = ns.cnt + 1 %}{% endif %}
 {% if h[2] is not none %}{% set ns.code = h[2] %}{% endif %}
 {% endif %}
 {% endfor %}
 
+{% if ns.t_min <= ns.t_max %}
 <div class="card" style="min-width:120px;">
 <h2>{{ pname }}</h2>
 <div class="info-row" style="font-size:13px;">
@@ -118,6 +119,7 @@
 {% if ns.cnt > 0 %} · ☁ {{ "%.0f"|format(ns.cloud / ns.cnt) }} %{% endif %}
 </div>
 </div>
+{% endif %}
 
 {% endfor %}
 
@@ -127,7 +129,7 @@
 {% for h in t %}
 {% if h[1] is not none %}{% set ns2.t_min = [ns2.t_min, h[1]]|min %}{% set ns2.t_max = [ns2.t_max, h[1]]|max %}{% endif %}
 {% if h[3] is not none %}{% set ns2.precip = ns2.precip + h[3] %}{% endif %}
-{% if h[5] is not none %}{% set ns2.wind = [ns2.wind, h[5]]|max %}{% set ns2.wind_dir = h[5] %}{% endif %}
+{% if h[5] is not none %}{% set ns2.wind = [ns2.wind, h[5]]|max %}{% endif %}{% if h[6] is not none %}{% set ns2.wind_dir = h[6] %}{% endif %}
 {% if h[7] is not none %}{% set ns2.cloud = ns2.cloud + h[7] %}{% set ns2.cnt = ns2.cnt + 1 %}{% endif %}
 {% if h[2] is not none %}{% set ns2.code = h[2] %}{% endif %}
 {% endfor %}

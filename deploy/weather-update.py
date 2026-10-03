@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Сбор погодных данных для панели LAN Discovery (Open-Meteo).
+"""Сбор погодных данных для панели LAN Discovery (Open-Meteo + met.no).
+
+Основной источник — Open-Meteo; при его недоступности (блок/лимит по IP)
+автоматически используется met.no Locationforecast (формат данных
+приводится к open-meteo-подобному словарю, восход/заход считается локально).
 
 Пишет в /opt/lan-discovery/devices.db:
   weather_observations   — текущий час (наблюдение для шапки/сейчас)
@@ -13,6 +17,7 @@
 Координаты/регион берутся из /etc/lan-discovery/settings.json (секция weather).
 """
 import json
+import math
 import os
 import re
 import sqlite3
@@ -59,6 +64,248 @@ def fetch(query, tries=2, timeout=12, pause=5):
                 last = e
                 time.sleep(pause)
     raise last
+
+
+# --- Запасной источник: met.no (api.met.no) -------------------------------
+# open-meteo периодически отдаёт 429/таймауты по IP; met.no отвечает 200.
+# Ответ Locationforecast приводится к словарю формата open-meteo, чтобы
+# основной код main() остался без изменений.
+
+METNO_UA = "lan-discovery-weather/1.1 (github.com/kotmartovskiy/Lan-discovery-1.1)"
+
+
+def _tz(tzname):
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo(tzname)
+    except Exception:
+        return timezone(timedelta(hours=3))
+
+
+def _metno_symbol_to_wmo(symbol):
+    """Symbol-code met.no (clearsky_day, lightrainshowers...) -> код WMO."""
+    s = re.sub(r"_(day|night|polartwilight)$", "", symbol or "")
+    if not s:
+        return None
+    if s.startswith("clearsky"):
+        return 0
+    if s.startswith("fair"):
+        return 1
+    if s.startswith("partlycloudy"):
+        return 2
+    if s.startswith("cloudy"):
+        return 3
+    if s.startswith("fog"):
+        return 45
+    if "thunder" in s:
+        return 96 if "hail" in s else 95
+    if "hail" in s:
+        return 96
+    heavy = "heavy" in s
+    light = "light" in s
+    if "freezing" in s or "sleet" in s:
+        return 67 if heavy else 66
+    if "snow" in s:
+        if "showers" in s:
+            return 86 if heavy else 85
+        return 75 if heavy else (71 if light else 73)
+    if "rain" in s:
+        if "showers" in s:
+            return 82 if heavy else (80 if light else 81)
+        return 65 if heavy else (61 if light else 63)
+    return 3
+
+
+def _sun_times(lat, lon, date, tz):
+    """Восход и заход (уравнение восхода), локальное ISO-время дня date."""
+    j0 = datetime(date.year, date.month, date.day, tzinfo=timezone.utc)
+    jd = j0.timestamp() / 86400.0 + 2440587.5
+    n = math.ceil(jd - 2451545.0 + 0.0008)
+    # J★ = n - lon/360 (lon — восточная долгота): солнечный полдень на 41°В
+    # наступает в 09:16 UTC, а не в 14:44
+    jstar = n - lon / 360.0
+    m = (357.5291 + 0.98560028 * jstar) % 360
+    c = (1.9148 * math.sin(math.radians(m))
+         + 0.0200 * math.sin(math.radians(2 * m))
+         + 0.0003 * math.sin(math.radians(3 * m)))
+    lam = (m + c + 180.0 + 102.9372) % 360
+    j_transit = (2451545.0 + jstar + 0.0053 * math.sin(math.radians(m))
+                 - 0.0069 * math.sin(math.radians(2 * lam)))
+    sin_dec = math.sin(math.radians(lam)) * math.sin(math.radians(23.44))
+    cos_dec = math.cos(math.asin(sin_dec))
+    cos_w0 = ((math.sin(math.radians(-0.833))
+               - math.sin(math.radians(lat)) * sin_dec)
+              / (math.cos(math.radians(lat)) * cos_dec))
+    if cos_w0 > 1 or cos_w0 < -1:
+        return None, None
+    w0 = math.degrees(math.acos(cos_w0))
+    out = []
+    for j in (j_transit - w0 / 360.0, j_transit + w0 / 360.0):
+        ts = (j - 2440587.5) * 86400.0
+        out.append(
+            datetime.fromtimestamp(ts, tz=timezone.utc)
+            .astimezone(tz).strftime("%Y-%m-%dT%H:%M")
+        )
+    return out[0], out[1]
+
+
+def metno_to_openmeteo(met, lat, lon, tzname, now):
+    """Словарь формата open-meteo из ответа met.no Locationforecast."""
+    ts = (met.get("properties") or {}).get("timeseries") or []
+    if not ts:
+        return None
+    tz = _tz(tzname)
+
+    entries = []
+    for item in ts:
+        try:
+            t = datetime.strptime(item["time"], "%Y-%m-%dT%H:%M:%SZ")
+            t = t.replace(tzinfo=timezone.utc).astimezone(tz)
+        except Exception:
+            continue
+        data = item.get("data") or {}
+        entries.append({
+            "t": t,
+            "inst": (data.get("instant") or {}).get("details") or {},
+            "h1": data.get("next_1_hours") or {},
+            "h6": data.get("next_6_hours") or {},
+            "h12": data.get("next_12_hours") or {},
+        })
+    if not entries:
+        return None
+
+    def code_of(e):
+        for seg in (e["h1"], e["h6"], e["h12"]):
+            sym = (seg.get("summary") or {}).get("symbol_code")
+            if sym:
+                wmo = _metno_symbol_to_wmo(sym)
+                if wmo is not None:
+                    return wmo
+        return 3
+
+    def wind_kmh(inst):
+        v = inst.get("wind_speed")
+        return round(v * 3.6, 1) if v is not None else None
+
+    # --- current: точка, ближайшая к текущему моменту ---
+    cur_e = min(entries, key=lambda e: abs((e["t"] - now).total_seconds()))
+    inst = cur_e["inst"]
+    temp = inst.get("air_temperature")
+    v_kmh = wind_kmh(inst)
+    apparent = temp
+    if temp is not None and temp <= 10 and (v_kmh or 0.0) >= 4.8:
+        try:
+            apparent = (13.12 + 0.6215 * temp
+                        - 11.37 * (v_kmh ** 0.16)
+                        + 0.3965 * temp * (v_kmh ** 0.16))
+        except Exception:
+            apparent = temp
+    precip_now = ((cur_e["h1"].get("details") or {})
+                  .get("precipitation_amount") or 0.0)
+    current = {
+        "temperature_2m": temp,
+        "apparent_temperature": (round(apparent, 1)
+                                 if apparent is not None else temp),
+        "relative_humidity_2m": inst.get("relative_humidity"),
+        "precipitation": precip_now,
+        "weather_code": code_of(cur_e),
+        "wind_speed_10m": v_kmh if v_kmh is not None else 0.0,
+        "wind_direction_10m": inst.get("wind_from_direction"),
+        "surface_pressure": inst.get("air_pressure_at_sea_level"),
+        "cloud_cover": inst.get("cloud_area_fraction"),
+    }
+
+    # --- hourly: остаток сегодня + завтра (пока есть next_1_hours) ---
+    today_s = now.strftime("%Y-%m-%d")
+    tomorrow_s = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+    now_h = now.strftime("%Y-%m-%dT%H:00")
+    hourly = {
+        "time": [], "temperature_2m": [], "weather_code": [],
+        "precipitation": [], "precipitation_probability": [],
+        "wind_speed_10m": [], "wind_direction_10m": [], "cloud_cover": [],
+    }
+    for e in entries:
+        th = e["t"].strftime("%Y-%m-%dT%H:%M")
+        if th[:10] not in (today_s, tomorrow_s) or th < now_h:
+            continue
+        if not e["h1"]:
+            break
+        det = e["h1"].get("details") or {}
+        hi = e["inst"]
+        hourly["time"].append(th)
+        hourly["temperature_2m"].append(hi.get("air_temperature"))
+        hourly["weather_code"].append(code_of(e))
+        hourly["precipitation"].append(det.get("precipitation_amount") or 0.0)
+        hourly["precipitation_probability"].append(None)
+        hourly["wind_speed_10m"].append(wind_kmh(hi))
+        hourly["wind_direction_10m"].append(hi.get("wind_from_direction"))
+        hourly["cloud_cover"].append(hi.get("cloud_area_fraction"))
+
+    # --- daily: агрегаты по локальным дням + восход/заход локально ---
+    by_date = {}
+    for e in entries:
+        dkey = e["t"].strftime("%Y-%m-%d")
+        rec = by_date.get(dkey)
+        if rec is None:
+            rec = by_date[dkey] = {
+                "date": e["t"].date(), "tmin": None, "tmax": None,
+                "precip": 0.0, "wmax": None,
+                "noon": None, "noon_dist": 99,
+            }
+        t = e["inst"].get("air_temperature")
+        if t is not None:
+            rec["tmin"] = t if rec["tmin"] is None else min(rec["tmin"], t)
+            rec["tmax"] = t if rec["tmax"] is None else max(rec["tmax"], t)
+        seg = e["h1"] or e["h6"] or e["h12"]
+        p = (seg.get("details") or {}).get("precipitation_amount")
+        if p is not None:
+            rec["precip"] += p
+        w = wind_kmh(e["inst"])
+        if w is not None:
+            rec["wmax"] = w if rec["wmax"] is None else max(rec["wmax"], w)
+        dist = abs(e["t"].hour - 12)
+        if dist <= rec["noon_dist"]:
+            rec["noon_dist"] = dist
+            rec["noon"] = e
+
+    daily = {
+        "time": [], "weather_code": [], "temperature_2m_max": [],
+        "temperature_2m_min": [], "precipitation_sum": [],
+        "precipitation_probability_max": [], "wind_speed_10m_max": [],
+        "wind_direction_10m": [], "sunrise": [], "sunset": [],
+    }
+    for dkey in sorted(by_date):
+        rec = by_date[dkey]
+        if rec["tmin"] is None or rec["tmax"] is None:
+            continue
+        sunrise, sunset = _sun_times(lat, lon, rec["date"], tz)
+        noon = rec["noon"] or {}
+        daily["time"].append(dkey)
+        daily["weather_code"].append(code_of(noon) if noon else 3)
+        daily["temperature_2m_max"].append(round(rec["tmax"], 1))
+        daily["temperature_2m_min"].append(round(rec["tmin"], 1))
+        daily["precipitation_sum"].append(round(rec["precip"], 1))
+        daily["precipitation_probability_max"].append(None)
+        daily["wind_speed_10m_max"].append(rec["wmax"] or 0.0)
+        noon_inst = (noon or {}).get("inst") or {}
+        daily["wind_direction_10m"].append(
+            noon_inst.get("wind_from_direction")
+        )
+        daily["sunrise"].append(sunrise)
+        daily["sunset"].append(sunset)
+
+    if not daily["time"]:
+        return None
+    return {"current": current, "hourly": hourly, "daily": daily}
+
+
+def fetch_metno(lat, lon, tzname, now):
+    url = ("https://api.met.no/weatherapi/locationforecast/2.0/compact"
+           "?lat=%s&lon=%s" % (lat, lon))
+    req = urllib.request.Request(url, headers={"User-Agent": METNO_UA})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        met = json.loads(r.read().decode("utf-8"))
+    return metno_to_openmeteo(met, lat, lon, tzname, now)
 
 
 REGION_CODES = {
@@ -224,7 +471,23 @@ def main():
         "precipitation_probability_max,wind_speed_10m_max,sunrise,sunset"
         "&forecast_days=7"
     )
-    data, endpoint = fetch(query)
+    try:
+        data, endpoint = fetch(query)
+    except Exception as e:
+        print("=== OPEN-METEO FAILED: %s" % e, file=sys.stderr)
+        data, endpoint = None, None
+
+    if data is None:
+        # open-meteo недоступен (429/блок по IP) — пробуем met.no
+        try:
+            data = fetch_metno(lat, lon, tzname, now)
+            endpoint = "met.no"
+        except Exception as e:
+            print("=== MET.NO FAILED: %s" % e, file=sys.stderr)
+        if data is None:
+            raise RuntimeError(
+                "погодные источники недоступны (open-meteo, met.no)"
+            )
 
     current = data.get("current", {})
     hourly = data.get("hourly", {})
@@ -308,9 +571,10 @@ def main():
     for i, t in enumerate(times):
         if len(t) >= 13 and int(t[11:13]) == 12:
             noon_wdir[t[:10]] = hourly.get("wind_direction_10m", [None] * len(times))[i]
-
+    # у met.no-фолбэка направление дня сразу в daily (полудень прошёл)
     fc_rows = []
     d_times = daily.get("time", [])
+    daily_wdir = daily.get("wind_direction_10m") or [None] * len(d_times)
     for i, fdate in enumerate(d_times):
         row = (
             fdate,
@@ -320,7 +584,7 @@ def main():
             daily.get("precipitation_sum", [None] * len(d_times))[i],
             daily.get("precipitation_probability_max", [None] * len(d_times))[i],
             daily.get("wind_speed_10m_max", [None] * len(d_times))[i],
-            noon_wdir.get(fdate),
+            daily_wdir[i] or noon_wdir.get(fdate),
             (daily.get("sunrise", [None] * len(d_times))[i] or None),
             (daily.get("sunset", [None] * len(d_times))[i] or None),
             fetched_at,
