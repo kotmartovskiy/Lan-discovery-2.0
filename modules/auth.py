@@ -3,6 +3,8 @@ import json
 import os
 import time
 
+from flask_wtf.csrf import CSRFError
+
 USERS_PATH = "/etc/lan-discovery/users.json"
 SECRET_KEY_PATH = "/etc/lan-discovery/secret.key"
 SESSION_TTL = 12 * 3600  # TTL сессии, сек (P0-5): старые сессии без login_ts тоже истекают
@@ -188,3 +190,26 @@ def register_routes(app, ctx):
     def logout():
         session.pop("user", None)
         return redirect(url_for("login_page"))
+
+    @app.errorhandler(CSRFError)
+    def _csrf_stale(e):
+        """Устаревший/чужой CSRF → человеку понятный ответ.
+
+        Ловушка стенда N6: восстановленная вкладка или кэш формы /login
+        без живой куки сессии давал голый 400 «The CSRF session token is
+        missing» без подсказки. Теперь /login отдаёт свежую форму (200,
+        юзер просто жмёт «Войти»), API — JSON 400, остальное — текст с
+        подсказкой F5. Защита не ослабляется: валидация токена та же.
+        """
+        if request.path.startswith("/api/"):
+            return jsonify(ok=False, error="csrf",
+                           message="Форма устарела — обновите страницу"), 400
+        if request.path == "/login":
+            return render_template(
+                "login.html",
+                error="Форма устарела — войдите ещё раз.",
+                panel_name=_panel_name(),
+            ), 200
+        return ("Форма устарела — обновите страницу (F5) и повторите "
+                "действие.", 400, {"Content-Type":
+                                   "text/plain; charset=utf-8"})

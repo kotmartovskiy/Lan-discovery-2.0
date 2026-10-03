@@ -74,10 +74,23 @@ def test_help_page_has_no_password_literals(admin_session, panel_url):
 
 
 def test_login_post_without_csrf_rejected(panel_url):
+    """POST /login без CSRF: вход не совершается.
+
+    1.1: голый 400. 2.0 (ловушка стенда N6): свежая форма с подсказкой
+    «Форма устарела» (200) вместо бэкенд-текста — но 302/входа нет,
+    валидация токена не ослаблена.
+    """
+    h = requests.get(panel_url + "/api/health", timeout=10).json()
+    v = str(h.get("version") or "")
     r = requests.post(panel_url + "/login",
                       data={"username": "admin", "password": "x"},
                       allow_redirects=False, timeout=10)
-    assert r.status_code == 400
+    if v.startswith("2."):
+        assert r.status_code == 200          # не 302 → не залогинился
+        assert "Форма устарела" in r.text    # человеку понятный ответ
+        assert "csrf_token" in r.text        # свежая форма для повтора
+    else:
+        assert r.status_code == 400
 
 
 def test_api_status_requires_session(panel_url):

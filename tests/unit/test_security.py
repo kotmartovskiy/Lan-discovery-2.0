@@ -41,6 +41,24 @@ def test_security_headers_on_login(client):
     assert r.headers.get("Referrer-Policy") == "same-origin"
 
 
+def test_stale_csrf_on_login_rerenders_form(csrf_client):
+    """Мёртвый CSRF на /login → свежая форма (200), а не голый 400.
+
+    Ловушка стенда N6: восстановленная вкладка/кэш формы без живой куки
+    («The CSRF session token is missing») — юзер должен просто нажать
+    «Войти», без ручного F5. Валидация не ослаблена: чужой токен
+    отклонён, рендерится только форма.
+    """
+    r = csrf_client.post("/login", data={
+        "username": "admin", "password": "1234",
+        "csrf_token": "deadbeef",
+    })
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert "csrf_token" in html            # свежая форма с новым токеном
+    assert "Форма устарела" in html
+
+
 def test_security_headers_on_api(client):
     r = client.get("/api/health")
     assert r.status_code in (200, 503)  # 503 — нет системных бинарей
