@@ -344,6 +344,40 @@ def _inject_user():
             "blocks_for": block_items}
 
 
+# ==================== Demo mode (§28) ====================
+# UI → API adapter (core/demo) → Real API | Demo API → fixtures.
+# Хук ставится первым (до CSRFProtect): в demo панель — read-only
+# барьер: GET /api/* из фикстур, изменяющие методы → 403.
+
+def _demo_api_adapter():
+    from core import demo as core_demo
+    if not core_demo.demo_enabled():
+        return None
+    if not request.path.startswith("/api/"):
+        return None
+    if request.method not in ("GET", "HEAD"):
+        return jsonify({"ok": False, "demo": True,
+                        "error": "demo mode: запись запрещена"}), 403
+    from modules.auth import get_current_user
+    if not get_current_user():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    fx = core_demo.fixture(request.path)
+    if fx is core_demo._NO_FIXTURE:
+        return jsonify({"ok": False, "demo": True,
+                        "error": "demo: фикстуры нет",
+                        "path": request.path}), 404
+    return jsonify(fx)
+
+
+app.before_request_funcs.setdefault(None, []).insert(0, _demo_api_adapter)
+
+
+@app.context_processor
+def _inject_demo():
+    from core import demo as core_demo
+    return {"demo_mode": core_demo.demo_enabled()}
+
+
 # ==================== Auth ====================
 
 from modules.auth import register_routes as register_auth_routes

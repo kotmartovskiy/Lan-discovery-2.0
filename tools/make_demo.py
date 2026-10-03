@@ -16,6 +16,14 @@ demo.js внедряется в <head> — виджеты шапки (погод
 
 Использование (на хосте панели):
   cd /opt/lan-discovery && venv/bin/python tools/make_demo.py /tmp/demo
+
+Режим фикстур для API-адаптера панели (спека §28, core/demo):
+  venv/bin/python tools/make_demo.py --fixtures /tmp/demo-fixtures
+
+  Снимает только GET-API (без HTML) с той же санитизацией →
+  <dir>/api/<path>.json; панель в demo-режиме (settings.web.demo
+  или LAN_DEMO=1, LAN_DEMO_DIR=<dir>) отдаёт их вместо реальных
+  данных, страницы рендерятся production-шаблонами.
 """
 import hashlib
 import json
@@ -29,7 +37,10 @@ from datetime import datetime
 
 sys.path.insert(0, "/opt/lan-discovery")
 
-OUT = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else "/tmp/demo")
+# --fixtures: только API-снимки (фикстуры core/demo, §28), без HTML
+_FIXTURES_MODE = "--fixtures" in sys.argv[1:]
+_argv = [a for a in sys.argv[1:] if a != "--fixtures"]
+OUT = os.path.abspath(_argv[0] if _argv else "/tmp/demo")
 DB = "/opt/lan-discovery/devices.db"
 SNAP = datetime.now().strftime("%d.%m.%Y %H:%M")
 
@@ -397,6 +408,37 @@ def login(client):
     print("login: ok")
 
 
+def _sanitize_api_json(fixes):
+    """Санитайзер API-снимков: имена, MAC, подсеть, пароли. Версия файлов."""
+    n_json = 0
+    for dirpath, _, files in os.walk(os.path.join(OUT, "api")):
+        for fn in sorted(files):
+            if not fn.endswith(".json"):
+                continue
+            p = os.path.join(dirpath, fn)
+            try:
+                text = open(p, encoding="utf-8").read()
+            except OSError as e:
+                print("JSON READ SKIP", p, e)
+                continue
+            try:
+                text = json.dumps(scrub_name_keys(json.loads(text)),
+                                  ensure_ascii=False)
+            except Exception:
+                pass
+            for old, new in sorted(fixes.items(), key=lambda kv: -len(kv[0])):
+                text = text.replace(old, new)
+            text = MAC_RE.sub(fake_mac, text)
+            text = scrub_net_secrets(text)
+            try:
+                with open(p, "w", encoding="utf-8") as f:
+                    f.write(text)
+                n_json += 1
+            except OSError as e:
+                print("JSON WRITE SKIP", p, e)
+    return n_json
+
+
 def main():
     if os.path.isdir(OUT):
         shutil.rmtree(OUT)
@@ -415,9 +457,9 @@ def main():
     client = panel_app.app.test_client()
     login(client)
 
-    # --- страницы ---
+    # --- страницы (нет в режиме --fixtures: §28 не копирует HTML) ---
     page_map = {}
-    pages = list(HTML_PAGES)
+    pages = list(HTML_PAGES) if not _FIXTURES_MODE else []
     pages += ["/device/" + ip for ip in ips]
     pages += ["/inventory/device/" + ip for ip in ips]
     for path in pages:
@@ -450,6 +492,25 @@ def main():
         write_file(path.lstrip("/") + ".json", r.get_data(as_text=True))
         n_api += 1
     print("api snapshots:", n_api)
+
+    if _FIXTURES_MODE:
+        # --- только фикстуры: санитайзеры без HTML-этапов ---
+        for rel, empty in EMPTY_JSON.items():
+            write_file(rel, empty)
+        p = os.path.join(OUT, "api", "settings.json")
+        if os.path.exists(p):
+            try:
+                data = json.load(open(p, encoding="utf-8"))
+                json.dump(scrub(data), open(p, "w", encoding="utf-8"),
+                          ensure_ascii=False, indent=1)
+            except Exception as e:
+                print("settings scrub err:", e)
+        n_json = _sanitize_api_json(fixes)
+        print("json sanitized:", n_json)
+        n_files = sum(len(files) for _, _, files in os.walk(OUT))
+        print("FIXTURES DONE -> %s (%d files), snapshot %s"
+              % (OUT, n_files, SNAP))
+        return
 
     # --- слепок Emergency Restore Server ---
     try:
@@ -503,33 +564,7 @@ def main():
             print("settings scrub err:", e)
 
     # --- санитайзер API-снимков: имена + случайные MAC ---
-    n_json = 0
-    for dirpath, _, files in os.walk(os.path.join(OUT, "api")):
-        for fn in sorted(files):
-            if not fn.endswith(".json"):
-                continue
-            p = os.path.join(dirpath, fn)
-            try:
-                text = open(p, encoding="utf-8").read()
-            except OSError as e:
-                print("JSON READ SKIP", p, e)
-                continue
-            try:
-                text = json.dumps(scrub_name_keys(json.loads(text)),
-                                  ensure_ascii=False)
-            except Exception:
-                pass
-            for old, new in sorted(fixes.items(), key=lambda kv: -len(kv[0])):
-                text = text.replace(old, new)
-            text = MAC_RE.sub(fake_mac, text)
-            text = scrub_net_secrets(text)
-            try:
-                with open(p, "w", encoding="utf-8") as f:
-                    f.write(text)
-                n_json += 1
-            except OSError as e:
-                print("JSON WRITE SKIP", p, e)
-    print("json sanitized:", n_json)
+    print("json sanitized:", _sanitize_api_json(fixes))
 
     # --- трансформация всех HTML ---
     for fname in list(os.listdir(OUT)):

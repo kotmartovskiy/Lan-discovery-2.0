@@ -864,6 +864,20 @@ textarea:focus-visible,
     padding: 0 16px 14px;
 }
 
+/* Demo mode (§28): плашка API-адаптера фикстур. */
+.demo-banner {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 99990;
+    background: #8a6d1a;
+    color: #fff8dc;
+    font: 12px/1.7 system-ui, sans-serif;
+    text-align: center;
+    padding: 3px 8px;
+}
+
 @media (max-width: 420px) {
     .section {
         padding: 6px 7px;
