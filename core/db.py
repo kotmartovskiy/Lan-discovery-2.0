@@ -177,9 +177,13 @@ def _ensure_extra_tables(con):
             pm10 REAL,
             radiation REAL,
             radiation_level TEXT,
+            radiation_points TEXT,
             fetched_at TEXT
         )
     """)
+    _env_cols = {r[1] for r in con.execute("PRAGMA table_info(env_data)")}
+    if "radiation_points" not in _env_cols:
+        con.execute("ALTER TABLE env_data ADD COLUMN radiation_points TEXT")
     con.execute("""
         CREATE TABLE IF NOT EXISTS mchs_alerts (
             id INTEGER PRIMARY KEY,

@@ -1,5 +1,6 @@
 import sqlite3
 import re
+import json
 from datetime import datetime, timezone, timedelta
 from flask import render_template, jsonify
 
@@ -174,29 +175,43 @@ def weather_daily():
         return []
 
 def load_env_data():
-    """Load today's UV, air quality, radiation data (fallback to latest if today not yet fetched)"""
+    """Today's UV/air/radiation + nearest EGASRMRO points (fallback to latest if today not yet fetched)"""
     try:
         today = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d")
         con = sqlite3.connect(DB, timeout=30)
         con.execute("PRAGMA busy_timeout=30000")
+        cols = {r[1] for r in con.execute("PRAGMA table_info(env_data)")}
+        has_pts = "radiation_points" in cols
+        base = ("uv_index, uv_level, aqi, aqi_level, pm25, pm10, "
+                "radiation, radiation_level")
+        if has_pts:
+            base += ", radiation_points"
         row = con.execute(
-            "SELECT uv_index, uv_level, aqi, aqi_level, pm25, pm10, radiation, radiation_level "
-            "FROM env_data WHERE date = ?",
+            f"SELECT {base} FROM env_data WHERE date = ?",
             (today,)
         ).fetchone()
         if not row:
             row = con.execute(
-                "SELECT uv_index, uv_level, aqi, aqi_level, pm25, pm10, radiation, radiation_level "
-                "FROM env_data ORDER BY date DESC LIMIT 1"
+                f"SELECT {base} FROM env_data ORDER BY date DESC LIMIT 1"
             ).fetchone()
         con.close()
         if row:
-            return {
+            data = {
                 "uv_index": row[0], "uv_level": row[1],
                 "aqi": row[2], "aqi_level": row[3],
                 "pm25": row[4], "pm10": row[5],
-                "radiation": row[6], "radiation_level": row[7]
+                "radiation": row[6], "radiation_level": row[7],
+                "radiation_points": None,
             }
+            if has_pts and len(row) > 8 and row[8]:
+                try:
+                    data["radiation_points"] = json.loads(row[8])
+                except (TypeError, ValueError):
+                    pass
+            data["settlement"] = (
+                load_settings().get("weather", {}) or {}
+            ).get("region_name") or "Иваново"
+            return data
     except Exception as e:
         pass
     return None

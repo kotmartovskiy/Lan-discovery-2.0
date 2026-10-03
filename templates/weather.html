@@ -300,9 +300,18 @@
 
 <div class="info-row">
 <span class="info-label">Радиационный фон:</span>
-{% if env_data and env_data.radiation %}{{ "%.1f"|format(env_data.radiation) }} мкР/ч
+{% if env_data and env_data.radiation is not none %}{{ "%.2f"|format(env_data.radiation) }} мкЗв/ч
 ({{ env_data.radiation_level }}){% else %}недоступно{% endif %}
 </div>
+
+{% if env_data and env_data.radiation_points %}
+<div class="rad-points">
+<div class="rad-points-head">Ближайшие пункты к {{ env_data.settlement }} (ЕГАСМРО):</div>
+{% for p in env_data.radiation_points %}
+<div class="rad-point">{{ p.name }} — {{ "%.2f"|format(p.value) }} мкЗв/ч · {{ p.dist }} км {{ p.dir }} · {{ p.date }}</div>
+{% endfor %}
+</div>
+{% endif %}
 
 </div>
 </div>

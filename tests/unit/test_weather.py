@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Unit: свежесть погодных данных в ридере /weather (прогноз/предупреждения)."""
+import json
 from datetime import datetime, timedelta
 
 import pytest
@@ -172,3 +173,69 @@ def test_mchs_alert_status_stale_hidden(wdb):
     stale = (_NOW - timedelta(days=3)).isoformat(timespec="minutes")
     _set_mchs(wdb, "2026-09-28 12:07", "x", fetched_at=stale)
     assert wr.mchs_alert_status() is None
+
+
+def _insert_env(db, date, radiation, level, points_json=None):
+    import sqlite3
+    con = sqlite3.connect(db)
+    con.execute(
+        "INSERT OR REPLACE INTO env_data "
+        "(date, uv_index, uv_level, aqi, aqi_level, radiation, "
+        "radiation_level, radiation_points, fetched_at) "
+        "VALUES (?, 5.0, 'Умеренный', 30, 'Хорошо', ?, ?, ?, ?)",
+        (date, radiation, level, points_json,
+         _NOW.isoformat(timespec="seconds")),
+    )
+    con.commit()
+    con.close()
+
+
+def test_load_env_data_radiation_points(wdb):
+    pts = [{"name": "Волжская Гмо", "value": 0.12, "dist": 152,
+            "dir": "ВЮВ", "date": "03.10.2026", "lat": 56.683, "lng": 43.433},
+           {"name": "Павлово", "value": 0.12, "dist": 171,
+            "dir": "ЮВ", "date": "03.10.2026", "lat": 55.95, "lng": 43.033}]
+    _insert_env(wdb, _NOW.strftime("%Y-%m-%d"), 0.12, "Норма",
+                json.dumps(pts, ensure_ascii=False))
+
+    data = wr.load_env_data()
+    assert data["radiation"] == 0.12
+    assert data["radiation_level"] == "Норма"
+    assert [p["name"] for p in data["radiation_points"]] == [
+        "Волжская Гмо", "Павлово"]
+    assert data["radiation_points"][0]["dist"] == 152
+    assert data["settlement"] == "Иваново"
+
+
+def test_load_env_data_broken_points_json(wdb):
+    _insert_env(wdb, _NOW.strftime("%Y-%m-%d"), 0.11, "Норма", "{bad json")
+
+    data = wr.load_env_data()
+    assert data["radiation"] == 0.11
+    assert data["radiation_points"] is None
+
+
+def test_load_env_data_old_schema_without_points(wdb):
+    import sqlite3
+    con = sqlite3.connect(wdb)
+    con.execute("ALTER TABLE env_data RENAME TO env_data_new")
+    con.execute(
+        "CREATE TABLE env_data ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT UNIQUE, "
+        "uv_index REAL, uv_level TEXT, aqi REAL, aqi_level TEXT, "
+        "pm25 REAL, pm10 REAL, radiation REAL, radiation_level TEXT, "
+        "fetched_at TEXT)")
+    con.execute(
+        "INSERT INTO env_data (date, uv_index, uv_level, radiation, "
+        "radiation_level, fetched_at) VALUES (?, 4.0, 'Умеренный', "
+        "0.10, 'Норма', ?)",
+        (_NOW.strftime("%Y-%m-%d"),
+         _NOW.isoformat(timespec="seconds")),
+    )
+    con.commit()
+    con.close()
+
+    data = wr.load_env_data()
+    assert data["radiation"] == 0.10
+    assert data["radiation_points"] is None
+    assert data["settlement"] == "Иваново"

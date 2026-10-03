@@ -129,8 +129,29 @@ def test_full_init_clean_db(tmp_path, monkeypatch):
     tables = _tables(db)
     assert CORE_TABLES <= tables
     assert ENSURE_TABLES <= tables
+    assert "radiation_points" in _columns(db, "env_data")
     assert {"idx_events_ip_id", "idx_events_event",
             "idx_weather_observations_timestamp_unique"} <= _indexes(db)
+
+
+def test_env_data_radiation_points_added_to_old_table(tmp_path, monkeypatch):
+    """Существующая env_data без radiation_points получает колонку (ALTER)."""
+    db = str(tmp_path / "old_env.db")
+    con = sqlite3.connect(db)
+    con.execute(
+        "CREATE TABLE env_data ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT UNIQUE, "
+        "uv_index REAL, uv_level TEXT, aqi REAL, aqi_level TEXT, "
+        "pm25 REAL, pm10 REAL, radiation REAL, radiation_level TEXT, "
+        "fetched_at TEXT)")
+    con.commit()
+    con.close()
+
+    monkeypatch.setattr(dr, "DB", db)
+    monkeypatch.setattr(dr, "_init_done", False)
+    dr.init_db_schema(force=True)
+
+    assert "radiation_points" in _columns(db, "env_data")
 
 
 def test_init_twice_noop(tmp_path, monkeypatch):
