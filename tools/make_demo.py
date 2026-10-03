@@ -16,6 +16,8 @@ demo.js внедряется в <head> — виджеты шапки (погод
 
 Использование (на хосте панели):
   cd /opt/lan-discovery && venv/bin/python tools/make_demo.py /tmp/demo
+  Приложение/БД определяются от расположения скрипта (корень репо) —
+  работает при любом --prefix, без хардкода /opt.
 
 Режим фикстур для API-адаптера панели (спека §28, core/demo):
   venv/bin/python tools/make_demo.py --fixtures /tmp/demo-fixtures
@@ -35,13 +37,17 @@ import sys
 import urllib.parse
 from datetime import datetime
 
-sys.path.insert(0, "/opt/lan-discovery")
+# Корень репозитория от скрипта (tools/..) — не хардкод /opt: на стенде
+# 2.0 (и при любом --prefix) берём своё приложение и свою devices.db,
+# а не чужую установку в /opt/lan-discovery
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
 
 # --fixtures: только API-снимки (фикстуры core/demo, §28), без HTML
 _FIXTURES_MODE = "--fixtures" in sys.argv[1:]
 _argv = [a for a in sys.argv[1:] if a != "--fixtures"]
 OUT = os.path.abspath(_argv[0] if _argv else "/tmp/demo")
-DB = "/opt/lan-discovery/devices.db"
+DB = os.path.join(ROOT, "devices.db")
 SNAP = datetime.now().strftime("%d.%m.%Y %H:%M")
 
 HTML_PAGES = [

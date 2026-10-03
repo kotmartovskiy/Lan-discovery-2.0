@@ -75,24 +75,36 @@ def sanitize(text: str) -> str:
     return text.replace("wiki: `/wiki`.", "документация: этот репозиторий.")
 
 
+def emit(src: pathlib.Path, dst: pathlib.Path):
+    """Санитизованная копия одного файла (dst может быть в подпапке)."""
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    text = sanitize(src.read_text(encoding="utf-8"))
+    dst.write_text(text, encoding="utf-8", newline="\n")
+
+
 for f in sorted(SRC.glob("*.md")):
-    text = sanitize(f.read_text(encoding="utf-8"))
     name = "Оглавление.md" if f.name == "_Sidebar.md" else f.name
-    (DST / name).write_text(text, encoding="utf-8", newline="\n")
+    emit(f, DST / name)
+
+# Набор 2.0 (docs/2.0/*.md) — та же санитизация, отдельная подпапка;
+# иначе UPGRADE/INSTALL и прочие доки 2.0 не доезжают до публичного репо
+for f in sorted((SRC / "2.0").glob("*.md")):
+    emit(f, DST / "2.0" / f.name)
 
 (DST / "README.md").write_text(
     (DST / "Home.md").read_text(encoding="utf-8"), encoding="utf-8", newline="\n"
 )
 
 leaks = []
-for f in DST.glob("*.md"):
+for f in DST.rglob("*.md"):
     t = f.read_text(encoding="utf-8")
     for pat in (r"192\.168\.3\.", r"\b1234\b", r"kot:kot", r"/wiki/"):
         for m in re.finditer(pat, t):
             line = t[: m.start()].count("\n") + 1
-            leaks.append(f"{f.name}:{line}: {t.splitlines()[line - 1].strip()[:100]}")
+            rel = f.relative_to(DST)
+            leaks.append(f"{rel}:{line}: {t.splitlines()[line - 1].strip()[:100]}")
 
-print(f"files: {len(list(DST.glob('*.md')))} -> {DST}")
+print(f"files: {len(list(DST.rglob('*.md')))} -> {DST}")
 print(f"leaks: {len(leaks)}")
 for l in leaks:
     print("  ", l)
