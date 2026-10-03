@@ -20,9 +20,12 @@ sudo ./update.sh                            # git pull (если PREFIX — git-
 sudo ./update.sh --dry-run                  # показать план
 sudo ./update.sh --rollback [TS]            # откат к бэкапу TS (или последнему)
 sudo ./update.sh --keep 10                  # сколько бэкапов хранить (default 5)
+sudo ./update.sh --unit lan-discovery-2     # нестандартный юнит (default lan-discovery)
 ```
 
-Бэкапы: `/var/backups/lan-discovery/<TS>/` (код, config, БД).
+Бэкапы: `/var/backups/lan-discovery/<TS>/` (код, config, БД). Health
+проверяет **наш** порт: `127.0.0.1:<web.flask_port из settings>` (default
+8080) — на стенде рядом с 1.1 ложный success от чужой панели исключён.
 
 ## Миграции БД
 
@@ -42,6 +45,12 @@ sqlite3 /opt/lan-discovery/devices.db "PRAGMA user_version;"   # ожидает�
 /opt/lan-discovery/venv/bin/pip install -r requirements.txt
 sudo systemctl restart lan-discovery
 ```
+
+Граница (Task6): провал `pip` внутри `update.sh` **не** триггерит
+авто-rollback — бэкап не содержит venv, откат кода при сломанных
+зависимостях не помогает. Скрипт останавливается на шаге pip, сервис
+продолжает работать на старом процессе; поправьте сеть/пакеты и
+повторите. Авто-rollback действует на verify (py_compile) и health.
 
 ## Сбои пакетов, которые ставил модуль (§26)
 

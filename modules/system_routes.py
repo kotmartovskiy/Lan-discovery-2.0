@@ -12,10 +12,11 @@ from core.config import SETTINGS_PATH
 from core.version import APP_VERSION
 from core import config as core_config, services as core_services, storage as core_storage
 
-DB = "/opt/lan-discovery/devices.db"
+# Task4: БД — из core.db; скрипт замены диска — в каталоге кода (префикс)
+from core.db import DB
 DB_BACKUP_DIR = core_storage.DB_BACKUP_DIR
 DB_BACKUP_PATTERN = "devices_*.db"
-DISK_REPLACE_SCRIPT = "/opt/lan-discovery/disk_replace.py"
+DISK_REPLACE_SCRIPT = os.path.join(core_config.PREFIX, "disk_replace.py")
 CLONE_STATE_FILE = "/tmp/lan-discovery-clone.json"
 IPTV_DIR = core_storage.path("media", "IPTV")
 IPTV_UPDATE_STATUS = "/etc/lan-discovery/iptv-update-status.json"
@@ -637,13 +638,15 @@ def about_data():
         except Exception:
             pass
 
+    # Task4: пути из префикса/константы core.db (не хардкод /opt)
+    _app_path = os.path.join(core_config.PREFIX, "app.py")
     try:
-        app_size = os.path.getsize("/opt/lan-discovery/app.py")
+        app_size = os.path.getsize(_app_path)
     except Exception:
         app_size = 0
 
     try:
-        db_size = os.path.getsize("/opt/lan-discovery/devices.db")
+        db_size = os.path.getsize(DB)
     except Exception:
         db_size = 0
 
@@ -651,9 +654,9 @@ def about_data():
         "python": platform.python_version(),
         "flask": getattr(__import__("flask"), "__version__", "unknown"),
         "version": APP_VERSION,
-        "app": "/opt/lan-discovery/app.py",
+        "app": _app_path,
         "app_size": _human_size(app_size),
-        "database": "/opt/lan-discovery/devices.db",
+        "database": DB,
         "database_size": _human_size(db_size),
     }
 

@@ -17,9 +17,14 @@ modules/weather_routes.py (см. docs/Инвентаризация-core-2.0.md) 
 
 Контракт:
     SETTINGS_PATH            — путь по умолчанию (/etc/lan-discovery/...)
+    PREFIX, DB_PATH          — префикс установки и БД рядом с кодом (§25)
     load(path) -> dict       — кэш 10 с на путь; битый/нет файла → {}
     get(section, key, default, path)
-    save(data, path)         — атомарно (tmp + os.replace), пишет кэш
+    save(data, path)         — атомарно (write_json_atomic), пишет кэш
+    write_json_atomic(p, d)  — ЕДИНЫЙ механизм записи JSON state (§20):
+                               tmp → flush+fsync → os.replace; сбой не
+                               трогает цель (читатель видит старый или
+                               новый валидный JSON, не обрезанный)
     clear_cache(path)        — сброс кэша (для тестов/после правок)
 """
 import json
@@ -30,6 +35,23 @@ SETTINGS_PATH = "/etc/lan-discovery/settings.json"
 # runtime state (§20): владельцы — module_loader/roles (алиасы там)
 MODULES_STATE_PATH = "/etc/lan-discovery/modules.json"
 ROLES_STATE_PATH = "/etc/lan-discovery/roles.json"
+
+
+def _default_prefix():
+    """Префикс установки: env LAN_PREFIX, иначе каталог самого кода.
+
+    core/config.py лежит в <prefix>/core/ → dirname(dirname(__file__))
+    == префикс: default-установка даёт /opt/lan-discovery (как и раньше),
+    `./install.sh --prefix DIR` — свой каталог; в репо-чекауте — корень
+    репо (*.db в .gitignore). Env LAN_PREFIX — явный override (юнит/шелл).
+    """
+    return os.environ.get("LAN_PREFIX") or os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__)))
+
+
+PREFIX = _default_prefix()
+DB_PATH = os.path.join(PREFIX, "devices.db")
+
 _TTL = 10
 _cache = {}  # путь -> {"data": dict, "ts": float}
 
@@ -62,16 +84,38 @@ def get(section, key, default=None, path=None):
     return sec.get(key, default)
 
 
-def save(data, path=None):
-    """Атомарная запись + инвалидация кэша. True при успехе."""
-    path = path or SETTINGS_PATH
+def write_json_atomic(path, data):
+    """Атомарная запись JSON: tmp → flush+fsync → os.replace.
+
+    Сбой сериализации/записи удаляет tmp и НЕ трогает цель — убийство
+    процесса в любой точке оставляет старый валидный файл либо новый
+    валидный файл, но никогда обрезанный JSON. Исключение пробрасывается
+    — обёртки (save_state/_write_state/save) возвращают False.
+    """
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
     tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-    os.replace(tmp, path)
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except OSError:
+            pass
+        raise
+    return True
+
+
+def save(data, path=None):
+    """Атомарная запись + инвалидация кэша. True при успехе."""
+    path = path or SETTINGS_PATH
+    write_json_atomic(path, data)
     _cache[path] = {"data": data, "ts": time.time()}
     return True
 

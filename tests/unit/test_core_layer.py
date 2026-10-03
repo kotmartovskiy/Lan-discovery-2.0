@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 """Unit: PHASE 2.0-2 — core/process, services, config, network, storage
 (read-only контракты + первый перенос вызовов из system_routes)."""
+import glob
+import json
 import os
+import re
 import sqlite3
 import subprocess
 import sys
@@ -332,3 +335,76 @@ def test_device_identity_api(client, tmp_path, monkeypatch):
         {"ip": "192.168.3.50", "first_seen": "t1", "last_seen": "t2"}]
     assert client.get(
         "/api/device/10.255.255.254/identity").status_code == 404
+
+
+# --- Task1: единый кэш/writer настроек + атомарная запись core.config -------
+
+def test_config_torn_write_keeps_old_file(tmp_path):
+    """Сбой сериализации не портит файл: цель цела, tmp-обломков нет."""
+    p = str(tmp_path / "settings.json")
+    core_config.clear_cache(p)
+    assert core_config.save({"web": {"flask_port": 8080}}, p) is True
+
+    class _NotJson:
+        pass
+
+    with pytest.raises(TypeError):
+        core_config.save({"web": {"port": _NotJson()}}, p)
+    # цель не тронута: на диске по-прежнему старый валидный JSON
+    with open(p, encoding="utf-8") as f:
+        assert json.load(f) == {"web": {"flask_port": 8080}}
+    assert not os.path.exists(p + ".tmp")
+    core_config.clear_cache(p)
+    assert core_config.load(p) == {"web": {"flask_port": 8080}}
+
+
+def test_single_settings_writer_invariant():
+    """§20/Task1: кэш и запись settings — только core/config.py.
+
+    Вторая независимая реализация (кэш + open(..., "w")) в app/modules/core
+    — ровно то, что породило неатомарный /api/settings и рассинхрон кэшей.
+    """
+    root = os.path.dirname(os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__))))  # tests/unit -> корень
+    cache_hits, write_hits = [], []
+    files = [os.path.join(root, "app.py")]
+    files += sorted(glob.glob(os.path.join(root, "core", "*.py")))
+    files += sorted(glob.glob(os.path.join(root, "modules", "*.py")))
+    for path in files:
+        rel = os.path.relpath(path, root).replace(os.sep, "/")
+        if rel == "core/config.py":
+            continue
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        if "_settings_cache" in text:
+            cache_hits.append(rel)
+        for n, line in enumerate(text.splitlines(), 1):
+            if re.search(r'open\([^)]*settings[^)]*,\s*["\']w', line, re.I):
+                write_hits.append("%s:%d" % (rel, n))
+    assert cache_hits == [], "второй кэш settings: %s" % cache_hits
+    assert write_hits == [], "неатомарная запись settings: %s" % write_hits
+
+
+# --- Task4: префикс/БД без хардкода /opt ------------------------------------
+
+def test_prefix_env_and_db_path(tmp_path, monkeypatch):
+    """LAN_PREFIX переопределяет префикс; core.db следует за core.config."""
+    import importlib
+    import core.db as cdb
+
+    monkeypatch.setenv("LAN_PREFIX", str(tmp_path))
+    try:
+        importlib.reload(core_config)
+        assert core_config.PREFIX == str(tmp_path)
+        assert core_config.DB_PATH == str(tmp_path / "devices.db")
+    finally:
+        monkeypatch.delenv("LAN_PREFIX", raising=False)
+        importlib.reload(core_config)
+    # без env — каталог самого core/config.py (<repo>/core → <repo>):
+    # дефолт идентичен старому /opt и не зависит от префикса
+    repo = os.path.dirname(
+        os.path.dirname(os.path.abspath(core_config.__file__)))
+    assert core_config.PREFIX == repo
+    assert core_config.DB_PATH == os.path.join(repo, "devices.db")
+    # core.db.DB вычислен при импорте того же config — рассинхрон невозможен
+    assert cdb.DB == core_config.DB_PATH

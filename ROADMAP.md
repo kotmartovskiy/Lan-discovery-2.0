@@ -861,3 +861,35 @@ Release — по отдельному указанию; живой прогон 
   падал в NameError: _cfg (только в замыкании register_routes);
   фикс — дефолт без _cfg, unit +1 (414 passed), задеплоен после
   бэкапа modules/network_routes.py.
+
+### 03.10.2026 — P2 Cleanup: Configuration Core, атомарность, префикс — **DONE**
+
+- Аудит 7 подзадач по коду (не по промпту/README): закрыто 10 P2-хвостов
+  + 3 новых. **Configuration Core** — один кэш/writer: `core/config`
+  (адаптеры `load_settings/save_settings` в app/core_routes/weather
+  делегируют, второй кэш и `open(..., "w")` удалены — инвариант-тест
+  сканирует app/core/modules). **Префикс**: `core.config.PREFIX/DB_PATH`
+  (env `LAN_PREFIX`) вместо хардкода `/opt/lan-discovery/devices.db`
+  (core/db, currencies/inventory/recycling/system/weather, install.sh
+  step_db); BindPaths стенда `/opt/lan-discovery-2.0:/opt/lan-discovery`
+  даёт тот же путь БД внутри сервиса — данные не сдвинулись.
+  **Атомарность**: `modules.json`/`roles.json` через `write_json_atomic`
+  (tmp+fsync+os.replace, обломки tmp убираются, False наверх).
+  **update.sh**: health-порт из `web.flask_port` (хардкод 8080 на стенде
+  ловил чужую панель 1.1), флаг `--unit`, `network_check.py` в
+  CODE_ITEMS, meta-версия из `core/version.py`; граница rollback/провал
+  pip и семантика доставки событий (durable history + best-effort notify,
+  без replay) зафиксированы в docs §3.11/Установка/UPGRADE и шапке
+  events.py; sync_check — инвентарь корневого network_check.py и roles/
+  (был ложный only_local); починен фикстур test_appliance_smoke под
+  новый контракт.
+- Тесты: +9 → **423 passed / 5 skipped** (torn-write core.config,
+  инвариант единственного writer'a, prefix/DB, roles/module-state
+  atomic+corrupt, no-replay/порядок батча, installer --prefix,
+  update.sh --help/флаги). Деплой N6 с бэкапами
+  (/root/p2cleanup-backup*-*.tar.gz, 21+7 файлов): py_compile + bash -n
+  зелёные, сервис active, state-файлы валидны, .tmp = 0. **Live 16/16**
+  + пробы 12/12 (settings GET→POST идентичен, roles apply, module
+  toggle ×2, network config/check, аноним /api/settings → 401).
+  sync_check `--prefix /opt/lan-discovery-2.0` → **exit 0** (exact=225);
+  сервис 1.1 не тронут.

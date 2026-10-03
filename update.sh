@@ -10,6 +10,8 @@
 #                    без --from — git pull, если $PREFIX это git-репо
 #   --rollback [TS]  откат к бэкапу TS (или к последнему, если TS не указан)
 #   --prefix DIR     установочный каталог (default: /opt/lan-discovery)
+#   --unit NAME      systemd-юнит (default: lan-discovery); health-порт —
+#                    из settings web.flask_port (default 8080)
 #   --keep N         сколько бэкапов хранить (default: 5)
 #   --dry-run        только показать план, ничего не менять
 #
@@ -21,10 +23,11 @@ BACKUP_ROOT="/var/backups/lan-discovery"
 FROM=""
 ROLLBACK_TS=""
 DO_ROLLBACK=0
+UNIT="lan-discovery"
 KEEP=5
 DRY_RUN=0
 
-usage() { sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -35,6 +38,7 @@ while [[ $# -gt 0 ]]; do
                      fi
                      shift ;;
         --prefix)    PREFIX="${2:?--prefix требует значение}"; shift 2 ;;
+        --unit)      UNIT="${2:?--unit требует значение}"; shift 2 ;;
         --keep)      KEEP="${2:?--keep требует число}"; shift 2 ;;
         --dry-run)   DRY_RUN=1; shift ;;
         -h|--help)   usage; exit 0 ;;
@@ -53,9 +57,9 @@ run() {
 [[ $EUID -eq 0 || $DRY_RUN -eq 1 ]] \
     || die "нужен root (sudo): бэкап в $BACKUP_ROOT и restart сервиса"
 
-CODE_ITEMS=(app.py core modules templates static games tools deploy
-            requirements.txt requirements-dev.txt install.sh update.sh
-            pytest.ini tests)
+CODE_ITEMS=(app.py network_check.py core modules templates static games
+            tools deploy requirements.txt requirements-dev.txt install.sh
+            update.sh pytest.ini tests)
 
 # ------------------------------------------------------------------ backup
 backup_path() {
@@ -91,7 +95,13 @@ dst.close(); src.close()
     local git_rev=""
     [[ -d "$PREFIX/.git" ]] && git_rev=$(git -C "$PREFIX" rev-parse HEAD 2>/dev/null || true)
     local app_ver=""
-    app_ver=$(grep -oE 'APP_VERSION *= *"[^"]+"' "$PREFIX/app.py" 2>/dev/null | head -1 | sed 's/.*"\(.*\)"/\1/' || true)
+    # Task6: версия 2.0 живёт в core/version.py (grep по app.py находил
+    # только import → в meta.json пустая строка); app.py — fallback
+    app_ver=$(grep -oE 'APP_VERSION *= *"[^"]+"' "$PREFIX/core/version.py" 2>/dev/null \
+        | head -1 | sed 's/.*"\(.*\)"/\1/' || true)
+    [[ -n "$app_ver" ]] \
+        || app_ver=$(grep -oE 'APP_VERSION *= *"[^"]+"' "$PREFIX/app.py" 2>/dev/null \
+            | head -1 | sed 's/.*"\(.*\)"/\1/' || true)
     printf '{"ts": "%s", "version": "%s", "from": "%s", "git_rev": "%s"}\n' \
         "$ts" "$app_ver" "${FROM:-git}" "$git_rev" > "$dir/meta.json"
     BACKUP_TS="$ts"
@@ -190,21 +200,31 @@ do_pip() {
         -r "$PREFIX/requirements.txt"
 }
 
+# Порт панели — из settings.json (web.flask_port, default 8080).
+# Хардкод 8080 ошибочно проверял ЧУЖУЮ панель: на стенде 2.0 живёт на
+# 8090, а 1.1 отвечает на 8080 — health давал ложный success/провал.
+health_port() {
+    python3 -c "import json; print(int(json.load(open('/etc/lan-discovery/settings.json')).get('web', {}).get('flask_port') or 8080))" \
+        2>/dev/null || echo 8080
+}
+
 restart_and_health() {
-    log "step: restart — systemctl restart lan-discovery"
+    log "step: restart — systemctl restart $UNIT"
     if [[ $DRY_RUN -eq 1 ]]; then
-        log "DRY: systemctl restart lan-discovery"
+        log "DRY: systemctl restart $UNIT"
         return 0
     fi
     if command -v systemctl >/dev/null 2>&1; then
-        systemctl restart lan-discovery
+        systemctl restart "$UNIT"
     else
         warn "systemctl отсутствует — рестарт пропущен"
     fi
-    log "step: health — жду http://127.0.0.1:8080/api/health (до 60 с)"
+    local port
+    port=$(health_port)
+    log "step: health — жду http://127.0.0.1:$port/api/health (до 60 с)"
     local i
     for i in $(seq 1 30); do
-        if curl -fsS --max-time 3 "http://127.0.0.1:8080/api/health" \
+        if curl -fsS --max-time 3 "http://127.0.0.1:$port/api/health" \
                 >/dev/null 2>&1; then
             log "step: health — OK"
             return 0

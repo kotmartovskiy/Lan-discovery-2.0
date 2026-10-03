@@ -137,3 +137,44 @@ def test_install_sh_seeds_first_admin():
     assert "network_check.py" in text
 
 
+
+
+def test_install_sh_prefix_db_path():
+    """Task4: --prefix меняет и путь БД (лог шага db), не только код/venv."""
+    bash = _bash_candidate()
+    if bash is None:
+        pytest.skip("bash не доступен")
+    r = subprocess.run(
+        [bash, os.path.join(ROOT, "install.sh"),
+         "--dry-run", "--skip-apt", "--prefix", "/srv/lan-test"],
+        capture_output=True, text=True, timeout=300, cwd=ROOT,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "step: db" in r.stdout
+    assert "/srv/lan-test/devices.db" in r.stdout
+
+
+def test_update_sh_syntax_and_flags():
+    """Task6: update.sh — bash -n, health-порт из settings, юнит/флаги."""
+    bash = _bash_candidate()
+    if bash is None:
+        pytest.skip("bash не доступен")
+    path = os.path.join(ROOT, "update.sh")
+    r = subprocess.run([bash, "-n", path],
+                       capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    # b2: файл, обновляемый самим update.sh, не выпадает из бэкапа кода
+    assert "network_check.py" in text
+    # health проверяет наш юнит и НАШ порт (web.flask_port из settings) —
+    # хардкод 8080 на стенде ловил чужую панель 1.1
+    assert "--unit" in text
+    assert '"$UNIT"' in text
+    assert "flask_port" in text and "health_port" in text
+    # usage (диапазон строк шапки) печатается и включает новые флаги
+    r = subprocess.run([bash, path, "--help"],
+                       capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    assert "--unit NAME" in r.stdout
+    assert "--rollback" in r.stdout

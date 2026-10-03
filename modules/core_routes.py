@@ -13,7 +13,8 @@ from core import process
 
 # ==================== Cache dicts ====================
 
-_settings_cache = {"data": None, "ts": 0}
+# Task1: кэш/чтение/запись settings — только core.config (§20); здесь
+# только compat-адаптеры с прежними именами (потребители не переписываем)
 _iptv_update_status_cache = {"data": None, "ts": 0}
 _rate_limits = {}
 
@@ -38,28 +39,16 @@ os.makedirs(SECRETS_DIR, exist_ok=True)
 # ==================== Core utility functions ====================
 
 def load_settings():
-    from core.config import SETTINGS_PATH
-    now = time.time()
-    if _settings_cache["data"] is not None and now - _settings_cache["ts"] < 10:
-        return _settings_cache["data"]
-    try:
-        with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        _settings_cache["data"] = data
-        _settings_cache["ts"] = now
-        return data
-    except Exception:
-        return {}
+    """Чтение settings — делегирование core.config (единый кэш §20)."""
+    from core import config as core_config
+    return core_config.load()
 
 
 def save_settings(data):
-    from core.config import SETTINGS_PATH
+    """Запись settings — атомарно через core.config (tmp+fsync+replace)."""
+    from core import config as core_config
     try:
-        with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-        _settings_cache["data"] = data
-        _settings_cache["ts"] = time.time()
-        return True
+        return core_config.save(data)
     except Exception:
         return False
 
@@ -532,7 +521,7 @@ def register_routes(app, ctx):
         old = load_settings()
         _deep_update(old, data)
         if save_settings(old):
-            _settings_cache["ts"] = 0
+            # save уже обновил кэш core.config — ручная инвалидация не нужна
             return jsonify({"ok": True})
         return jsonify({"error": "save failed"}), 500
 

@@ -15,6 +15,13 @@ PHASE 2.0-12 (§16 Event system):
 - `subscribe()` — in-process подписка, ошибки подписчиков не роняют писателя;
 - dual-read в `list_events`: фильтр `event=ONLINE` видит и legacy, и
   `device.online` (и обратно) — лента/UI не ломаются.
+
+Семантика доставки (зафиксировано, §16/§17, docs/Архитектура-2.0 §3.11):
+*durable history + best-effort in-process notify*. SQLite-запись
+переживает рестарт, но notify делает только живой процесс (после commit:
+`emit` — сразу, discovery — `notify_all`); kill -9 в этом окне теряет
+доставку, не запись. Replay/cursor нет — рестарт историю не переигрывает;
+at-most-once на событие, порядок = порядок пачки.
 """
 import json
 import logging

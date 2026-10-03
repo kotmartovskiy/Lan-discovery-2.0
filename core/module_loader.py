@@ -120,10 +120,11 @@ def _read_json(path, default):
 
 
 def save_state(state):
+    # Task2: атомарная запись (core.config.write_json_atomic: tmp+fsync +
+    # os.replace) — kill -9 в любой точке не оставляет обрезанный
+    # modules.json; читатель видит старое либо новое валидное состояние.
     try:
-        os.makedirs(os.path.dirname(STATE_PATH), exist_ok=True)
-        with open(STATE_PATH, "w", encoding="utf-8") as f:
-            json.dump(state, f, ensure_ascii=False, indent=2)
+        config.write_json_atomic(STATE_PATH, state)
         _state_cache["mtime"] = -1
         return True
     except Exception:

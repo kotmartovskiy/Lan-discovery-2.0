@@ -73,13 +73,13 @@ def add(p, rel):
 
 for rel in ["app.py", "requirements.txt", "requirements-dev.txt",
             "pytest.ini", "install.sh", "update.sh", "recovery.sh",
-            "CHANGELOG.md"]:
+            "network_check.py", "CHANGELOG.md"]:
     p = os.path.join(BASE, rel)
     if os.path.isfile(p):
         add(p, rel)
 
-for tree in ["modules", "core", "templates", "static", "games", "tools",
-             "deploy", "docs", "tests"]:
+for tree in ["modules", "core", "roles", "templates", "static", "games",
+             "tools", "deploy", "docs", "tests"]:
     root = os.path.join(BASE, tree)
     if not os.path.isdir(root):
         continue

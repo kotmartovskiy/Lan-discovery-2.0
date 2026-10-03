@@ -372,3 +372,33 @@ def test_mutating_routes_have_edit_guard():
     assert offenders == [], "нет @can_edit/@admin_required: %s" % offenders
 
 
+
+
+# --- Task3: атомарная запись roles.json (real file, не патченый _read_state) ---
+
+def test_write_state_atomic_and_corrupt_fallback(tmp_path, monkeypatch):
+    """Сбой записи не портит roles.json; битый файл => роль default."""
+    p = str(tmp_path / "roles.json")
+    monkeypatch.setattr(roles, "STATE_PATH", p)
+
+    # успех: валидный JSON, tmp-обломков нет, состояние читается обратно
+    assert roles._write_state({"active": "media"}) is True
+    with open(p, encoding="utf-8") as f:
+        assert json.load(f) == {"active": "media"}
+    assert not os.path.exists(p + ".tmp")
+    assert roles._read_state() == {"active": "media"}
+
+    # неатомарный провал невозможен: цель цела, tmp убран, False наверх
+    class _NotJson:
+        pass
+
+    assert roles._write_state({"active": _NotJson()}) is False
+    with open(p, encoding="utf-8") as f:
+        assert json.load(f) == {"active": "media"}
+    assert not os.path.exists(p + ".tmp")
+
+    # битый (рваный) файл на входе => state пуст => active_role == default
+    with open(p, "w", encoding="utf-8") as f:
+        f.write('{"active": "med')
+    assert roles._read_state() == {}
+    assert roles.active_role() == "default"

@@ -17,6 +17,7 @@ _APP_DIR = os.path.dirname(os.path.abspath(__file__))
 if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
 
+from core import config as core_config
 from core import process as core_process
 from core import storage as core_storage
 from core.db import DB
@@ -29,7 +30,9 @@ logging.basicConfig(
 )
 log = logging.getLogger("lan-discovery")
 
-SETTINGS_PATH = "/etc/lan-discovery/settings.json"
+# Task1: путь/кэш/запись settings — только core.config (§20, единственный
+# канонический implementation); ниже — compat-адаптеры для потребителей.
+SETTINGS_PATH = core_config.SETTINGS_PATH
 USERS_PATH = "/etc/lan-discovery/users.json"
 IPTV_CONFIG = "/etc/lan-discovery/iptv-playlists.json"
 IPTV_DIR = core_storage.path("media", "IPTV")
@@ -38,7 +41,6 @@ GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "games")
 TRANSMISSION_CONF = "/etc/transmission-daemon/settings.json"
 _SERVICE_START = time.time()
 
-_settings_cache = {"data": None, "ts": 0}
 _rate_limits = {}
 _inet_cache = {"ok": None, "ts": 0}
 _page_data_cache = {"data": None, "ts": 0}
@@ -46,28 +48,16 @@ _monitoring_cache = {"data": None, "ts": 0}
 
 
 def load_settings():
-    now = time.time()
-    if _settings_cache["data"] is not None and now - _settings_cache["ts"] < 10:
-        return _settings_cache["data"]
-    try:
-        with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        _settings_cache["data"] = data
-        _settings_cache["ts"] = now
-        return data
-    except Exception:
-        return {}
+    """Чтение settings — делегирование core.config (единый кэш 10 с)."""
+    return core_config.load()
 
 
 def save_settings(data):
+    """Запись settings — делегирование core.config (атомарно: tmp+replace)."""
     try:
-        os.makedirs(os.path.dirname(SETTINGS_PATH), exist_ok=True)
-        with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-        _settings_cache["data"] = data
-        _settings_cache["ts"] = time.time()
+        return core_config.save(data)
     except Exception:
-        pass
+        return False
 
 
 def _session_cookie_name():

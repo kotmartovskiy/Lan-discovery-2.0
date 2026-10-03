@@ -17,7 +17,10 @@ from core import config
 
 log = logging.getLogger("lan-discovery")
 
-DB = "/opt/lan-discovery/devices.db"
+# Task4: путь БД — из core.config (§20/§25): env LAN_PREFIX либо каталог
+# самого кода → ./install.sh --prefix DIR кладёт devices.db в свой префикс
+# и не пишет в чужой /opt (раньше хардкод ломал изоляцию префикса)
+DB = config.DB_PATH
 
 SCHEMA_VERSION = 3
 _init_lock = threading.Lock()

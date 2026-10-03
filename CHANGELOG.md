@@ -9,6 +9,22 @@
 ## [Unreleased]
 
 ### Исправлено
+- **P2 cleanup (config/db/roles/update):** единый кэш/writer настроек —
+  `core/config` (адаптеры `load_settings/save_settings` в app /
+  core_routes / weather делегируют; второй кэш и `open(..., "w")`
+  удалены — инвариант-тест `test_single_settings_writer_invariant`);
+  `core.config.PREFIX`/`DB_PATH` (env `LAN_PREFIX`) вместо хардкода
+  `/opt/lan-discovery/devices.db` (core/db, currencies, inventory,
+  recycling, system_routes, weather_routes, install.sh step_db);
+  атомарная запись `modules.json`/`roles.json` через
+  `write_json_atomic` (tmp+fsync+os.replace, обломки tmp убираются);
+  `update.sh`: health-порт из `web.flask_port` settings (хардкод 8080
+  на стенде ловил чужую панель 1.1), флаг `--unit`, `network_check.py`
+  в CODE_ITEMS, meta-версия из `core/version.py`; границы rollback
+  (провал pip не триггерит откат — venv не в бэкапе) и семантика
+  доставки событий (durable history + best-effort notify, без
+  replay/cursor) зафиксированы в docs (§3.11, Установка, UPGRADE) и
+  шапке `core/events.py`. Unit: 423 passed / 5 skipped (+9).
 - **FINAL BETA AUDIT (pre-release):** блокеры аудита закрыты, unit 413
   passed / 5 skipped (+16 тестов к базовым 402; CI ожидает 418
   passed); live-прогон на стенде N6 — после деплоя.

@@ -37,7 +37,6 @@ def smoke_env(monkeypatch, tmp_path, _csrf_off):
     import core.db as dr
     import core.module_loader as ml
     import core.roles as roles
-    import modules.core_routes as cr
     import modules.devices_routes as droutes
     import modules.system_routes as sys_routes
 
@@ -73,7 +72,9 @@ def smoke_env(monkeypatch, tmp_path, _csrf_off):
     monkeypatch.setattr(roles, "STATE_PATH", str(tmp_path / "roles.json"))
     monkeypatch.setattr(core_config, "SETTINGS_PATH",
                         str(tmp_path / "settings.json"))
-    monkeypatch.setattr(cr, "_settings_cache", {"data": None, "ts": 0.0})
+    # Task1: кэш settings живёт в core.config (адаптеры app/core_routes
+    # делегируют) — сбрасываем единый кэш, отдельного кэша больше нет
+    core_config.clear_cache()
 
     # сеть не трогаем: скан подменён (паттерн test_jobs)
     monkeypatch.setattr(

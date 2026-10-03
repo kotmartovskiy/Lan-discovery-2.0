@@ -1,28 +1,21 @@
 import sqlite3
-import json
 import re
-import time
 from datetime import datetime, timezone, timedelta
 from flask import render_template, jsonify
 
-DB = "/opt/lan-discovery/devices.db"
-SETTINGS_PATH = "/etc/lan-discovery/settings.json"
+from core import config as core_config
+# Task4: БД — из core.db (единственный владелец пути; --prefix уводит
+# devices.db в каталог кода, а не в чужой /opt)
+from core.db import DB
 
-_settings_cache = {"data": None, "ts": 0}
+# Task1: путь/кэш/чтение settings — только core.config (§20); алиас —
+# совместимость (имя модуля сохранено, §32)
+SETTINGS_PATH = core_config.SETTINGS_PATH
 
 
 def load_settings():
-    now = time.time()
-    if _settings_cache["data"] is not None and now - _settings_cache["ts"] < 10:
-        return _settings_cache["data"]
-    try:
-        with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        _settings_cache["data"] = data
-        _settings_cache["ts"] = now
-        return data
-    except Exception:
-        return {}
+    """Чтение settings — делегирование core.config (единый кэш §20)."""
+    return core_config.load()
 
 
 def weather_is_weekend(date_str):

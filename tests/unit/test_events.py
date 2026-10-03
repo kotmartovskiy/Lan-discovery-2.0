@@ -254,3 +254,38 @@ def test_add_event_without_out_no_fanout(events_con):
     assert list_events(events_con, ip="10.0.0.2")[0][5] == "NEW"
 
 
+# --- Task5: семантика доставки — durable history + best-effort notify (§16) ---
+
+def test_events_persist_but_not_replayed(events_con):
+    """«Рестарт» (пустой список подписчиков) не переигрывает историю."""
+    # событие уже в истории — переживает рестарт процесса
+    add_event(events_con, "10.0.0.1", event="OFFLINE")
+    events_con.commit()
+    assert len(list_events(events_con, ip="10.0.0.1")) == 1
+    # подписчик появился ПОСЛЕ — replay/cursor отсутствует (документировано
+    # в docs/Архитектура-2.0 §3.11 и шапке core/events.py)
+    seen = []
+    subscribe(seen.append)
+    assert seen == []
+    # доездывает только новое событие, история молчит
+    emit("device.offline", con=events_con, ip="10.0.0.1")
+    events_con.commit()
+    assert [p["name"] for p in seen] == ["device.offline"]
+    # обе записи в истории (dup/replay не нужен — пишем ровно один раз)
+    assert len(list_events(events_con, ip="10.0.0.1")) == 2
+
+
+def test_notify_all_preserves_batch_order(events_con):
+    """notify_all доставляет батч строго в порядке списка (§16)."""
+    seen = []
+    subscribe(lambda p: seen.append(p["ip"]))
+    out = []
+    for ip in ("10.0.0.1", "10.0.0.2", "10.0.0.3"):
+        add_event(events_con, ip, event="NEW", out=out)
+    events_con.commit()
+    assert seen == []  # молчим до fan-out (notify — после commit)
+    notify_all(out)
+    assert seen == ["10.0.0.1", "10.0.0.2", "10.0.0.3"]
+    assert len(list_events(events_con)) == 3
+
+

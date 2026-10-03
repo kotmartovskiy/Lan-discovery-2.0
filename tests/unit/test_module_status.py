@@ -113,3 +113,38 @@ def test_modules_page_renders(client):
     # манифесты v2 несут version (PHASE 2.0-15) → «Unknown» не показывается
     assert ">Unknown<" not in html
     assert ">v2.0.0<" in html
+
+
+# --- Task2: атомарное состояние модулей (modules.json) ----------------------
+
+def test_save_state_atomic_and_corrupt(tmp_path, monkeypatch):
+    """Убийство в середине записи не оставляет обрезанный modules.json."""
+    import json
+    import os
+    import core.module_loader as ml
+
+    p = str(tmp_path / "modules.json")
+    monkeypatch.setattr(ml, "STATE_PATH", p)
+    monkeypatch.setattr(ml, "_state_cache", {"mtime": -1, "data": None})
+
+    # успех: валидный JSON без tmp-обломков, кэш инвалидирован
+    assert ml.save_state({"order": ["a", "b"], "statuses": {}}) is True
+    with open(p, encoding="utf-8") as f:
+        assert json.load(f) == {"order": ["a", "b"], "statuses": {}}
+    assert not os.path.exists(p + ".tmp")
+    assert ml.load_state() == {"order": ["a", "b"], "statuses": {}}
+
+    # неатомарный провал: цель цела, tmp убран, False наверх
+    class _NotJson:
+        pass
+
+    assert ml.save_state({"order": _NotJson()}) is False
+    with open(p, encoding="utf-8") as f:
+        assert json.load(f) == {"order": ["a", "b"], "statuses": {}}
+    assert not os.path.exists(p + ".tmp")
+
+    # битый (рваный) файл => читатель видит default ({}), не исключение
+    with open(p, "w", encoding="utf-8") as f:
+        f.write('{"order": [')
+    monkeypatch.setattr(ml, "_state_cache", {"mtime": -1, "data": None})
+    assert ml.load_state() == {}

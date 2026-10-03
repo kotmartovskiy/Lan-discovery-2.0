@@ -4,7 +4,8 @@ import time
 from datetime import datetime, timedelta
 
 
-DB = "/opt/lan-discovery/devices.db"
+# Task4: БД — из core.db (единый источник пути, §20/§25)
+from core.db import DB
 _USD_RUB_CACHE = None
 _USD_RUB_TS = 0
 _OZ_TO_G = 31.1035

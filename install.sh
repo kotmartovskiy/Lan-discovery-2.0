@@ -319,8 +319,8 @@ PYEOF
 # --------------------------------------------------------------------- db
 step_db() {
     log "step: db — init схемы (миграции/ensure/retention; идемпотентно)"
-    [[ "$PREFIX" == "/opt/lan-discovery" ]] \
-        || warn "префикс нестандартный ($PREFIX): БД создаётся по пути из кода /opt/lan-discovery/devices.db"
+    # Task4: БД следует за префиксом (core.config: каталог кода / LAN_PREFIX)
+    log "  БД: $PREFIX/devices.db"
     run bash -c "cd '$PREFIX' && ./venv/bin/python -c 'from modules.devices_routes import init_db_schema; init_db_schema()'"
 }
 

@@ -189,10 +189,11 @@ def _read_state():
 
 
 def _write_state(state):
+    # Task3: атомарная запись (core.config.write_json_atomic) — сбой/kill
+    # в середине записи не портит roles.json; активная роль после
+    # перезапуска читается из старого либо нового валидного файла.
     try:
-        os.makedirs(os.path.dirname(STATE_PATH), exist_ok=True)
-        with open(STATE_PATH, "w", encoding="utf-8") as f:
-            json.dump(state, f, ensure_ascii=False, indent=2)
+        config.write_json_atomic(STATE_PATH, state)
         return True
     except Exception:
         return False
