@@ -359,7 +359,7 @@ def test_scan_route_submits_job(client, jobs_db, devices_db, monkeypatch):
         "Nmap scan report for 10.0.0.1\nHost is up.\n")
     monkeypatch.setattr(
         dr, "reconcile",
-        lambda con, cur, now=None:
+        lambda con, cur, now=None, events_out=None:
         {"new": 1, "online": 1, "offline": 0, "mac_changed": 0,
          "ip_changed": 0})
 

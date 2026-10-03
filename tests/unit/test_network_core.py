@@ -483,3 +483,26 @@ def test_route_nettools_uses_core_process(client, monkeypatch):
     d = client.post("/api/nettools/ping", json={"host": "ya.ru"}).get_json()
     assert d == {"ok": True, "output": "PING ok"}
     assert seen["cmd"][:2] == ["ping", "-c"]
+
+
+def test_network_check_script_shipped_and_resolved():
+    """C-02: network_check.py лежит в репо, путь — от __file__, не /opt."""
+    import json
+    import os
+    import subprocess
+    import sys
+
+    from modules.network_routes import NETWORK_CHECK_SCRIPT
+
+    assert os.path.isfile(NETWORK_CHECK_SCRIPT), NETWORK_CHECK_SCRIPT
+    # tests/unit -> tests -> корень репо
+    root = os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))))
+    assert os.path.dirname(NETWORK_CHECK_SCRIPT) == root
+    # скрипт исполняем: неизвестное действие -> безопасный JSON без сети
+    r = subprocess.run([sys.executable, NETWORK_CHECK_SCRIPT, "bogus"],
+                       capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, r.stderr
+    assert json.loads(r.stdout) == {"error": "unknown action"}
+
+

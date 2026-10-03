@@ -80,20 +80,35 @@ def now_ts():
 
 def add_event(con, ip, hostname=None, mac=None, event="INFO",
               source="discovery", metadata=None, severity=None,
-              timestamp=None):
-    """Вставить событие; возвращает фактическую severity."""
+              timestamp=None, out=None):
+    """Вставить событие; возвращает фактическую severity.
+
+    out (B-03) — список-сборщик payload'ов: событие копируется туда
+    вместо немедленного fan-out, доставка — `notify_all` ПОСЛЕ commit
+    вызывающей стороны (иначе подписчик automation пишет в БД внутри
+    незакрытой транзакции писателя → busy/deadlock, §16/§17).
+    Имя в payload — каноническое namespace-имя (legacy-имя остаётся
+    в колонке events.event, dual-read их сводит).
+    """
     if severity not in SEVERITIES:
         severity = EVENT_SEVERITY.get(event, DEFAULT_SEVERITY)
     meta = json.dumps(metadata, ensure_ascii=False) if metadata else None
+    ts = timestamp or now_ts()
     con.execute(
         """
         INSERT INTO events
         (timestamp, ip, hostname, mac, event, severity, source, metadata)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (timestamp or now_ts(), ip, hostname, mac, event, severity,
-         source, meta),
+        (ts, ip, hostname, mac, event, severity, source, meta),
     )
+    if out is not None:
+        out.append({
+            "name": LEGACY_ALIASES.get(event, event),
+            "ip": ip, "hostname": hostname, "mac": mac,
+            "severity": severity, "source": source,
+            "metadata": metadata, "timestamp": ts,
+        })
     return severity
 
 
@@ -125,6 +140,18 @@ def _notify(payload):
         except Exception as e:
             log.error("EVENTS subscriber error (%s): %s",
                       payload.get("name"), e)
+
+
+def notify_all(payloads):
+    """Отложенный fan-out (B-03): доставить подписчикам payload'ы,
+    накопленные `add_event(..., out=...)`.
+
+    Вызывать только ПОСЛЕ commit писателя: подписчик automation
+    открывает своё соединение и коммитит записи (fired_count) — внутри
+    чужой незакрытой транзакции это busy-ожидание/deadlock (§16/§17).
+    """
+    for payload in payloads:
+        _notify(payload)
 
 
 def emit(name, *, con=None, ip=None, hostname=None, mac=None,

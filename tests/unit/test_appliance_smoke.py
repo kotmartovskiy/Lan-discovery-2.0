@@ -82,7 +82,7 @@ def smoke_env(monkeypatch, tmp_path, _csrf_off):
         "Nmap scan report for 10.0.0.1\nHost is up.\n")
     monkeypatch.setattr(
         droutes, "reconcile",
-        lambda con, cur, now=None:
+        lambda con, cur, now=None, events_out=None:
         {"new": 1, "online": 1, "offline": 0, "mac_changed": 0,
          "ip_changed": 0})
 
@@ -110,7 +110,8 @@ def test_appliance_chain_27(smoke_env, monkeypatch):
     c = app_module.app.test_client()
 
     # --- 2. login: анониму админ-API закрыт, после /login — открыт
-    assert c.get("/api/settings").status_code == 302
+    # D-08: API без сессии — JSON 401 (раньше 302 на HTML-форму)
+    assert c.get("/api/settings").status_code == 401
     r = c.post("/login", data={"username": "admin", "password": "1234"})
     assert r.status_code in (200, 302)
     assert c.get("/api/settings").status_code == 200

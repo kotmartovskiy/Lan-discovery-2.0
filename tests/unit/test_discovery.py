@@ -396,3 +396,75 @@ def test_identity_move_inherits_and_history(monkeypatch, devices_db, no_dns):
     # старая строка знает тот же device_id
     assert _identity(devices_db, "192.168.3.70")[0] == \
         "mac:aa:bb:cc:dd:ee:30"
+# --- B-03: события discovery доходят до подписчиков/Automation -------------
+
+def test_reconcile_events_out_then_notify(monkeypatch, devices_db, no_dns):
+    """reconcile собирает payload'ы; notify_all — только после commit."""
+    import core.events as core_ev
+
+    monkeypatch.setattr(d, "_max_misses", lambda: 2)
+    con = sqlite3.connect(devices_db)
+    info = {"hostname": "pc", "mac": "AA:BB:CC:DD:EE:01", "vendor": None}
+    out = []
+    d.reconcile(con, {"192.168.3.10": info}, now="01.02.2026 10:00:00",
+                events_out=out)
+    d.reconcile(con, {}, now="01.02.2026 10:01:00", events_out=out)
+    d.reconcile(con, {}, now="01.02.2026 10:02:00", events_out=out)  # offline
+    con.commit()
+    assert [p["name"] for p in out] == ["device.new", "device.offline"]
+    assert out[1]["severity"] == "warning"
+
+    seen = []
+    un = core_ev.subscribe(seen.append)
+    try:
+        core_ev.notify_all(out)
+    finally:
+        un()
+    assert [p["name"] for p in seen] == ["device.new", "device.offline"]
+    con.close()
+
+
+def test_discovery_payload_fires_automation_rule(monkeypatch, devices_db,
+                                                 no_dns):
+    """B-03: payload discovery триггерит правило automation §17 (dual-read)."""
+    import core.automation as au
+    import core.events as core_ev
+
+    monkeypatch.setattr(d, "_max_misses", lambda: 1)
+    con = sqlite3.connect(devices_db)
+    au.ensure_automation_table(con)
+    rid, err = au.add_rule(con, {
+        "name": "offline-alert",   # legacy-имя события — как в UI 1.x
+        "event": "OFFLINE",
+        "actions": [{"type": "log", "message": "устройство ушло"}],
+    })
+    assert err is None
+
+    info = {"hostname": "pc", "mac": "AA:BB:CC:DD:EE:01", "vendor": None}
+    out = []
+    d.reconcile(con, {"192.168.3.10": info}, now="01.02.2026 10:00:00",
+                events_out=out)
+    d.reconcile(con, {}, now="01.02.2026 10:01:00", events_out=out)
+    con.commit()
+    assert [p["name"] for p in out] == ["device.new", "device.offline"]
+
+    # доставка подписчикам (fan-out после commit)
+    seen = []
+    un = core_ev.subscribe(seen.append)
+    try:
+        core_ev.notify_all(out)
+    finally:
+        un()
+    payload = seen[1]
+
+    # automation: legacy-правило ловит namespace-имя discovery-события
+    assert au.match_event("OFFLINE", payload["name"])
+    au.handle_event(payload)
+    fired = con.execute(
+        "SELECT fired_count FROM automation_rules WHERE id=?",
+        (rid,)).fetchone()[0]
+    con.close()
+    au._last_fired.pop(rid, None)
+    assert fired == 1
+
+

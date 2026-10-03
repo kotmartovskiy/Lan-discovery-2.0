@@ -54,11 +54,20 @@ def load_users():
 
 
 def save_users(data):
+    # D-07: атомарная запись (tmp + os.replace) — обрыв/параллельный читатель
+    # не получит обрезанный users.json (иначе панель остаётся без входа).
+    tmp = USERS_PATH + ".tmp"
     try:
-        with open(USERS_PATH, "w", encoding="utf-8") as f:
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
+        os.replace(tmp, USERS_PATH)
         return True
     except Exception:
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except OSError:
+            pass
         return False
 
 
@@ -96,10 +105,14 @@ def get_current_username():
 
 def login_required(f):
     from functools import wraps
-    from flask import redirect, url_for
+    from flask import redirect, url_for, request, jsonify
     @wraps(f)
     def wrapped(*args, **kwargs):
         if not get_current_user():
+            # D-08: API без сессии — JSON 401 (302 на HTML-форму ломает
+            # fetch-клиенты), страницы — редирект на /login, как раньше
+            if request.path.startswith("/api/"):
+                return jsonify({"error": "unauthorized"}), 401
             return redirect(url_for("login_page"))
         return f(*args, **kwargs)
     return wrapped

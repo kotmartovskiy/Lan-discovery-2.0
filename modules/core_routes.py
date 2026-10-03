@@ -586,6 +586,7 @@ def register_routes(app, ctx):
         return {"ok": True, "notes": idx}
 
     @app.route("/api/notes", methods=["POST"])
+    @can_edit
     @login_required
     def api_notes_create():
         data = request.json
@@ -602,6 +603,7 @@ def register_routes(app, ctx):
         return {"ok": True, "id": note_id}
 
     @app.route("/api/notes/<int:note_id>", methods=["PUT"])
+    @can_edit
     @login_required
     def api_notes_update(note_id):
         data = request.json
@@ -618,6 +620,7 @@ def register_routes(app, ctx):
         return {"ok": False, "error": "Not found"}, 404
 
     @app.route("/api/notes/<int:note_id>", methods=["DELETE"])
+    @can_edit
     @login_required
     def api_notes_delete(note_id):
         idx = _notes_index()

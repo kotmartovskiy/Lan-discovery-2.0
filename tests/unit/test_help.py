@@ -6,6 +6,7 @@ help.html больше не зашит под X96 Max: board/IP/диск/ssh/res
 любая X96-константа, отсутствующая на текущем хосте, не должна попадать
 в отрендеренную страницу.
 """
+import os
 import time
 
 import pytest
@@ -50,6 +51,7 @@ def test_help_renders_dynamic(client):
         assert "ssh root@192.168.3.243" not in body
 
 
+@pytest.mark.skipif(not os.path.isdir("/proc"), reason="только Linux: диски /dev")
 def test_help_facts_structure():
     from modules.core_routes import _help_facts
     hf = _help_facts()["hf"]

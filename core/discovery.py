@@ -20,7 +20,7 @@ import logging
 from datetime import datetime
 
 from core import identity, process
-from core.events import add_event
+from core.events import add_event, notify_all
 
 log = logging.getLogger("lan-discovery")
 
@@ -199,7 +199,7 @@ def get_scan_status():
     return st
 
 
-def reconcile(con, current_devices, now=None):
+def reconcile(con, current_devices, now=None, events_out=None):
     """DB-слой скана: upsert обнаруженных, misses/ONLINE/OFFLINE пропавших.
 
     Смена MAC у известного устройства дополнительно логируется событием
@@ -209,6 +209,10 @@ def reconcile(con, current_devices, now=None):
     (is_new=0), событие IP_CHANGED с metadata.old_ip; прежняя запись
     уходит в OFFLINE штатным механизмом misses.
     Возвращает статистику {new, online, offline, mac_changed, ip_changed}.
+
+    events_out (B-03): переданный список пополняется payload'ами событий;
+    вызывающая сторона коммитит и затем зовёт events.notify_all — так
+    события доходят до Automation §17 без записи в чужой транзакции.
     """
     if now is None:
         now = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
@@ -267,11 +271,12 @@ def reconcile(con, current_devices, now=None):
 
             if mac_changed:
                 add_event(con, ip, hostname, mac, "MAC_CHANGED",
-                          timestamp=now)
+                          timestamp=now, out=events_out)
                 stats["mac_changed"] += 1
 
             if not was_online:
-                add_event(con, ip, hostname, mac, "ONLINE", timestamp=now)
+                add_event(con, ip, hostname, mac, "ONLINE", timestamp=now,
+                          out=events_out)
                 stats["online"] += 1
 
             # identity (2.0-11, §15): device_id присваивается один раз,
@@ -313,7 +318,8 @@ def reconcile(con, current_devices, now=None):
                 )
                 identity.record_ip(con, did, ip, now)
                 add_event(con, ip, hostname, mac, "IP_CHANGED",
-                          metadata={"old_ip": moved[0]}, timestamp=now)
+                          metadata={"old_ip": moved[0]}, timestamp=now,
+                          out=events_out)
                 stats["ip_changed"] += 1
             else:
                 did = identity.derive_id(mac, ip)
@@ -327,7 +333,8 @@ def reconcile(con, current_devices, now=None):
                     (ip, hostname, mac, vendor, now, now, did),
                 )
                 identity.record_ip(con, did, ip, now)
-                add_event(con, ip, hostname, mac, "NEW", timestamp=now)
+                add_event(con, ip, hostname, mac, "NEW", timestamp=now,
+                          out=events_out)
                 stats["new"] += 1
 
     # НЕ ОБНАРУЖЕННЫЕ УСТРОЙСТВА
@@ -348,7 +355,8 @@ def reconcile(con, current_devices, now=None):
                 "SELECT hostname, mac FROM devices WHERE ip=?", (ip,)
             ).fetchone()
             add_event(con, ip, row[0] if row else None,
-                      row[1] if row else None, "OFFLINE", timestamp=now)
+                      row[1] if row else None, "OFFLINE", timestamp=now,
+                      out=events_out)
             stats["offline"] += 1
         else:
             con.execute(
@@ -386,8 +394,12 @@ def scan_loop():
             from core.db import get_db
 
             con = get_db()
-            reconcile(con, current_devices, now)
+            events_out = []
+            reconcile(con, current_devices, now, events_out=events_out)
             con.commit()
+            # B-03: fan-out строго после commit (см. events.notify_all)
+            if events_out:
+                notify_all(events_out)
 
             _scan_status["last_scan"] = now
             _scan_status["last_ok"] = now

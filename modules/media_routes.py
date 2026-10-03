@@ -785,6 +785,7 @@ def register_routes(app, ctx):
             return jsonify({"volume": 5})
 
     @app.route("/api/alarm/volume", methods=["POST"])
+    @can_edit
     @login_required
     def api_alarm_volume_set():
         data = request.get_json() or {}
@@ -797,6 +798,7 @@ def register_routes(app, ctx):
             return jsonify({"error": str(e)}), 500
 
     @app.route("/api/alarm/play", methods=["POST"])
+    @can_edit
     @login_required
     def api_alarm_play():
         global _alarm_process
@@ -817,6 +819,7 @@ def register_routes(app, ctx):
             return jsonify({"error": str(e)}), 500
 
     @app.route("/api/alarm/stop", methods=["POST"])
+    @can_edit
     @login_required
     def api_alarm_stop():
         global _alarm_process
@@ -836,6 +839,7 @@ def register_routes(app, ctx):
         return jsonify(_load_alarms())
 
     @app.route("/api/alarms", methods=["POST"])
+    @can_edit
     @login_required
     def api_alarms_add():
         data = request.get_json() or {}
@@ -852,6 +856,7 @@ def register_routes(app, ctx):
         return jsonify({"ok": True, "alarm": alarm})
 
     @app.route("/api/alarms/<int:aid>", methods=["DELETE"])
+    @can_edit
     @login_required
     def api_alarms_delete(aid):
         alarms = _load_alarms()
@@ -860,6 +865,7 @@ def register_routes(app, ctx):
         return jsonify({"ok": True})
 
     @app.route("/api/alarms/<int:aid>/toggle", methods=["POST"])
+    @can_edit
     @login_required
     def api_alarms_toggle(aid):
         alarms = _load_alarms()
@@ -899,6 +905,7 @@ def register_routes(app, ctx):
         return jsonify(playlists)
 
     @app.route("/api/radio/play", methods=["POST"])
+    @can_edit
     @login_required
     def api_radio_play():
         global _radio_index
@@ -915,12 +922,14 @@ def register_routes(app, ctx):
         return jsonify({"ok": True})
 
     @app.route("/api/radio/stop", methods=["POST"])
+    @can_edit
     @login_required
     def api_radio_stop():
         _radio_stop()
         return jsonify({"ok": True})
 
     @app.route("/api/radio/next", methods=["POST"])
+    @can_edit
     @login_required
     def api_radio_next():
         global _radio_index
@@ -933,6 +942,7 @@ def register_routes(app, ctx):
         return jsonify({"error": "no stations"}), 400
 
     @app.route("/api/radio/prev", methods=["POST"])
+    @can_edit
     @login_required
     def api_radio_prev():
         global _radio_index
@@ -1042,6 +1052,7 @@ def register_routes(app, ctx):
         return jsonify({"stations": stations[:500], "total": len(stations), "name": data.get("name", filename)})
 
     @app.route("/api/player/play", methods=["POST"])
+    @can_edit
     @login_required
     def api_player_play():
         global _player_index
@@ -1059,12 +1070,14 @@ def register_routes(app, ctx):
         return jsonify({"ok": True})
 
     @app.route("/api/player/stop", methods=["POST"])
+    @can_edit
     @login_required
     def api_player_stop():
         _player_stop()
         return jsonify({"ok": True})
 
     @app.route("/api/player/next", methods=["POST"])
+    @can_edit
     @login_required
     def api_player_next():
         global _player_index
@@ -1081,6 +1094,7 @@ def register_routes(app, ctx):
         return jsonify({"error": "no stations"}), 400
 
     @app.route("/api/player/prev", methods=["POST"])
+    @can_edit
     @login_required
     def api_player_prev():
         global _player_index
@@ -1097,6 +1111,7 @@ def register_routes(app, ctx):
         return jsonify({"error": "no stations"}), 400
 
     @app.route("/api/player/random", methods=["POST"])
+    @can_edit
     @login_required
     def api_player_random():
         global _player_random
@@ -1161,6 +1176,7 @@ def register_routes(app, ctx):
         return jsonify({"ok": True})
 
     @app.route("/api/cameras/<int:cam_id>/start", methods=["POST"])
+    @can_edit
     @login_required
     def api_cameras_start(cam_id):
         cameras = _load_cameras()
@@ -1171,12 +1187,14 @@ def register_routes(app, ctx):
         return jsonify({"error": "not found"}), 404
 
     @app.route("/api/cameras/<int:cam_id>/stop", methods=["POST"])
+    @can_edit
     @login_required
     def api_cameras_stop(cam_id):
         _stop_camera_stream(cam_id)
         return jsonify({"ok": True})
 
     @app.route("/api/cameras/start_all", methods=["POST"])
+    @can_edit
     @login_required
     def api_cameras_start_all():
         for c in _load_cameras():
@@ -1184,6 +1202,7 @@ def register_routes(app, ctx):
         return jsonify({"ok": True})
 
     @app.route("/api/cameras/stop_all", methods=["POST"])
+    @can_edit
     @login_required
     def api_cameras_stop_all():
         for cam_id in list(_camera_processes.keys()):
@@ -1287,6 +1306,7 @@ def register_routes(app, ctx):
             return {"ok": False, "error": str(e)}
 
     @app.route("/api/transmission/add", methods=["POST"])
+    @can_edit
     @login_required
     def api_transmission_add():
         url = request.json.get("url", "").strip()
@@ -1301,6 +1321,7 @@ def register_routes(app, ctx):
         return {"ok": False, "error": "Transmission не доступен"}
 
     @app.route("/api/transmission/action", methods=["POST"])
+    @can_edit
     @login_required
     def api_transmission_action():
         data = request.json
@@ -1324,6 +1345,7 @@ def register_routes(app, ctx):
         return {"ok": False, "error": "Transmission не доступен"}
 
     @app.route("/api/transmission/queue", methods=["POST"])
+    @can_edit
     @login_required
     def api_transmission_queue():
         data = request.json
@@ -1491,6 +1513,7 @@ def register_routes(app, ctx):
             return {"ok": False, "error": str(e)}
 
     @app.route("/api/upnp/play", methods=["POST"])
+    @can_edit
     @login_required
     def api_upnp_play():
         data = request.json or {}
@@ -1508,6 +1531,7 @@ def register_routes(app, ctx):
         return {"ok": False, "error": "SOAP failed"}
 
     @app.route("/api/upnp/pause", methods=["POST"])
+    @can_edit
     @login_required
     def api_upnp_pause():
         data = request.json or {}
@@ -1519,6 +1543,7 @@ def register_routes(app, ctx):
         return {"ok": True}
 
     @app.route("/api/upnp/stop", methods=["POST"])
+    @can_edit
     @login_required
     def api_upnp_stop():
         data = request.json or {}
@@ -1530,6 +1555,7 @@ def register_routes(app, ctx):
         return {"ok": True}
 
     @app.route("/api/upnp/next", methods=["POST"])
+    @can_edit
     @login_required
     def api_upnp_next():
         data = request.json or {}
@@ -1541,6 +1567,7 @@ def register_routes(app, ctx):
         return {"ok": True}
 
     @app.route("/api/upnp/prev", methods=["POST"])
+    @can_edit
     @login_required
     def api_upnp_prev():
         data = request.json or {}
@@ -1552,6 +1579,7 @@ def register_routes(app, ctx):
         return {"ok": True}
 
     @app.route("/api/upnp/volume", methods=["POST"])
+    @can_edit
     @login_required
     def api_upnp_volume():
         data = request.json or {}
@@ -1564,6 +1592,7 @@ def register_routes(app, ctx):
         return {"ok": True}
 
     @app.route("/api/upnp/mute", methods=["POST"])
+    @can_edit
     @login_required
     def api_upnp_mute():
         data = request.json or {}

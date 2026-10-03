@@ -11,7 +11,11 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from html import escape as _html_escape
 
-sys.path.insert(0, "/opt/lan-discovery")
+# B-05: sys.path — только каталог самого app.py (не хардкод /opt/...):
+# при запуске из чужого префикса (--prefix) не подхватывается ядро 1.1
+_APP_DIR = os.path.dirname(os.path.abspath(__file__))
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
 
 from core import process as core_process
 from core import storage as core_storage
@@ -366,20 +370,25 @@ def _demo_api_adapter():
     from core import demo as core_demo
     if not core_demo.demo_enabled():
         return None
-    if not request.path.startswith("/api/"):
+    is_api = request.path.startswith("/api/")
+    if request.method in ("GET", "HEAD"):
+        if not is_api:
+            return None
+        from modules.auth import get_current_user
+        if not get_current_user():
+            return jsonify({"ok": False, "error": "unauthorized"}), 401
+        fx = core_demo.fixture(request.path)
+        if fx is core_demo._NO_FIXTURE:
+            return jsonify({"ok": False, "demo": True,
+                            "error": "demo: фикстуры нет",
+                            "path": request.path}), 404
+        return jsonify(fx)
+    # D-09: изменяющие методы — барьер на ВСЕХ путях (HTML-формы раньше
+    # проходили мимо read-only барьера), только /login (POST входа) — внутрь
+    if request.path == "/login":
         return None
-    if request.method not in ("GET", "HEAD"):
-        return jsonify({"ok": False, "demo": True,
-                        "error": "demo mode: запись запрещена"}), 403
-    from modules.auth import get_current_user
-    if not get_current_user():
-        return jsonify({"ok": False, "error": "unauthorized"}), 401
-    fx = core_demo.fixture(request.path)
-    if fx is core_demo._NO_FIXTURE:
-        return jsonify({"ok": False, "demo": True,
-                        "error": "demo: фикстуры нет",
-                        "path": request.path}), 404
-    return jsonify(fx)
+    return jsonify({"ok": False, "demo": True,
+                    "error": "demo mode: запись запрещена"}), 403
 
 
 app.before_request_funcs.setdefault(None, []).insert(0, _demo_api_adapter)

@@ -2,6 +2,7 @@ import json
 import os
 import re
 import socket
+import sys
 import threading
 import time
 
@@ -10,7 +11,10 @@ from flask import request, jsonify, render_template
 from core import network as core_net
 from core import process as core_process
 
-NETWORK_CHECK_SCRIPT = "/opt/lan-discovery/network_check.py"
+# C-02: скрипт лежит рядом с кодом (корень репо), путь вычисляется от __file__
+# — работает и при --prefix, и в контейнере стенда N6 (BindPaths /opt/...)
+_NETWORK_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+NETWORK_CHECK_SCRIPT = os.path.join(_NETWORK_ROOT, "network_check.py")
 NETWORK_CONFIG = "/etc/lan-discovery/network.json"
 
 _network_config_cache = {"data": None, "ts": 0}
@@ -147,12 +151,13 @@ def register_routes(app, ctx):
     def api_network_check():
         """Check network connectivity"""
         try:
-            out = _cmd(["python3", NETWORK_CHECK_SCRIPT, "all"], timeout=30)
+            out = _cmd([sys.executable, NETWORK_CHECK_SCRIPT, "all"], timeout=30)
             return jsonify(json.loads(out))
         except Exception as e:
             return jsonify({"internet": False, "ru_zone": False, "error": str(e)})
 
     @app.route("/api/network/check_host", methods=["POST"])
+    @can_edit
     @login_required
     def api_network_check_host():
         """Check custom host connectivity"""
@@ -163,12 +168,13 @@ def register_routes(app, ctx):
         if not _valid_host(host):
             return jsonify({"error": "invalid host"}), 400
         try:
-            out = _cmd(["python3", NETWORK_CHECK_SCRIPT, "provider", host.strip()], timeout=15)
+            out = _cmd([sys.executable, NETWORK_CHECK_SCRIPT, "provider", host.strip()], timeout=15)
             return jsonify(json.loads(out))
         except Exception as e:
             return jsonify({"host": host, "online": False, "error": str(e)})
 
     @app.route("/api/nettools/ping", methods=["POST"])
+    @can_edit
     @login_required
     def api_nettools_ping():
         host = request.json.get("host", "").strip()
@@ -186,6 +192,7 @@ def register_routes(app, ctx):
             return {"ok": False, "error": str(e)}
 
     @app.route("/api/nettools/dns", methods=["POST"])
+    @can_edit
     @login_required
     def api_nettools_dns():
         host = request.json.get("host", "").strip()
@@ -208,6 +215,7 @@ def register_routes(app, ctx):
             return {"ok": False, "error": str(e)}
 
     @app.route("/api/nettools/ports", methods=["POST"])
+    @can_edit
     @login_required
     def api_nettools_ports():
         data = request.json
@@ -247,6 +255,7 @@ def register_routes(app, ctx):
         return {"ok": True, "results": results}
 
     @app.route("/api/nettools/trace", methods=["POST"])
+    @can_edit
     @login_required
     def api_nettools_trace():
         host = request.json.get("host", "").strip()
@@ -348,6 +357,7 @@ def register_routes(app, ctx):
             return {"ok": False, "error": str(e)}
 
     @app.route("/api/bluetooth/scan", methods=["POST"])
+    @can_edit
     @login_required
     def api_bluetooth_scan():
         try:
@@ -357,6 +367,7 @@ def register_routes(app, ctx):
             return {"ok": False, "error": str(e)}
 
     @app.route("/api/bluetooth/discoverable", methods=["POST"])
+    @can_edit
     @login_required
     def api_bluetooth_discoverable():
         on = request.json.get("on", True)
@@ -402,6 +413,7 @@ def register_routes(app, ctx):
             return {"ok": False, "error": str(e)}
 
     @app.route("/api/bluetooth/connect", methods=["POST"])
+    @can_edit
     @login_required
     def api_bluetooth_connect():
         mac = request.json.get("mac", "")
@@ -415,6 +427,7 @@ def register_routes(app, ctx):
             return {"ok": False, "error": str(e)}
 
     @app.route("/api/bluetooth/disconnect", methods=["POST"])
+    @can_edit
     @login_required
     def api_bluetooth_disconnect():
         mac = request.json.get("mac", "")
@@ -427,6 +440,7 @@ def register_routes(app, ctx):
             return {"ok": False, "error": str(e)}
 
     @app.route("/api/bluetooth/pair", methods=["POST"])
+    @can_edit
     @login_required
     def api_bluetooth_pair():
         mac = request.json.get("mac", "")
@@ -440,6 +454,7 @@ def register_routes(app, ctx):
             return {"ok": False, "error": str(e)}
 
     @app.route("/api/bluetooth/remove", methods=["POST"])
+    @can_edit
     @login_required
     def api_bluetooth_remove():
         mac = request.json.get("mac", "")
@@ -452,6 +467,7 @@ def register_routes(app, ctx):
             return {"ok": False, "error": str(e)}
 
     @app.route("/api/bluetooth/power", methods=["POST"])
+    @can_edit
     @login_required
     def api_bluetooth_power():
         on = request.json.get("on", True)

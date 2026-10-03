@@ -2,8 +2,50 @@
 
 Формат: [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 версионирование — [SemVer](https://semver.org/lang/ru/). Версия панели —
-`APP_VERSION` в `app.py` (показывается в `/api/health`, `/api/system/health`
-и на странице «О системе»). Git-тег `vX.Y.Z` ставится на релиз.
+`APP_VERSION` в `core/version.py` (§34; показывается в `/api/health`,
+`/api/system/health` и на странице «О системе»). Git-тег `vX.Y.Z`
+ставится на релиз.
+
+## [Unreleased]
+
+### Исправлено
+- **FINAL BETA AUDIT (pre-release):** блокеры аудита закрыты, unit 413
+  passed / 5 skipped (+16 тестов к базовым 402; CI ожидает 418
+  passed); live-прогон на стенде N6 — после деплоя.
+- **A-01 установка:** `install.sh step_config` сидит `users.json`
+  (admin/1234, bcrypt с fallback legacy sha256 и ленивым re-hash при
+  входе; идемпотентно — существующий файл не трогается, запись
+  атомарная) — чистая Debian получает вход, как обещают install.sh и
+  `docs/2.0/INSTALL.md`; `step_code` кладёт `network_check.py`.
+- **C-02 сеть:** `network_check.py` возвращён в репо (со стенда;
+  раньше существовал только в `/opt/...` и не входил в git),
+  `NETWORK_CHECK_SCRIPT` вычисляется от `__file__` (живёт при
+  `--prefix`/BindPaths), запуск через `sys.executable`.
+- **B-03 события→automation:** `add_event(..., out=)` +
+  `events.notify_all()` — discovery (фоновый `scan_loop` и ручной
+  скан-job) коммитит транзакцию и только потом делает fan-out
+  подписчикам, без записи в чужую открытую транзакцию (busy/deadlock);
+  payload несёт каноническое namespace-имя (`device.offline`), в БД
+  остаётся legacy-имя — dual-read сводит обе стороны. Правила §17 на
+  `device.*` теперь реально срабатывают на сканы.
+- **B-04 RBAC:** `@can_edit` на 45 mutation-маршрутах (notes ×3,
+  inventory, media ×29, network ×12) — роль guest (просмотр) получает
+  403 на запись во всех модулях; инвариант-тест сканирует
+  `modules/*.py` + `app.py`, параметризованный guest-403 — на
+  репрезентативных эндпоинтах.
+- **B-05 portability:** `sys.path` в `app.py` — каталог самого `app.py`
+  (с dedup) вместо хардкода `/opt/lan-discovery` — запуск из другого
+  префикса не подхватывает чужое ядро.
+- **D-07** `auth.save_users` пишет атомарно (tmp + `os.replace`) —
+  обрыв не оставляет обрезанный `users.json`.
+- **D-08** `login_required`: `/api/*` без сессии → JSON **401** (раньше
+  302 на HTML-форму ломал fetch-клиенты), страницы — 302 как раньше.
+- **D-09** demo-барьер (§28): изменяющие методы на HTML-путях тоже 403
+  (раньше проверялись только `/api/*`); `/login` — исключение, вход в
+  демо жив.
+- **D-10** два windows-only теста получили `skipif` по `/proc`
+  (диски/lsblk), **D-11** ссылка на `APP_VERSION` в CHANGELOG
+  указывает `core/version.py` (§34).
 
 ## [2.0.0] — 03.10.2026
 

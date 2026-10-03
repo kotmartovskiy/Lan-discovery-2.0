@@ -17,6 +17,7 @@ from core.discovery import (  # noqa: F401
     scan_loop,
     start_scan_thread,
 )
+from core.events import notify_all
 
 
 # Схема и коннектор БД — core/db.py (PHASE 2.0-10); реэкспорт символов —
@@ -359,11 +360,16 @@ def _scan_job(ctx, subnet, ifaces):
     now = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
 
     con = get_db()
+    events_out = []
     try:
-        stats = reconcile(con, current, now)
+        stats = reconcile(con, current, now, events_out=events_out)
         con.commit()
     finally:
         con.close()
+
+    # B-03: fan-out событий (Automation §17) — строго после commit
+    if events_out:
+        notify_all(events_out)
 
     ctx.progress(100)
     ctx.log("Скан завершён: %d устройств" % len(current))

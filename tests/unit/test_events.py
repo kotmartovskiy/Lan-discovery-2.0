@@ -8,7 +8,7 @@ import pytest
 import core.events as ev
 from core.events import (EVENT_SEVERITY, NAMESPACE_EVENTS, add_event,
                          cleanup_old_events, emit, event_to_dict,
-                         list_events, now_ts, subscribe)
+                         list_events, notify_all, now_ts, subscribe)
 
 
 @pytest.fixture(autouse=True)
@@ -218,3 +218,39 @@ def test_list_events_dual_read_aliases(events_con):
     events_con.commit()
     assert len(list_events(events_con, event="job.started")) == 1
     assert len(list_events(events_con, event="ONLINE")) == 2
+# --- B-03: отложенный fan-out discovery -> Automation (§16/§17) ------------
+
+def test_add_event_out_defers_notify(events_con):
+    """add_event(out=...) копирует payload, доставка — только notify_all."""
+    seen = []
+    subscribe(seen.append)
+    out = []
+    add_event(events_con, "10.0.0.1", hostname="h", event="OFFLINE",
+              metadata={"x": 1}, timestamp="01.02.2026 12:00:00", out=out)
+    # подписчик молчит до fan-out (тот вызывается после commit писателя)
+    assert seen == []
+    assert len(out) == 1
+    p = out[0]
+    # имя payload — каноническое namespace-имя (dual-read сводит с legacy)
+    assert p == {"name": "device.offline", "ip": "10.0.0.1",
+                 "hostname": "h", "mac": None, "severity": "warning",
+                 "source": "discovery", "metadata": {"x": 1},
+                 "timestamp": "01.02.2026 12:00:00"}
+    events_con.commit()
+    notify_all(out)
+    assert seen == [p]
+    # в БД событие записано legacy-именем (обратная совместимость UI/фильтров)
+    assert event_to_dict(list_events(events_con, ip="10.0.0.1")[0])[
+        "event"] == "OFFLINE"
+
+
+def test_add_event_without_out_no_fanout(events_con):
+    """Без out фан-аут не делает ни add_event, ни notify_all (это emit)."""
+    seen = []
+    subscribe(seen.append)
+    add_event(events_con, "10.0.0.2", event="NEW")
+    events_con.commit()
+    assert seen == []
+    assert list_events(events_con, ip="10.0.0.2")[0][5] == "NEW"
+
+

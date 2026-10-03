@@ -131,3 +131,20 @@ def test_fixtures_loader(tmp_path):
         demo.clear_cache()
     assert data["/api/jobs"] == {"ok": True, "jobs": []}
     assert "/api/broken" not in data
+
+
+def test_adapter_forbids_html_mutation(client):
+    """D-09: не-GET на HTML-путях тоже под read-only барьером.
+
+    Раньше хук проверял только /api/* — HTML-формы mutation проходили
+    в реальные роуты. /login (POST входа) — исключение, вход в демо жив.
+    """
+    r = client.post("/system", data={"x": "1"})
+    assert r.status_code == 403
+    data = r.get_json()
+    assert data["demo"] is True and data["ok"] is False
+    # POST /login проходит барьер (дальше CSRF/валидация, но не 403-demo)
+    r = client.post("/login", data={"username": "admin", "password": "1234"})
+    assert r.status_code != 403
+
+

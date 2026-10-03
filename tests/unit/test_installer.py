@@ -81,6 +81,12 @@ def test_install_sh_syntax_and_dry_run():
                  "config", "db", "unit", "health"):
         assert "step: %s" % step in r.stdout, "нет шага %s" % step
     assert "DRY-RUN" in r.stdout
+    # A-01: config-шаг всегда логирует ветку users.json (сид admin)
+    assert "users.json" in r.stdout
+    # A-01: config-шаг всегда логирует ветку users.json (сид admin)
+    assert "users.json" in r.stdout
+    # A-01: config-шаг всегда логирует ветку users.json (сид admin)
+    assert "users.json" in r.stdout
 
 
 def test_hw_detect_report():
@@ -107,3 +113,27 @@ def test_hw_detect_report():
             rep = json.load(f)
         assert rep["platform"]["arch"]
         assert "detected_at" in rep and "distro" in rep
+
+
+def test_install_sh_seeds_first_admin():
+    """A-01: step_config сидит users.json — чистая установка получает вход.
+
+    Без users.json load_users() -> {} и панель вообще без входа, хотя
+    install.sh и docs/2.0/INSTALL.md обещают admin/1234.
+    """
+    text = _read_install_sh()
+    assert 'USERS="/etc/lan-discovery/users.json"' in text
+    start = text.index("step_config() {")
+    end = text.index("step_db() {", start)   # граница следующей функции
+    body = text[start:end]
+    assert "$USERS" in body              # ветка сидинга users.json
+    assert "password_hash" in body       # формат совместим с auth.login
+    assert "bcrypt" in body              # bcrypt (+ fallback legacy sha256)
+    assert "os.replace" in body          # атомарная запись, не обрезанный файл
+    assert "enabled" in body
+    # идемпотентно: существующий users.json не перезаписывается
+    assert "уже есть" in body
+    # step_code кладёт network_check.py (C-02)
+    assert "network_check.py" in text
+
+

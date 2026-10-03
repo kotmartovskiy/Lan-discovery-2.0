@@ -818,3 +818,30 @@ Release — по отдельному указанию; живой прогон 
   войдите ещё раз» (200, юзер жмёт без F5), /api/* → JSON 400, прочее →
   текст с подсказкой F5; валидация токена не ослаблена. Тесты: unit +1
   (402 в CI), live-тест с версионным гейтом (1.1 → прежний 400).
+
+
+### 03.10.2026 — FINAL BETA AUDIT: pre-release блокеры закрыты — **DONE**
+
+- Аудит 18 этапов своими инструментами (подагенты упали на rate limit)
+  выдал шесть классов находок; в код внесены все блокеры:
+  **A-01** — install.sh `step_config` сидит users.json (admin/1234,
+  bcrypt; идемпотентно, атомарно): чистая установка без входа больше
+  невозможна; **C-02** — network_check.py возвращён в репо, путь от
+  __file__ (не /opt-хардкод), вызовы sys.executable;
+  **B-03** — discovery-события наконец доходят до Automation §17:
+  add_event(out=) + notify_all ПОСЛЕ commit писателя (иначе подписчик
+  automation писал в БД внутри чужой транзакции → busy/deadlock),
+  payload — namespace-имя, БД — legacy (dual-read);
+  **B-04** — @can_edit на 45 mutation-маршрутах (notes/inventory/media/
+  network), guest-role получает 403 на запись, инвариант-тест сканирует
+  modules/+app.py; **B-05** — sys.path app.py от __file__ (нет
+  подхвата ядра 1.1 из чужого префикса); долг **D-07..D-11**
+  (атомарный save_users, 401 JSON для /api без сессии, demo-барьер на
+  не-GET HTML-путей кроме /login, skipif /proc для 2 windows-only
+  тестов, ссылка APP_VERSION → core/version.py в CHANGELOG).
+- Тесты: +16 (A-01, C-02, B-03 ×4, B-04 — инвариант + guest ×5,
+  D-07, D-08, D-09, B-05); локально **413 passed / 5 skipped**
+  (402 базовых + 16 новых; CI — 418 passed)
+  (skipped — только Linux-гейты); существующие фикстуры под новый
+  контракт починены (401 вместо 302 в смоуке, events_out в моках
+  reconcile). Деплой на стенд N6 и live-прогон — следующий шаг.

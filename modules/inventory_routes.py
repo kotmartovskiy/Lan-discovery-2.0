@@ -26,6 +26,7 @@ def _spawn_inventory_scan():
 
 def register_routes(app, ctx):
     login_required = ctx.login_required
+    can_edit = ctx.can_edit
     page_data = ctx.page_data
     _cfg = ctx._cfg
     DB = ctx.DB
@@ -149,6 +150,7 @@ def register_routes(app, ctx):
         return render_template("inventory.html", **data)
 
     @app.route("/inventory/scan", methods=["POST"])
+    @can_edit
     @login_required
     def inventory_scan():
         _spawn_inventory_scan()

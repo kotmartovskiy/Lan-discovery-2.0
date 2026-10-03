@@ -79,3 +79,15 @@ def test_help_lan_gated_by_subnet():
         assert sum(1 for n in hf["lan"] if n["here"]) <= 1
     else:
         assert hf["lan"] == []
+
+
+def test_app_sys_path_from_file_not_hardcoded():
+    """B-05: sys.path app.py — от __file__, без хардкода /opt/lan-discovery.
+
+    Иначе запуск с другим префиксом (--prefix) подхватывает чужое ядро 1.1.
+    """
+    text = (ROOT / "app.py").read_text(encoding="utf-8")
+    assert 'sys.path.insert(0, "/opt/lan-discovery")' not in text
+    assert "_APP_DIR = os.path.dirname(os.path.abspath(__file__))" in text
+
+

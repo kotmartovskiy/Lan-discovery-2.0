@@ -25,6 +25,7 @@ usage() {
 PREFIX="/opt/lan-discovery"
 UNIT_DIR="/etc/systemd/system"
 SETTINGS="/etc/lan-discovery/settings.json"
+USERS="/etc/lan-discovery/users.json"
 SKIP_APT=0
 NO_ENABLE=0
 DRY_RUN=0
@@ -143,9 +144,9 @@ step_code() {
     fi
     log "step: code — копирую код в $PREFIX"
     run mkdir -p "$PREFIX"
-    for item in app.py core modules templates static games tools deploy \
-                requirements.txt requirements-dev.txt pytest.ini install.sh \
-                tests; do
+    for item in app.py network_check.py core modules templates static games \
+                tools deploy requirements.txt requirements-dev.txt pytest.ini \
+                install.sh tests; do
         if [[ -e "$SCRIPT_DIR/$item" ]]; then
             run cp -r "$SCRIPT_DIR/$item" "$PREFIX/"
         fi
@@ -238,15 +239,13 @@ step_venv() {
 step_config() {
     if [[ -f "$SETTINGS" ]]; then
         log "step: config — уже есть ($SETTINGS), не трогаю"
-        return
-    fi
-    log "step: config — создаю базовый $SETTINGS (авто-subnet из интерфейсов)"
-    if [[ $DRY_RUN -eq 1 ]]; then
+    elif [[ $DRY_RUN -eq 1 ]]; then
+        log "step: config — создаю базовый $SETTINGS (авто-subnet из интерфейсов)"
         log "DRY: запись базового settings.json в $SETTINGS"
-        return
-    fi
-    mkdir -p "$(dirname "$SETTINGS")"
-    "$PY_BIN" - "$SETTINGS" <<'PYEOF'
+    else
+        log "step: config — создаю базовый $SETTINGS (авто-subnet из интерфейсов)"
+        mkdir -p "$(dirname "$SETTINGS")"
+        "$PY_BIN" - "$SETTINGS" <<'PYEOF'
 import ipaddress, json, subprocess, sys
 
 subnet = None
@@ -282,6 +281,39 @@ with open(sys.argv[1], "w", encoding="utf-8") as f:
     json.dump(cfg, f, indent=2, ensure_ascii=False)
 print(f"[install]   subnet={cfg['network']['subnet']} self_ips={self_ips}")
 PYEOF
+    fi
+
+    # A-01: первый администратор. Без users.json чистая установка остаётся
+    # вообще без входа (load_users() → {}): login обещан docs/2.0/INSTALL.md.
+    if [[ -f "$USERS" ]]; then
+        log "step: config — $USERS уже есть, не трогаю"
+    elif [[ $DRY_RUN -eq 1 ]]; then
+        log "DRY: запись $USERS (логин admin)"
+    else
+        log "step: config — создаю $USERS (admin/1234 — сменить после первого входа)"
+        mkdir -p "$(dirname "$USERS")"
+        local upy="$PREFIX/venv/bin/python"
+        [[ -x "$upy" ]] || upy="$PY_BIN"
+        "$upy" - "$USERS" <<'PYEOF'
+import hashlib, json, os, sys
+
+path = sys.argv[1]
+pw = "1234"
+try:
+    import bcrypt
+    hashed = bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
+except Exception:
+    # legacy sha256: auth._verify_hash принимает, логин лениво перехеширует в bcrypt
+    hashed = hashlib.sha256(pw.encode()).hexdigest()
+tmp = path + ".tmp"
+with open(tmp, "w", encoding="utf-8") as f:
+    json.dump({"admin": {"password_hash": hashed, "role": "admin",
+                         "enabled": True, "display_name": "admin"}},
+              f, indent=2, ensure_ascii=False)
+os.replace(tmp, path)
+print(f"[install]   users: admin создан")
+PYEOF
+    fi
 }
 
 # --------------------------------------------------------------------- db

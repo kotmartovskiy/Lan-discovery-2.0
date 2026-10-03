@@ -331,3 +331,44 @@ def test_overview_conflict_and_role_flags(tmp_path, monkeypatch):
     assert byid["disks"]["role"] == "optional"
     assert byid["notes"]["role"] == "conflict"
     assert r["conflicts"] == ["notes"]
+
+
+def test_mutating_routes_have_edit_guard():
+    """B-04: инвариант аудита — mutation-маршрут не может быть login-only.
+
+    Каждый @app.route с POST/PUT/DELETE/PATCH обязан иметь @can_edit
+    или @admin_required (иначе guest-role пишет в систему, §11).
+    """
+    import pathlib
+    import re
+
+    root = pathlib.Path(__file__).resolve().parents[2]
+    files = sorted((root / "modules").glob("*.py")) + [root / "app.py"]
+    offenders = []
+    for path in files:
+        lines = path.read_text(encoding="utf-8").splitlines()
+        i = 0
+        while i < len(lines):
+            if not lines[i].lstrip().startswith("@app.route"):
+                i += 1
+                continue
+            j = i
+            while j < len(lines) and not lines[j].lstrip().startswith("def "):
+                j += 1
+            block = lines[i:j] if j <= len(lines) else lines[i:]
+            text = "\n".join(block)
+            m = re.search(r"methods\s*=\s*\[([^\]]*)\]", text)
+            mut = bool(m) and any(
+                meth in m.group(1)
+                for meth in ("POST", "PUT", "DELETE", "PATCH"))
+            decs = [x.strip() for x in block if x.strip().startswith("@")]
+            if (mut and "@login_required" in decs
+                    and "@can_edit" not in decs
+                    and "@admin_required" not in decs):
+                rm = re.search(r'"(/[^"]*)"', text)
+                offenders.append("%s:%d %s" % (
+                    path.name, i + 1, rm.group(1) if rm else "?"))
+            i = j + 1
+    assert offenders == [], "нет @can_edit/@admin_required: %s" % offenders
+
+

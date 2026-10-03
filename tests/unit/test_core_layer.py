@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Unit: PHASE 2.0-2 — core/process, services, config, network, storage
 (read-only контракты + первый перенос вызовов из system_routes)."""
+import os
 import sqlite3
 import subprocess
 import sys
@@ -289,6 +290,7 @@ def test_storage_smart_report_contract(monkeypatch):
     assert core_storage.smart_report("sda") == "smartctl не установлен"
 
 
+@pytest.mark.skipif(not os.path.isdir("/proc"), reason="только Linux: lsblk/диски")
 def test_api_disks_shape(client):
     """GET /api/disks после переноса на core.storage: старый контракт."""
     r = client.get("/api/disks")

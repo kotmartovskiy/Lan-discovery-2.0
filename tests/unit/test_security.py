@@ -168,3 +168,68 @@ def test_guest_cannot_read_settings(client, monkeypatch):
         s["login_ts"] = _time.time()
     r = client.get("/api/settings")
     assert r.status_code == 200
+
+
+# --- Pre-release: B-04 (guest не пишет), D-07 (атомарный users),
+# --- D-08 (API без сессии -> 401 JSON) ---------------------------------------
+
+def _login_as(client, username):
+    import time as _time
+    with client.session_transaction() as s:
+        s["user"] = username
+        s["login_ts"] = _time.time()
+
+
+def test_anonymous_api_returns_401_json(client):
+    """D-08: GET /api без сессии — JSON 401, а не 302 на HTML-форму."""
+    r = client.get("/api/network/config")
+    assert r.status_code == 401
+    assert r.get_json() == {"error": "unauthorized"}
+    # страницы по-прежнему редиректят на /login
+    r = client.get("/")
+    assert r.status_code == 302
+    assert "/login" in r.headers.get("Location", "")
+
+
+@pytest.mark.parametrize("url", [
+    "/api/notes",          # core_routes (B-04: 3 маршрута заметок)
+    "/inventory/scan",     # inventory
+    "/api/nettools/ping",  # network
+    "/api/alarm/stop",     # media
+    "/api/radio/play",     # media
+])
+def test_guest_cannot_mutate(client, monkeypatch, url):
+    """B-04: роль guest (просмотр) -> 403 на mutation-маршрутах модулей."""
+    from modules import auth
+    monkeypatch.setattr(
+        auth, "load_users",
+        lambda: {"guest": {"password_hash": "x", "role": "guest",
+                           "enabled": True},
+                 "admin": {"password_hash": "x", "role": "admin",
+                           "enabled": True}})
+    _login_as(client, "guest")
+    r = client.post(url, json={"host": "127.0.0.1", "title": "t",
+                               "body": "b", "message": "m"})
+    assert r.status_code == 403, (url, r.status_code,
+                                  r.get_data(as_text=True)[:160])
+    assert r.get_json()["error"] == "forbidden"
+
+
+def test_save_users_atomic(tmp_path, monkeypatch):
+    """D-07: save_users — tmp + os.replace; обрыв не оставляет битый файл."""
+    import json
+
+    from modules import auth
+    p = tmp_path / "users.json"
+    monkeypatch.setattr(auth, "USERS_PATH", str(p))
+    assert auth.save_users({"admin": {"password_hash": "h", "role": "admin",
+                                      "enabled": True}})
+    assert p.is_file()
+    assert not (tmp_path / "users.json.tmp").exists()
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert data["admin"]["role"] == "admin"
+    # неатомарный путь -> False, tmp-файл не остаётся
+    monkeypatch.setattr(auth, "USERS_PATH",
+                        str(tmp_path / "missing" / "users.json"))
+    assert auth.save_users({"x": {}}) is False
+    assert not (tmp_path / "missing").exists()
