@@ -24,11 +24,13 @@ def test_health_shape(panel_url):
     assert d.get("last_discovery") is not None
 
 
-def test_anonymous_api_events_redirect(panel_url):
+def test_anonymous_api_events_unauthorized(panel_url):
+    # D-08: API без сессии — JSON 401, а не 302 на HTML-форму
     import requests
     r = requests.get(panel_url + "/api/events?limit=3", timeout=10,
                      allow_redirects=False)
-    assert r.status_code == 302
+    assert r.status_code == 401
+    assert "error" in json.loads(r.text)
 
 
 def test_login_and_events(admin_session, panel_url):

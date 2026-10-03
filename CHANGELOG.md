@@ -46,6 +46,17 @@
 - **D-10** два windows-only теста получили `skipif` по `/proc`
   (диски/lsblk), **D-11** ссылка на `APP_VERSION` в CHANGELOG
   указывает `core/version.py` (§34).
+- **fallback `network.json`** (пойман живой пробой N6):
+  `load_network_config()` при отсутствии
+  `/etc/lan-discovery/network.json` падал в `NameError: _cfg`
+  (`_cfg` существует только в замыкании `register_routes`) — 500 на
+  GET конфига сети у любого залогиненного; теперь возвращает дефолт
+  хостов. Unit +1.
+- **Live-пробы на стенде N6 (после деплоя):** аноним `/api/*` → 401
+  JSON, гость читает 200 и получает 403 на POST (B-04), админ
+  `/api/network/check` → валидный JSON `internet/ru_zone` без
+  parse-ошибки (C-02); live 16 passed (анонимные 302-тесты переведены
+  на контракт 401).
 
 ## [2.0.0] — 03.10.2026
 

@@ -506,3 +506,14 @@ def test_network_check_script_shipped_and_resolved():
     assert json.loads(r.stdout) == {"error": "unknown action"}
 
 
+
+
+def test_load_network_config_fallback_without_file(tmp_path, monkeypatch):
+    # live-проба N6: нет /etc/lan-discovery/network.json -> раньше NameError
+    # (_cfg только в замыкании register_routes) и 500 на чтении для гостя
+    import modules.network_routes as nr
+    monkeypatch.setattr(nr, "NETWORK_CONFIG", str(tmp_path / "nope.json"))
+    nr._network_config_cache["data"] = None
+    nr._network_config_cache["ts"] = 0
+    out = nr.load_network_config()
+    assert out == {"hosts": ["google.com", "ya.ru", "192.168.3.1"]}

@@ -94,9 +94,11 @@ def test_login_post_without_csrf_rejected(panel_url):
 
 
 def test_api_status_requires_session(panel_url):
+    # D-08: /api без сессии — JSON 401 (302 ломал fetch-клиенты)
     r = requests.get(panel_url + "/api/status", allow_redirects=False,
                      timeout=10)
-    assert r.status_code == 302
+    assert r.status_code == 401
+    assert "error" in json.loads(r.text)
 
 
 def test_health_shape_security_fields(admin_session, panel_url):

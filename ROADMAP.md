@@ -845,3 +845,19 @@ Release — по отдельному указанию; живой прогон 
   (skipped — только Linux-гейты); существующие фикстуры под новый
   контракт починены (401 вместо 302 в смоуке, events_out в моках
   reconcile). Деплой на стенд N6 и live-прогон — следующий шаг.
+
+- Деплой и живые пробы (N6): бэкапы 24 файлов в /root/prerelease-*
+  -backup.tar.gz, архив 25 файлов распакован, py_compile + bash -n
+  зелёные, юнит lan-discovery-2 перезапущен (health 2.0.0 /
+  user_version=3). **Live 16 passed** — анонимный 302-контракт в
+  двух тестах заменён на новый D-08 (401 + JSON). Пробы новых
+  фиксов: аноним /api/status → 401 {"error": "unauthorized"};
+  временный гость (probe_guest, восстановлен байт-в-байт после
+  пробы): чтение 200, POST /api/nettools/ping → 403 forbidden
+  (B-04); админ /api/network/check → валидный JSON
+  {"internet": true, "ru_zone": true} (C-02, файл в репо и на
+  стенде). Ловушка пробы: GET /api/network/config у гостя → 500 —
+  load_network_config при отсутствии /etc/lan-discovery/network.json
+  падал в NameError: _cfg (только в замыкании register_routes);
+  фикс — дефолт без _cfg, unit +1 (414 passed), задеплоен после
+  бэкапа modules/network_routes.py.

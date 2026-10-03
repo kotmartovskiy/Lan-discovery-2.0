@@ -52,7 +52,10 @@ def load_network_config():
         _network_config_cache["ts"] = now
         return data
     except Exception:
-        return {"hosts": _cfg("network", "default_hosts", ["google.com", "ya.ru", "192.168.3.1"])}
+        # _cfg живёт только в замыкании register_routes (ctx) — на
+        # модульном уровне его нет: NameError → 500 при отсутствии
+        # network.json. Дефолт — тот же, что в _cfg(..., default_hosts).
+        return {"hosts": ["google.com", "ya.ru", "192.168.3.1"]}
 
 def save_network_config(data):
     try:
