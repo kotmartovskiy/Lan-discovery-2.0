@@ -344,7 +344,10 @@ th, td {
 th {
     color: #999;
     position: sticky;
-    top: var(--header-height, 0px);
+    /* .table-wrap (overflow-x:auto) — scroll-контейнер: top отсчитывается от
+       него, а не от окна, поэтому var(--header-height) прижимал th к верху
+       обёртки и смещал строку заголовка вниз на высоту шапки поверх данных */
+    top: 0;
     background: #111;
     z-index: 10;
 }
