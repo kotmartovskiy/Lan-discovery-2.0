@@ -34,4 +34,7 @@ def admin_session(panel_url):
     r = s.post(panel_url + "/login", data=data, timeout=10,
                allow_redirects=False)
     assert r.status_code in (200, 302), r.status_code
+    if m:
+        # тот же токен — для POST в live-тестах (CSRFProtect: X-CSRFToken)
+        s.csrf_token = m.group(1)
     return s

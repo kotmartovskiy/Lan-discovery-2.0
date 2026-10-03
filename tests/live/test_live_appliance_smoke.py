@@ -30,6 +30,14 @@ def _wait_job(s, panel_url, jid, timeout=90):
     pytest.skip("job %s не завершился за %ss" % (jid, timeout))
 
 
+def _post(s, url, **kw):
+    """POST с CSRF (Flask-WTF): живая панель требует X-CSRFToken."""
+    tok = getattr(s, "csrf_token", None)
+    if tok:
+        kw.setdefault("headers", {})["X-CSRFToken"] = tok
+    return s.post(url, **kw)
+
+
 def test_appliance_chain_live(admin_session, panel_url):
     s = admin_session
 
@@ -49,8 +57,8 @@ def test_appliance_chain_live(admin_session, panel_url):
     assert isinstance(r.json(), dict)
 
     # --- module installation (notes)
-    r = s.post(panel_url + "/modules/notes/install", timeout=15,
-               allow_redirects=False)
+    r = _post(s, panel_url + "/modules/notes/install", timeout=15,
+              allow_redirects=False)
     assert r.status_code in (200, 302), r.status_code
     r = s.get(panel_url + "/api/jobs?limit=5", timeout=10)
     jobs = r.json()["jobs"]
@@ -64,7 +72,7 @@ def test_appliance_chain_live(admin_session, panel_url):
     r = s.get(panel_url + "/api/roles", timeout=10)
     assert r.status_code == 200
     assert r.json()["roles"]
-    r = s.post(panel_url + "/api/roles/default/apply", timeout=30)
+    r = _post(s, panel_url + "/api/roles/default/apply", timeout=30)
     assert r.status_code == 200
     ra = r.json()
     assert ra["ok"] is True, ra
@@ -80,13 +88,13 @@ def test_appliance_chain_live(admin_session, panel_url):
     r = s.get(panel_url + "/api/settings", timeout=10)
     orig = r.json().get("network", {}).get("scan_interval")
     probe = 41 if orig != 41 else 42
-    r = s.post(panel_url + "/api/settings",
-               json={"network": {"scan_interval": probe}}, timeout=10)
+    r = _post(s, panel_url + "/api/settings",
+              json={"network": {"scan_interval": probe}}, timeout=10)
     assert r.status_code == 200 and r.json()["ok"] is True
     r = s.get(panel_url + "/api/settings", timeout=10)
     assert r.json()["network"]["scan_interval"] == probe
-    r = s.post(panel_url + "/api/settings",
-               json={"network": {"scan_interval": orig}}, timeout=10)
+    r = _post(s, panel_url + "/api/settings",
+              json={"network": {"scan_interval": orig}}, timeout=10)
     assert r.status_code == 200 and r.json()["ok"] is True
 
     # --- update: единый источник версии (§34); сам update.sh — вручную
@@ -94,8 +102,8 @@ def test_appliance_chain_live(admin_session, panel_url):
     assert h["version"] == APP_VERSION
 
     # --- failure simulation: несуществующий модуль -> 404, state чист
-    r = s.post(panel_url + "/modules/no-such-module/install", timeout=10,
-               allow_redirects=False)
+    r = _post(s, panel_url + "/modules/no-such-module/install", timeout=10,
+              allow_redirects=False)
     assert r.status_code == 404
 
     # --- rollback/состояние: настройки вернулись, ничего не сломано
