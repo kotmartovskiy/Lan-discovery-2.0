@@ -7,8 +7,9 @@
   3) в JS нет fetch("...") с абсолютными путями;
   4) секреты вычищены (notes/secrets пусты, в settings нет token/password);
   5) каркасные файлы на месте (index, restore, stub, 404, demo.js, static);
-  6) MAC-адреса заменены на случайные (local admin), в именах нет
-     MAC-фрагментов; вкладки index не уходят в заглушку; demo.js в <head>.
+   6) MAC-адреса заменены на случайные (local admin), в именах нет
+      MAC-фрагментов; вкладки index ведут на страницы снимка; главные
+      разделы присутствуют файлами; demo.js в <head>.
 
 Запуск: python tools/demo_lint.py <папка-demo>
 Код 0 = чисто, 1 = найдены ошибки.
@@ -33,11 +34,16 @@ BARE12_RE = re.compile(
 PERSON_RE = re.compile(
     r'(?<![А-Яа-яЁё])(?:Света|Светы|Леся|Леси|Тима|Тимы)(?![А-Яа-яЁё])', re.I)
 
-# вкладки главной (должны вести на страницы снимка, а не на заглушку)
+# вкладки главной (должны вести на страницы снимка, а не на заглушку).
+# Навигация шелла 2.0: index/history/apps/system/modules (+ restore ниже)
 INDEX_TABS = (
-    "index.html", "inventory.html", "monitoring.html", "torrent.html",
-    "currencies.html", "weather.html", "apps.html", "system.html",
-    "about.html", "help.html", "modules.html",
+    "index.html", "history.html", "apps.html", "system.html", "modules.html",
+)
+# главные разделы обязаны присутствовать файлами (в 2.0 к ним ведут
+# ссылки из разделов, а не табы index — полнота слепка проверяется явно)
+REQUIRED_PAGES = INDEX_TABS + (
+    "restore.html", "inventory.html", "monitoring.html", "torrent.html",
+    "currencies.html", "weather.html", "about.html", "help.html",
 )
 
 errors = []
@@ -53,10 +59,13 @@ def warn(msg):
 
 
 def check_files():
-    for f in ("index.html", "restore.html", "stub.html", "404.html",
-              "demo.js", os.path.join("static", "style.css")):
+    for f in ("stub.html", "404.html", "demo.js",
+              os.path.join("static", "style.css")):
         if not os.path.exists(os.path.join(ROOT, f)):
             err("нет каркасного файла: " + f)
+    for f in REQUIRED_PAGES:
+        if not os.path.exists(os.path.join(ROOT, f)):
+            err("нет обязательной страницы: " + f)
 
 
 def check_secrets():

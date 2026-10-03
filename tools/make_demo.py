@@ -119,6 +119,17 @@ def fake_mac(m):
     return (first + ":" + rest).upper()
 
 
+def fake_bare_id(m):
+    """Голый 12-hex (job_id и т.п.) → 12 цифр: детерминированно (один и тот же
+    токен в events/jobs даёт один фейк), без a-f — demo_lint не считает его
+    MAC-фрагментом; буквенная часть исходного токена не восстанавливается."""
+    tok = m.group()
+    if not re.search(r"[a-fA-F]", tok):
+        return tok
+    h = hashlib.md5(("lan-demo-id:" + tok).encode("utf-8")).hexdigest()
+    return "".join(str(int(ch, 16) % 10) for ch in h[:12])
+
+
 def build_name_fixes():
     """Старое имя (с MAC) → нейтральное; сканируются колонки name/title БД."""
     fixes = {}
@@ -435,6 +446,7 @@ def _sanitize_api_json(fixes):
             for old, new in sorted(fixes.items(), key=lambda kv: -len(kv[0])):
                 text = text.replace(old, new)
             text = MAC_RE.sub(fake_mac, text)
+            text = BARE12_RE.sub(fake_bare_id, text)
             text = scrub_net_secrets(text)
             try:
                 with open(p, "w", encoding="utf-8") as f:
@@ -580,6 +592,7 @@ def main():
         html = open(path, encoding="utf-8").read()
         html = apply_name_fixes(html, fixes)
         html = MAC_RE.sub(fake_mac, html)
+        html = BARE12_RE.sub(fake_bare_id, html)
         html = scrub_net_secrets(html)
         html = transform(html, page_map)
         with open(path, "w", encoding="utf-8") as f:
