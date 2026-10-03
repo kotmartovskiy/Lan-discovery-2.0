@@ -1,12 +1,13 @@
-# Lan-discovery 2.0 (в разработке)
+# Lan-discovery 2.0.0
 
 Веб-панель управления домашней сетью для одноплатных компьютеров (Orange Pi, X96 Max / Amlogic, generic Debian/ARM): обнаружение устройств, мониторинг, IPTV/радио/плеер, сетевые инструменты, файлы, заметки, бэкапы и клонирование eMMC → SD.
 
-> **Статус 2.0:** параллельная разработка Universal Modular Appliance
-> Platform (спека — `docs/Спецификация-2.0.md`, архитектура —
-> `docs/Архитектура-2.0.md`, фазы — `ROADMAP.md`). **Боевые системы
-> (X96, Orange Pi) работают на версии 1.1** — репозиторий
-> `Lan-discovery-1.1`; 2.0 на них не деплоится.
+> **Статус 2.0.0 (03.10.2026):** Universal Modular Appliance Platform —
+> спека §0–37 выполнена, ROADMAP 2.0-0…2.0-21 закрыт (спека —
+> `docs/Спецификация-2.0.md`, архитектура — `docs/Архитектура-2.0.md`,
+> guides — `docs/2.0/`). **Боевые системы (X96, Orange Pi) работают на
+> версии 1.1** — репозиторий `Lan-discovery-1.1`; 2.0 на них не
+> деплоится.
 
 - **Панель:** `http://<ip>:8080` (Flask, Python 3, venv)
 - **Сервис:** `systemctl status lan-discovery`, код — `/opt/lan-discovery/app.py`
@@ -17,6 +18,26 @@
 использование свободно; коммерческое использование, распространение
 и публичные копии кода — только по письменному разрешению
 правообладателя (kotmartovskiy).
+
+## Что нового в версии 2.0 (03.10.2026)
+
+**Universal Modular Appliance Platform** (журнал — [CHANGELOG.md](CHANGELOG.md),
+release notes — [docs/2.0/RELEASE_NOTES.md](docs/2.0/RELEASE_NOTES.md)):
+
+- **Core-подсистемы с контрактами**: jobs (долгие операции с прогрессом и
+  событиями), network (+транзакции prepare/apply/verify/rollback), storage,
+  events, automation (правила Event→Action), roles (декларативные профили),
+  capabilities (11 групп), secrets (Fernet), единый источник версии (§34);
+  инверсии слоёв устранены: `modules → app` = 0.
+- **Портируемость (§30)**: плато-специфика убрана из кода — Orange Pi /
+  X96 Max / x86_64 через capabilities (grep-тест в CI); Installer §25
+  (`install.sh --dry-run`, best-effort зависимости); appliance smoke §27.
+- **Надёжность**: manifest trust (sha256/publishers), system rollback §26
+  (`core/syschange`), device identity (mac/ip, БД v3).
+- **UI 2.0**: Application Shell (разделы HOME…ADMIN), dashboard на главной,
+  `/devices`, `/storage`, единые toast/confirm (§23), demo mode §28
+  (API adapter → fixtures).
+- **Документация**: 11 guides §29 + INSTALL/UPGRADE/MIGRATION — `docs/2.0/`.
 
 ## Что нового в версии 1.1 (01.10.2026)
 

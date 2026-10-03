@@ -5,7 +5,7 @@
 `APP_VERSION` в `app.py` (показывается в `/api/health`, `/api/system/health`
 и на странице «О системе»). Git-тег `vX.Y.Z` ставится на релиз.
 
-## [2.0.0] — не выпущена (в разработке)
+## [2.0.0] — 03.10.2026
 
 ### Добавлено
 - **Release preparation (PHASE 2.0-21, §33 Ph.10/§29/§28):** документация §29 — 11 guides в ``docs/2.0/`` (ARCHITECTURE: целевая модель, границы Core/Module/Role/UI, инварианты слоёв; CORE_API: контракты всех subsystems; MODULES: манифест v2 + uniform ``register_routes(app, ctx)``; CAPABILITIES: 11 групп/reliability; ROLES: ``roles/*.json`` + compat-check; NETWORK: ``net.transaction``/discovery; STORAGE: ``ROOTS/path``; JOBS; SECURITY: secrets/trust/syschange; DEVELOPMENT: тесты/CI/инварианты; PORTING: чек-лист устройства и запрет ``if x96max``) + guides Ph.10 (INSTALL/UPGRADE/MIGRATION) + ``RELEASE_NOTES.md`` (draft v2.0.0; тег — по указанию, ``APP_VERSION`` — ``core/version.py``, §34). **Demo mode (§28):** ``core/demo.py`` — API adapter (``before_request`` первым): GET ``/api/*`` → фикстуры ``<dir>/api/*.json`` (кэш 5 с), без фикстуры → безопасный ``{ok:false, demo:true}`` 404, изменяющие методы → 403, без сессии → 401; включение ``settings.web.demo``/``LAN_DEMO=1``, плашка ``.demo-banner`` в ``base.html`` (production HTML не копируется); ``tools/make_demo.py --fixtures`` — снимок только GET-API с санитизацией (секреты/MAC/имена/подсеть), статичное демо-сайтное генерирование сохранено. Тесты: +7 (test_demo_adapter).
