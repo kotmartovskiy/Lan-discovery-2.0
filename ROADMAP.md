@@ -784,3 +784,25 @@
 **ROADMAP 2.0-0…2.0-21 закрыт.** Остаток: тег `v2.0.0` и публикация
 Release — по отдельному указанию; живой прогон на платах — N6
 (стенд решает пользователь).
+
+
+### 03.10.2026 — Стенд N6: живой прогон 2.0 на X96 Max — **DONE**
+
+- Стенд: X96 Max 192.168.3.243 — панель 2.0 параллельно с 1.1 (юнит
+  lan-discovery-2, порт **8090**: 8080 — 1.1, 8081 — сервис
+  восстановления, не трогаем). Изоляция — bind-монты в юните стенда:
+  весь /opt/lan-discovery и весь /etc/lan-discovery перекрыты СВОИМ
+  (/opt/lan-discovery-2.0 + etc-lan/: settings с портом 8090, свой
+  users admin/1234, копии iptv); код — релиз 2.0.0 как есть, своя БД
+  devices.db (миграции v1→v2→v3 применены при старте).
+- Прогон: health (2.0.0 / user_version=3 / board X96 Max / capabilities
+  = 12 / discovery жив), **live-смоук 16 passed** — цепочка §27:
+  capabilities → install notes (job module-install completed) → roles
+  default apply → settings change + откат → несуществующий модуль 404
+  (state чист). Остаток N6 (apt-deps/update.sh вручную) — по указанию.
+- Фикс в ходе прогона: live-тесты слали POST без CSRF → 400 (Flask-WTF
+  CSRFProtect; панель отвечала корректно) — dmin_session отдаёт
+  csrf_token, цепочка шлёт X-CSRFToken (8fe0f45); CI 400 passed.
+- 1.1 не тронута: 8080 active, 1.1.0 / user_version=2, settings.json и
+  users.json не менялись (запись изолирована bind-монтируемыми
+  каталогами).
