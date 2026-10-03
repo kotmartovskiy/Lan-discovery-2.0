@@ -44,6 +44,9 @@ REPL = [
     ("(пароль 1234)", "(пароль — свой)"),
     ("kot:kot", "<пользователь>:<группа>"),
     ("`admin` / `1234`", "`admin` / `<заданный при установке>`"),
+    # Дочистка остаточных/шаблонных IP рабочей подсети (в т.ч. 192.168.3.x)
+    ("192.168.3.", "192.168.1."),
+    ("`/wiki/` оставался", "wiki-раздел оставался"),
 ]
 
 WIKI = "https://github.com/kotmartovskiy/Lan-discovery-ARM/wiki/"
@@ -61,6 +64,9 @@ def _wiki_to_rel(text: str) -> str:
 def sanitize(text: str) -> str:
     for old, new in REPL:
         text = text.replace(old, new)
+    # Дочистка: оставшиеся токены «1234» (исторические описания «root/1234»,
+    # «admin/1234» в журналах) — после красивых REPL-вариантов выше
+    text = re.sub(r"\b1234\b", "<пароль>", text)
     text = _wiki_to_rel(text)
     text = text.replace(
         "- **Репозиторий:** https://github.com/kotmartovskiy/Lan-discovery-ARM\n",
