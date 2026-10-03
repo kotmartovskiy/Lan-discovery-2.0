@@ -66,4 +66,8 @@ Roles**. Плата/вендор нигде не упоминаются — то
 * **Роли**: `apply_role` → `role_blockers` (compat-check по
   capabilities) → включение/выключение модулей → state;
 * **Automation**: событие `events.emit` → `automation.handle_event`
-  → правило → действия (`log`/`event`, свои — через `register_action`).
+  → правило → действия (`log`/`event`, свои — через `register_action`);
+* **Demo (§28)**: UI → API adapter (`core/demo`, первый
+  `before_request`) → Real API | Demo API → fixtures
+  (`make_demo.py --fixtures`); режим — `settings.web.demo`/`LAN_DEMO=1`,
+  страницы рендерятся production-шаблонами с плашкой.

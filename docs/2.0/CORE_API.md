@@ -151,3 +151,19 @@ process.run(...)                                              # единый з�
 identity: присваивание device_id (mac:<mac> / ip:<ip>), ip_history
 syschange.run(...)  # preflight → backup → apply → verify → rollback (§26)
 ```
+
+## core/demo.py (фаза 2.0-21, §28)
+
+```python
+demo.demo_enabled() -> bool        # env LAN_DEMO=1 | settings.web.demo
+demo.fixtures_dir() -> str         # env LAN_DEMO_DIR | settings.web.demo_dir
+demo.fixture(path) -> данные | _NO_FIXTURE   # <dir>/api/<path>.json, кэш 5 с
+demo.fixtures(force=False) / clear_cache()
+```
+
+API-адаптер §28: `before_request` в `app.py` (первый в очереди) —
+в demo-режиме GET `/api/*` → фикстура, без фикстуры → безопасный
+`{ok:false, demo:true}` 404, изменяющие методы → 403, без сессии → 401;
+HTML — production-шаблоны с плашкой (`demo_mode` в контексте).
+Фикстуры: `tools/make_demo.py --fixtures <dir>` (санитизация API-снимка).
+Схема режима — ARCHITECTURE.md, «Основные потоки».
