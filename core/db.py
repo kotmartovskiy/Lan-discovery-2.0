@@ -281,6 +281,43 @@ def _ensure_extra_tables(con):
         "idx_weather_observations_timestamp_unique "
         "ON weather_observations(timestamp)"
     )
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS motion_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts TEXT NOT NULL,
+            epoch INTEGER NOT NULL,
+            camera_id INTEGER NOT NULL,
+            camera_name TEXT,
+            score REAL,
+            detector TEXT,
+            photo TEXT
+        )
+    """)
+    con.execute(
+        "CREATE INDEX IF NOT EXISTS idx_motion_events_epoch "
+        "ON motion_events(camera_id, epoch)"
+    )
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS motion_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_id INTEGER NOT NULL,
+            channel TEXT NOT NULL,
+            created_epoch INTEGER NOT NULL,
+            attempts INTEGER DEFAULT 0,
+            next_epoch INTEGER NOT NULL,
+            status TEXT DEFAULT 'pending',
+            last_error TEXT,
+            sent_epoch INTEGER,
+            caption TEXT
+        )
+    """)
+    con.execute(
+        "CREATE INDEX IF NOT EXISTS idx_motion_queue_status "
+        "ON motion_queue(status, next_epoch)"
+    )
+    _mq_cols = {r[1] for r in con.execute("PRAGMA table_info(motion_queue)")}
+    if "caption" not in _mq_cols:
+        con.execute("ALTER TABLE motion_queue ADD COLUMN caption TEXT")
 
     from core.jobs import ensure_jobs_table
     ensure_jobs_table(con)

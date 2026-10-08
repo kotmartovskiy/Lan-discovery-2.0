@@ -1,13 +1,13 @@
-import logging
+﻿import logging
 from datetime import datetime
 from flask import render_template, request, redirect, url_for, jsonify
 
 log = logging.getLogger("lan-discovery")
 
 
-# Discovery engine (PHASE 6): движок вынесен в core/discovery.py.
-# Реэкспорт — обратная совместимость: app.py / system_routes импортируют
-# эти символы из devices_routes; reconcile нужен и job'е скана (2.0-3).
+# Discovery engine (PHASE 6): РґРІРёР¶РѕРє РІС‹РЅРµСЃРµРЅ РІ core/discovery.py.
+# Р РµСЌРєСЃРїРѕСЂС‚ вЂ” РѕР±СЂР°С‚РЅР°СЏ СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ: app.py / system_routes РёРјРїРѕСЂС‚РёСЂСѓСЋС‚
+# СЌС‚Рё СЃРёРјРІРѕР»С‹ РёР· devices_routes; reconcile РЅСѓР¶РµРЅ Рё job'Рµ СЃРєР°РЅР° (2.0-3).
 from core.discovery import (  # noqa: F401
     get_hostname,
     get_scan_status,
@@ -20,9 +20,9 @@ from core.discovery import (  # noqa: F401
 from core.events import notify_all
 
 
-# Схема и коннектор БД — core/db.py (PHASE 2.0-10); реэкспорт символов —
-# обратная совместимость (спека §32): app/system_routes/tests импортируют
-# init_db_schema/get_db/DB отсюда.
+# РЎС…РµРјР° Рё РєРѕРЅРЅРµРєС‚РѕСЂ Р‘Р” вЂ” core/db.py (PHASE 2.0-10); СЂРµСЌРєСЃРїРѕСЂС‚ СЃРёРјРІРѕР»РѕРІ вЂ”
+# РѕР±СЂР°С‚РЅР°СЏ СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ (СЃРїРµРєР° В§32): app/system_routes/tests РёРјРїРѕСЂС‚РёСЂСѓСЋС‚
+# init_db_schema/get_db/DB РѕС‚СЃСЋРґР°.
 from core.db import (  # noqa: F401
     DB,
     SCHEMA_VERSION,
@@ -36,6 +36,7 @@ def register_routes(app, ctx):
     admin_required = ctx.admin_required
     page_data = ctx.page_data
     _cfg = ctx._cfg
+
 
     @app.route("/devices")
     @login_required
@@ -169,7 +170,7 @@ def register_routes(app, ctx):
 
             if not device:
 
-                return "Устройство не найдено", 404
+                return "РЈСЃС‚СЂРѕР№СЃС‚РІРѕ РЅРµ РЅР°Р№РґРµРЅРѕ", 404
 
             events = con.execute(
                 """
@@ -262,7 +263,7 @@ def register_routes(app, ctx):
     @app.route("/api/device/<ip>/identity")
     @login_required
     def device_identity(ip):
-        """Идентичность устройства (2.0-11, §15): device_id + IP history."""
+        """РРґРµРЅС‚РёС‡РЅРѕСЃС‚СЊ СѓСЃС‚СЂРѕР№СЃС‚РІР° (2.0-11, В§15): device_id + IP history."""
         from core import identity as identity_core
 
         con = get_db()
@@ -272,13 +273,13 @@ def register_routes(app, ctx):
             con.close()
         if ident is None:
             return jsonify({"ok": False,
-                            "error": "устройство не найдено"}), 404
+                            "error": "СѓСЃС‚СЂРѕР№СЃС‚РІРѕ РЅРµ РЅР°Р№РґРµРЅРѕ"}), 404
         return jsonify({"ok": True, **ident})
 
     @app.route("/api/events")
     @login_required
     def api_events():
-        """Фильтрованная лента событий (P7-3): ?limit=&event=&severity=&ip=."""
+        """Р¤РёР»СЊС‚СЂРѕРІР°РЅРЅР°СЏ Р»РµРЅС‚Р° СЃРѕР±С‹С‚РёР№ (P7-3): ?limit=&event=&severity=&ip=."""
         from core.events import list_events, event_to_dict
 
         try:
@@ -305,13 +306,13 @@ def register_routes(app, ctx):
     @app.route("/api/scan", methods=["POST"])
     @admin_required
     def api_scan():
-        """Ручное сканирование (P6-2; 2.0-3 — job, one-shot, без settings).
+        """Р СѓС‡РЅРѕРµ СЃРєР°РЅРёСЂРѕРІР°РЅРёРµ (P6-2; 2.0-3 вЂ” job, one-shot, Р±РµР· settings).
 
-        Тело (JSON, опционально): {"subnet": "192.168.1.0/24",
-        "ifaces": ["eth0"]}. Без параметров — текущая конфигурация.
-        Ответ: {"ok": true, "job": "<id>"} — статус и результат задачи:
-        GET /api/jobs/<id> (аддитивно к 1.1: devices/stats/subnet теперь
-        в job.result; ошибка nmap — статус job=failed).
+        РўРµР»Рѕ (JSON, РѕРїС†РёРѕРЅР°Р»СЊРЅРѕ): {"subnet": "192.168.1.0/24",
+        "ifaces": ["eth0"]}. Р‘РµР· РїР°СЂР°РјРµС‚СЂРѕРІ вЂ” С‚РµРєСѓС‰Р°СЏ РєРѕРЅС„РёРіСѓСЂР°С†РёСЏ.
+        РћС‚РІРµС‚: {"ok": true, "job": "<id>"} вЂ” СЃС‚Р°С‚СѓСЃ Рё СЂРµР·СѓР»СЊС‚Р°С‚ Р·Р°РґР°С‡Рё:
+        GET /api/jobs/<id> (Р°РґРґРёС‚РёРІРЅРѕ Рє 1.1: devices/stats/subnet С‚РµРїРµСЂСЊ
+        РІ job.result; РѕС€РёР±РєР° nmap вЂ” СЃС‚Р°С‚СѓСЃ job=failed).
         """
         data = request.get_json(silent=True) or {}
         subnet = (data.get("subnet") or "").strip() or None
@@ -322,7 +323,7 @@ def register_routes(app, ctx):
             or not all(isinstance(i, str) and i.strip() for i in ifaces)
         ):
             return jsonify(
-                {"ok": False, "error": "ifaces: непустой список строк"}
+                {"ok": False, "error": "ifaces: РЅРµРїСѓСЃС‚РѕР№ СЃРїРёСЃРѕРє СЃС‚СЂРѕРє"}
             ), 400
         if ifaces:
             ifaces = [i.strip() for i in ifaces]
@@ -331,7 +332,7 @@ def register_routes(app, ctx):
         jid = jobs.submit(
             "network-scan",
             lambda ctx: _scan_job(ctx, subnet, ifaces),
-            meta={"subnet": subnet or "авто"},
+            meta={"subnet": subnet or "Р°РІС‚Рѕ"},
         )
         return jsonify({"ok": True, "job": jid})
 
@@ -342,18 +343,18 @@ def _current_subnet():
 
 
 def _scan_job(ctx, subnet, ifaces):
-    """JOB (2.0-3): ручной скан — nmap + reconcile в фоне.
+    """JOB (2.0-3): СЂСѓС‡РЅРѕР№ СЃРєР°РЅ вЂ” nmap + reconcile РІ С„РѕРЅРµ.
 
-    cancelable не ставим: nmap-прогон изнутри не прервать (каждый ≤45s,
-    полный скан — несколько прогонов), честной отмены посреди нет.
+    cancelable РЅРµ СЃС‚Р°РІРёРј: nmap-РїСЂРѕРіРѕРЅ РёР·РЅСѓС‚СЂРё РЅРµ РїСЂРµСЂРІР°С‚СЊ (РєР°Р¶РґС‹Р№ в‰¤45s,
+    РїРѕР»РЅС‹Р№ СЃРєР°РЅ вЂ” РЅРµСЃРєРѕР»СЊРєРѕ РїСЂРѕРіРѕРЅРѕРІ), С‡РµСЃС‚РЅРѕР№ РѕС‚РјРµРЅС‹ РїРѕСЃСЂРµРґРё РЅРµС‚.
     """
-    ctx.log("Скан: запуск nmap (%s)" % (subnet or "текущая подсеть"))
+    ctx.log("РЎРєР°РЅ: Р·Р°РїСѓСЃРє nmap (%s)" % (subnet or "С‚РµРєСѓС‰Р°СЏ РїРѕРґСЃРµС‚СЊ"))
     ctx.progress(10)
     out = run_scan(subnet=subnet, ifaces=ifaces)
     if out is None:
         raise RuntimeError(
-            "сканирование недоступно (nmap отсутствует "
-            "или все прогоны упали)"
+            "СЃРєР°РЅРёСЂРѕРІР°РЅРёРµ РЅРµРґРѕСЃС‚СѓРїРЅРѕ (nmap РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ "
+            "РёР»Рё РІСЃРµ РїСЂРѕРіРѕРЅС‹ СѓРїР°Р»Рё)"
         )
     ctx.progress(60)
     current = parse_scan(out)
@@ -367,12 +368,12 @@ def _scan_job(ctx, subnet, ifaces):
     finally:
         con.close()
 
-    # B-03: fan-out событий (Automation §17) — строго после commit
+    # B-03: fan-out СЃРѕР±С‹С‚РёР№ (Automation В§17) вЂ” СЃС‚СЂРѕРіРѕ РїРѕСЃР»Рµ commit
     if events_out:
         notify_all(events_out)
 
     ctx.progress(100)
-    ctx.log("Скан завершён: %d устройств" % len(current))
+    ctx.log("РЎРєР°РЅ Р·Р°РІРµСЂС€С‘РЅ: %d СѓСЃС‚СЂРѕР№СЃС‚РІ" % len(current))
     return {
         "devices": len(current),
         "stats": stats,

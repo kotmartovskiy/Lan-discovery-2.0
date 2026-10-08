@@ -491,6 +491,11 @@ register_network_routes(app, ctx)
 from modules.media_routes import register_routes as register_media_routes
 register_media_routes(app, ctx)
 
+# ==================== Motion (детекция движения) ====================
+
+from modules.motion_routes import register_routes as register_motion_routes
+register_motion_routes(app, ctx)
+
 # ==================== Monitor ====================
 
 from modules.monitoring_routes import register_routes as register_monitoring_routes
