@@ -1,11 +1,12 @@
 {
   "id": "tvheadend",
+  "version": "2.0.0",
   "name": "TVheadend (DVB-T2)",
-  "description": "Сервер эфирного ТВ: мастер настройки DVB-адаптеров, PVR-хранилище; веб-интерфейс встроен с порта 9981",
+  "description": "РЎРµСЂРІРµСЂ СЌС„РёСЂРЅРѕРіРѕ РўР’: РјР°СЃС‚РµСЂ РЅР°СЃС‚СЂРѕР№РєРё DVB-Р°РґР°РїС‚РµСЂРѕРІ, PVR-С…СЂР°РЅРёР»РёС‰Рµ; РІРµР±-РёРЅС‚РµСЂС„РµР№СЃ РІСЃС‚СЂРѕРµРЅ СЃ РїРѕСЂС‚Р° 9981",
   "builtin": true,
   "type": "app",
   "help": true,
-  "app": {"title": "TVheadend", "icon": "📺", "category": "Медиа", "order": 40},
+  "app": {"title": "TVheadend", "icon": "рџ“є", "category": "РњРµРґРёР°", "order": 40},
   "deps": {
     "apt": [],
     "services": ["tvheadend"],
