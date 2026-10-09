@@ -662,6 +662,30 @@
 </div>
 </div>
 
+<!-- TVheadend (веб-интерфейс с порта 9981) -->
+<div class="app-overlay app-tvheadend" id="app-tvheadend">
+<div class="app-window" style="width:94vw;max-width:1500px;height:88vh;">
+<div class="app-header"><h3>📺 TVheadend (DVB-T2)</h3><button class="app-close" onclick="closeApp('tvheadend')">&times;</button></div>
+<iframe src="http://{{ request.host.split(':')[0] }}:9981/" style="width:100%;height:calc(88vh - 44px);border:none;border-radius:0 0 12px 12px;"></iframe>
+</div>
+</div>
+
+<!-- Netdata (веб-интерфейс с порта 19999) -->
+<div class="app-overlay app-netdata" id="app-netdata">
+<div class="app-window" style="width:94vw;max-width:1500px;height:88vh;">
+<div class="app-header"><h3>📈 Netdata</h3><button class="app-close" onclick="closeApp('netdata')">&times;</button></div>
+<iframe src="http://{{ request.host.split(':')[0] }}:19999/" style="width:100%;height:calc(88vh - 44px);border:none;border-radius:0 0 12px 12px;"></iframe>
+</div>
+</div>
+
+<!-- ADS-B / dump1090 (статика отдаётся панелью) -->
+<div class="app-overlay app-dump1090" id="app-dump1090">
+<div class="app-window" style="width:94vw;max-width:1500px;height:88vh;">
+<div class="app-header"><h3>✈️ ADS-B — карта бортов</h3><button class="app-close" onclick="closeApp('dump1090')">&times;</button></div>
+<iframe src="/dump1090/" style="width:100%;height:calc(88vh - 44px);border:none;border-radius:0 0 12px 12px;"></iframe>
+</div>
+</div>
+
 <script>
 function openApp(name) { document.getElementById('app-'+name).classList.add('open'); }
 function closeApp(name) { document.getElementById('app-'+name).classList.remove('open'); }

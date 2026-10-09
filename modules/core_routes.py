@@ -392,6 +392,29 @@ def register_routes(app, ctx):
             return "Not found", 404
         return send_file(filepath, mimetype="text/html")
 
+    # --- dump1090 (ADS-B): статика + JSON вместо lighttpd (модуль dump1090) ---
+
+    @app.route("/dump1090/")
+    @app.route("/dump1090/<path:rel>")
+    @login_required
+    def serve_dump1090(rel=""):
+        if rel.startswith("data/"):
+            root, rel = "/run/dump1090-mutability/", rel[5:]
+        else:
+            root = "/usr/share/dump1090-mutability/html/"
+        if not rel:
+            rel = "gmap.html"
+        safe = os.path.normpath(rel)
+        if safe.startswith("..") or os.path.isabs(safe):
+            return "Forbidden", 403
+        path = os.path.join(root, safe)
+        if not os.path.isfile(path):
+            return "Not found", 404
+        resp = send_file(path)
+        if path.endswith(".json"):
+            resp.headers["Cache-Control"] = "no-store"
+        return resp
+
     # --- Apps page ---
 
     @app.route("/apps")

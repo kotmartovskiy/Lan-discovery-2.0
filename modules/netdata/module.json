@@ -1,0 +1,14 @@
+{
+  "id": "netdata",
+  "name": "Netdata",
+  "description": "Мониторинг в реальном времени: CPU/RAM/диск/сеть, история метрик; веб-интерфейс встроен с порта 19999",
+  "builtin": true,
+  "type": "app",
+  "help": true,
+  "app": {"title": "Netdata", "icon": "📈", "category": "Система и сеть", "order": 5},
+  "deps": {
+    "apt": ["netdata"],
+    "services": ["netdata"],
+    "ports": [19999]
+  }
+}

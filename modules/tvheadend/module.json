@@ -1,0 +1,14 @@
+{
+  "id": "tvheadend",
+  "name": "TVheadend (DVB-T2)",
+  "description": "Сервер эфирного ТВ: мастер настройки DVB-адаптеров, PVR-хранилище; веб-интерфейс встроен с порта 9981",
+  "builtin": true,
+  "type": "app",
+  "help": true,
+  "app": {"title": "TVheadend", "icon": "📺", "category": "Медиа", "order": 40},
+  "deps": {
+    "apt": [],
+    "services": ["tvheadend"],
+    "ports": [9981]
+  }
+}
