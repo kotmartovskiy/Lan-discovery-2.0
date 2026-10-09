@@ -1,0 +1,13 @@
+[Unit]
+Description=LAN/LTE failover watchdog (lan-discovery phase 5)
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/lan_failover.sh
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
