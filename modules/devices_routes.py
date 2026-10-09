@@ -30,13 +30,13 @@ from core.db import (  # noqa: F401
     init_db_schema,
 )
 
+
 def register_routes(app, ctx):
     login_required = ctx.login_required
     can_edit = ctx.can_edit
     admin_required = ctx.admin_required
     page_data = ctx.page_data
     _cfg = ctx._cfg
-
 
     @app.route("/devices")
     @login_required

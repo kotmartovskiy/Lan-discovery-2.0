@@ -46,9 +46,9 @@ def queue_event(event_id, photo, caption, cfg_override=None):
         for name in enabled:
             con.execute(
                 "INSERT INTO motion_queue "
-                "(event_id, channel, created_epoch, attempts, next_epoch, status) "
-                "VALUES (?,?,?,?,?, 'pending')",
-                (int(event_id), name, now, 0, now),
+                "(event_id, channel, created_epoch, attempts, next_epoch, "
+                "status, caption) VALUES (?,?,?,?,?, 'pending', ?)",
+                (int(event_id), name, now, 0, now, str(caption or "")[:500]),
             )
         con.commit()
         return len(enabled)
@@ -236,7 +236,8 @@ def process_queue(now=None, cfg_override=None, inet_ok=None):
         if not inet_ok:
             return stats
         rows = con.execute(
-            "SELECT q.id, q.attempts, q.channel, m.photo, m.ts, m.camera_name "
+            "SELECT q.id, q.attempts, q.channel, m.photo, m.ts, "
+            "m.camera_name, q.caption "
             "FROM motion_queue q "
             "LEFT JOIN motion_events m ON m.id = q.event_id "
             "WHERE q.status='pending' AND q.next_epoch <= ? "
@@ -244,12 +245,15 @@ def process_queue(now=None, cfg_override=None, inet_ok=None):
             (int(now),),
         ).fetchall()
         channels = c.get("channels") or {}
-        for qid, attempts, channel, photo, ts, cam_name in rows:
+        for qid, attempts, channel, photo, ts, cam_name, raw_caption in rows:
             ch = channels.get(channel) or {}
             if not isinstance(ch, dict) or not ch.get("enabled"):
                 stats["skipped"] += 1
                 continue
-            caption = f"Движение: {cam_name or '?'} {ts or ''}".strip()
+            if ts or cam_name:
+                caption = f"Движение: {cam_name or '?'} {ts or ''}".strip()
+            else:
+                caption = (raw_caption or "Событие LAN Discovery").strip()
             try:
                 _send(channel, ch, photo, caption, c)
                 con.execute(

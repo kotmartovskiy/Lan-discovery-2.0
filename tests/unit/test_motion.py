@@ -131,6 +131,29 @@ def test_disabled_or_off_camera_ignored(motion, tmp_path):
                                 cfg_override=c) is None
 
 
+def test_cam_event_enqueues_caption_for_channels(motion):
+    """Потеря связи с камерой: событие панели + строка в очереди
+    уведомлений со своим текстом (caption, не из motion_events)."""
+    motion(_mcfg())
+    engine._cam_event({"id": "1", "name": "Двор"},
+                      "MOTION_CAM_DOWN", "warning",
+                      "нет связи с камерой", time.time())
+    from modules.devices_routes import get_db
+    con = get_db()
+    try:
+        ev = con.execute(
+            "SELECT event FROM events WHERE event='MOTION_CAM_DOWN'"
+        ).fetchone()
+        assert ev
+        q = con.execute(
+            "SELECT event_id, channel, status, caption FROM motion_queue"
+        ).fetchall()
+        assert q == [(0, "telegram", "pending",
+                      "Двор: нет связи с камерой")]
+    finally:
+        con.close()
+
+
 # ==================== Очередь уведомлений ====================
 
 def test_backoff_curve():

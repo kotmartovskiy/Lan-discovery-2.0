@@ -403,6 +403,12 @@ def _cam_event(cam, event, severity, note, now):
         log.error(f"MOTION CAM EVENT ERROR: {e}")
     finally:
         con.close()
+    try:
+        from modules import motion_notify
+        name = (cam or {}).get("name") or "?"
+        motion_notify.queue_event(0, None, f"{name}: {note}")
+    except Exception as e:
+        log.error(f"MOTION CAM ENQUEUE ERROR: {e}")
 
 
 # ==================== Цикл engine ====================
