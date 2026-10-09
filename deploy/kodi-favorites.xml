@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<favourites>
+	<favourite name="Браузер">RunProgram(/usr/bin/chromium,--new-window,http://192.168.3.243:8080)</favourite>
+	<favourite name="RetroArch">RunProgram(/usr/bin/retroarch)</favourite>
+</favourites>
