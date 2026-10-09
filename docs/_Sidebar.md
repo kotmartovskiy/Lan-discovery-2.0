@@ -17,6 +17,7 @@
 - [IPTV](https://github.com/kotmartovskiy/Lan-discovery-ARM/wiki/IPTV)
 - [SD-клонирование](https://github.com/kotmartovskiy/Lan-discovery-ARM/wiki/SD-клонирование)
 - [Погода](https://github.com/kotmartovskiy/Lan-discovery-ARM/wiki/Погода)
+- [Цифровое ТВ, камеры и SDR](https://github.com/kotmartovskiy/Lan-discovery-ARM/wiki/TV-и-SDR)
 
 **Справочник**
 
