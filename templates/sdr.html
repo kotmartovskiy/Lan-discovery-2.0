@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.sdr-wrap { display:flex; flex-direction:column; gap:12px; padding:16px; color:#ddd; }
+.sdr-bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; background:#1a1a2e; border:1px solid #333; border-radius:10px; padding:10px 12px; }
+.sdr-bar label { font-size:12px; color:#888; }
+.sdr-bar input[type=number] { width:110px; padding:6px 8px; background:#111; border:1px solid #333; border-radius:6px; color:#fff; font-size:15px; }
+.sdr-bar select { padding:6px; background:#111; border:1px solid #333; border-radius:6px; color:#ddd; }
+.sdr-bar button { padding:6px 12px; border:1px solid #333; border-radius:6px; background:#222; color:#ddd; cursor:pointer; font-size:13px; }
+.sdr-bar button:hover { background:#333; }
+.sdr-bar button.primary { background:#2563eb; border-color:#2563eb; color:#fff; }
+.sdr-bar button.rec { background:#e74c3c; border-color:#e74c3c; color:#fff; }
+.sdr-stat { font-size:12px; color:#8ab4f8; margin-left:auto; }
+.sdr-canvas-box { position:relative; background:#0b0b12; border:1px solid #333; border-radius:10px; overflow:hidden; }
+.sdr-canvas-box canvas { display:block; width:100%; }
+.sdr-freq-mark { position:absolute; top:0; bottom:0; width:1px; background:rgba(255,255,255,0.55); pointer-events:none; }
+.sdr-blank { position:absolute; inset:0; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; background:rgba(11,11,18,0.92); color:#aaa; font-size:14px; }
+.sdr-blank button { padding:8px 18px; border:none; border-radius:8px; background:#2563eb; color:#fff; cursor:pointer; }
+.sdr-presets { display:flex; flex-wrap:wrap; gap:6px; }
+.sdr-presets button { padding:4px 10px; font-size:12px; border:1px solid #333; border-radius:999px; background:#222; color:#8ab4f8; cursor:pointer; }
+.sdr-modes button.active { background:#2563eb; color:#fff; border-color:#2563eb; }
+</style>
+<div class="sdr-wrap">
+  <div class="sdr-bar">
+    <label>Частота, МГц</label>
+    <input type="number" id="sdr-freq" step="0.001" min="24" max="1766" value="100">
+    <button id="sdr-set">Настроить</button>
+    <label>Шаг</label>
+    <select id="sdr-step">
+      <option value="1000">1 кГц</option>
+      <option value="5000">5 кГц</option>
+      <option value="9000" selected>9 кГц</option>
+      <option value="10000">10 кГц</option>
+      <option value="25000">25 кГц</option>
+      <option value="100000">100 кГц</option>
+      <option value="1000000">1 МГц</option>
+    </select>
+    <button id="sdr-down">−</button>
+    <button id="sdr-up">+</button>
+    <span class="sdr-modes" style="display:flex;gap:4px;margin-left:8px">
+      <button data-mode="off" class="active">Звук выкл</button>
+      <button data-mode="fm">FM</button>
+      <button data-mode="am">AM</button>
+    </span>
+    <button id="sdr-run" class="primary">Старт</button>
+    <span class="sdr-stat" id="sdr-stat">…</span>
+  </div>
+  <div class="sdr-presets">
+    <button data-f="100000000">УКВ 100 МГц</button>
+    <button data-f="87500000">УКВ 87.5</button>
+    <button data-f="27125000">CB 27.125</button>
+    <button data-f="118500000">Air 118.5</button>
+    <button data-f="156800000">Marine 156.8</button>
+    <button data-f="162550000">NOAA 162.55</button>
+    <button data-f="462562500">FRS 462.5625</button>
+    <button data-f="433920000">SR 433.92</button>
+  </div>
+  <div class="sdr-canvas-box">
+    <canvas id="sdr-spectrum" height="120"></canvas>
+    <canvas id="sdr-waterfall" height="360"></canvas>
+    <div class="sdr-freq-mark" id="sdr-mark" style="left:50%"></div>
+    <div class="sdr-blank" id="sdr-blank">
+      <div id="sdr-blank-text">RTL-SDR свисток не обнаружен</div>
+      <button id="sdr-start-rtl">Запустить rtl_tcp</button>
+    </div>
+  </div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(function () {
+  const N = 2048;
+  const state = { freq: 100000000, rate: 2048000, mode: "off", running: false, sock: null };
+  const $ = (id) => document.getElementById(id);
+  const specCv = $("sdr-spectrum"), wfCv = $("sdr-waterfall");
+  const specCtx = specCv.getContext("2d"), wfCtx = wfCv.getContext("2d");
+  let iqRing = new Float32Array(N * 2), iqPos = 0;
+  const fftRe = new Float32Array(N), fftIm = new Float32Array(N);
+  const mag = new Float32Array(N / 2);
+  let audioCtx = null, scriptNode = null, audioQ = [];
+  let fmPrevI = 0, fmPrevQ = 0, lpI = 0, lpQ = 0, amDc = 0, decim = 43, decimAcc = 0;
+
+  function sizeCanvases() {
+    const w = wfCv.parentElement.clientWidth - 2;
+    specCv.width = w; wfCv.width = w;
+    wfCtx.fillStyle = "#0b0b12"; wfCtx.fillRect(0, 0, wfCv.width, wfCv.height);
+  }
+  sizeCanvases();
+  window.addEventListener("resize", sizeCanvases);
+
+  function fft() {
+    for (let i = 0; i < N; i++) {
+      const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1));
+      fftRe[i] = iqRing[i * 2] * w;
+      fftIm[i] = iqRing[i * 2 + 1] * w;
+    }
+    for (let len = 2; len <= N; len <<= 1) {
+      const step = len >> 1;
+      for (let i = 0; i < N; i += len) {
+        for (let j = 0; j < step; j++) {
+          const t = fftRe[i + j + step], u = fftIm[i + j + step];
+          const a = (-2 * Math.PI * j) / len;
+          const c = Math.cos(a), s = Math.sin(a);
+          const r = t * c - u * s, im = t * s + u * c;
+          fftRe[i + j + step] = fftRe[i + j] - r;
+          fftIm[i + j + step] = fftIm[i + j] - im;
+          fftRe[i + j] += r; fftIm[i + j] += im;
+        }
+      }
+    }
+    for (let k = 0; k < N / 2; k++) {
+      mag[k] = 10 * Math.log10(fftRe[k] * fftRe[k] + fftIm[k] * fftIm[k] + 1e-12);
+    }
+  }
+
+  function draw() {
+    const w = specCv.width, h = specCv.height;
+    specCtx.fillStyle = "#0b0b12"; specCtx.fillRect(0, 0, w, h);
+    specCtx.strokeStyle = "#2ecc71"; specCtx.beginPath();
+    for (let x = 0; x < w; x++) {
+      const v = mag[Math.floor((x / w) * (N / 2))];
+      const y = h - Math.max(0, Math.min(h, (v + 90) * (h / 70)));
+      x === 0 ? specCtx.moveTo(x, y) : specCtx.lineTo(x, y);
+    }
+    specCtx.stroke();
+    wfCtx.drawImage(wfCv, 0, 0, w, wfCv.height - 2, 0, 2, w, wfCv.height - 2);
+    const line = wfCtx.createImageData(w, 2);
+    for (let x = 0; x < w; x++) {
+      const v = mag[Math.floor((x / w) * (N / 2))];
+      const t = Math.max(0, Math.min(1, (v + 85) / 65));
+      const r = Math.floor(255 * Math.min(1, t * 2));
+      const g = Math.floor(255 * Math.min(1, t * 1.5));
+      const b = Math.floor(255 * Math.min(1, 0.3 + t * 0.4));
+      for (let y = 0; y < 2; y++) {
+        const o = (y * w + x) * 4;
+        line.data[o] = r; line.data[o + 1] = g; line.data[o + 2] = b; line.data[o + 3] = 255;
+      }
+    }
+    wfCtx.putImageData(line, 0, 0);
+  }
+
+  function processIQ(bytes) {
+    const n = bytes.length >> 1;
+    for (let i = 0; i < n; i++) {
+      const i0 = (bytes[i * 2] - 127.5) / 127.5;
+      const q0 = (bytes[i * 2 + 1] - 127.5) / 127.5;
+      iqRing[iqPos * 2] = i0; iqRing[iqPos * 2 + 1] = q0;
+      iqPos = (iqPos + 1) % N;
+      if (state.mode !== "off" && audioCtx) {
+        lpI += 0.02 * (i0 - lpI); lpQ += 0.02 * (q0 - lpQ);
+        let s = 0;
+        if (state.mode === "fm") {
+          const d = fmPrevI * lpQ - lpI * fmPrevQ;
+          const c = fmPrevI * lpI + fmPrevQ * lpQ;
+          s = Math.atan2(d, c) * 0.6;
+          fmPrevI = lpI; fmPrevQ = lpQ;
+        } else {
+          const env = Math.sqrt(lpI * lpI + lpQ * lpQ);
+          amDc += 0.001 * (env - amDc);
+          s = (env - amDc) * 2.5;
+        }
+        decimAcc += 1;
+        if (decimAcc >= decim) {
+          decimAcc = 0;
+          if (audioQ.length < 8192) audioQ.push(s);
+        }
+      }
+    }
+    if (iqPos === 0 || (iqPos > N / 2 && iqPos - N / 2 < n)) { fft(); draw(); }
+  }
+
+  function ensureAudio() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    decim = Math.max(1, Math.round(state.rate / audioCtx.sampleRate));
+    scriptNode = audioCtx.createScriptProcessor(4096, 0, 1);
+    scriptNode.onaudioprocess = (e) => {
+      const out = e.outputBuffer.getChannelData(0);
+      for (let i = 0; i < out.length; i++) out[i] = audioQ.length ? audioQ.shift() * 0.8 : 0;
+    };
+    scriptNode.connect(audioCtx.destination);
+  }
+
+  function csrf() {
+    return (document.querySelector('meta[name="csrf-token"]') || {}).content || "";
+  }
+
+  function setFreq(mhz) {
+    const f = Math.round(mhz * 1e6);
+    $("sdr-freq").value = (f / 1e6).toFixed(3).replace(/\.?0+$/, "");
+    fetch("/api/sdr/freq", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
+      body: JSON.stringify({ freq: f }),
+    }).then((r) => r.json()).then((d) => {
+      if (d.ok) { state.freq = d.freq; $("sdr-stat").textContent = "частота " + (d.freq / 1e6).toFixed(3) + " МГц" + (d.applied ? "" : " (применится при потоке)"); }
+      else $("sdr-stat").textContent = d.error || "ошибка";
+    });
+  }
+
+  function start() {
+    if (state.running) return;
+    state.running = true;
+    $("sdr-run").textContent = "Работает";
+    $("sdr-run").classList.remove("primary");
+    state.sock = io("/sdr");
+    state.sock.on("sdr_iq", (data) => {
+      const bytes = typeof data === "string" ? Uint8Array.from(atob(data), (c) => c.charCodeAt(0)) : new Uint8Array(data);
+      processIQ(bytes);
+    });
+    state.sock.on("connect_error", () => { $("sdr-stat").textContent = "socket error"; });
+    $("sdr-blank").style.display = "none";
+  }
+
+  async function pollStatus() {
+    try {
+      const r = await fetch("/api/sdr/status");
+      const d = await r.json();
+      state.rate = d.rate; state.freq = d.freq;
+      $("sdr-stat").textContent = d.streaming ? "поток идёт" : (d.dongle ? "rtl_tcp запущен" : "нет свистка/rtl_tcp");
+      $("sdr-blank").style.display = d.streaming || state.running ? "none" : "flex";
+      if (!d.streaming && d.error) $("sdr-blank-text").textContent = "rtl_tcp: " + d.error;
+      else if (!d.dongle) $("sdr-blank-text").textContent = "RTL-SDR свисток не обнаружен — вставьте приёмник и нажмите «Запустить rtl_tcp»";
+    } catch (e) { /* ignore */ }
+  }
+  pollStatus();
+  setInterval(pollStatus, 5000);
+
+  $("sdr-run").onclick = () => { ensureAudio(); start(); };
+  $("sdr-set").onclick = () => setFreq(parseFloat($("sdr-freq").value) || 100);
+  $("sdr-freq").onkeydown = (e) => { if (e.key === "Enter") $("sdr-set").click(); };
+  $("sdr-up").onclick = () => setFreq((state.freq + parseInt($("sdr-step").value, 10)) / 1e6);
+  $("sdr-down").onclick = () => setFreq((state.freq - parseInt($("sdr-step").value, 10)) / 1e6);
+  document.querySelectorAll(".sdr-presets button").forEach((b) => { b.onclick = () => setFreq(parseInt(b.dataset.f, 10) / 1e6); });
+  document.querySelectorAll(".sdr-modes button").forEach((b) => {
+    b.onclick = () => {
+      document.querySelectorAll(".sdr-modes button").forEach((x) => x.classList.remove("active"));
+      b.classList.add("active");
+      state.mode = b.dataset.mode;
+      if (state.mode !== "off") ensureAudio();
+      if (state.mode === "off") audioQ = [];
+    };
+  });
+  $("sdr-start-rtl").onclick = async () => {
+    $("sdr-blank-text").textContent = "Запускаю rtl_tcp…";
+    const r = await fetch("/api/sdr/rtl/start", { method: "POST", headers: { "X-CSRFToken": csrf() } });
+    const d = await r.json();
+    $("sdr-blank-text").textContent = d.ok
+      ? (d.reachable ? "rtl_tcp запущен — нажмите Старт" : "rtl_tcp запущен, но свисток не найден")
+      : "Ошибка: " + (d.error || "?");
+    pollStatus();
+  };
+})();
+</script>
+{% endblock %}

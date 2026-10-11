@@ -496,6 +496,11 @@ register_media_routes(app, ctx)
 from modules.motion_routes import register_routes as register_motion_routes
 register_motion_routes(app, ctx)
 
+# ==================== SDR radio ====================
+
+from modules.sdr_routes import register_routes as register_sdr_routes
+register_sdr_routes(app, ctx)
+
 # ==================== Monitor ====================
 
 from modules.monitoring_routes import register_routes as register_monitoring_routes

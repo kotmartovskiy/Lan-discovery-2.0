@@ -28,6 +28,7 @@ ROUTE_MODULES = (
     "media_routes",
     "monitoring_routes",
     "inventory_routes",
+    "sdr_routes",
     "core_routes",
 )
 

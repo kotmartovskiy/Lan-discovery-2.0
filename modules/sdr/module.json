@@ -1,0 +1,25 @@
+{
+  "id": "sdr",
+  "version": "2.0.0",
+  "name": "SDR-радио",
+  "description": "Виджет RTL-SDR: водопад и спектр, настройка частоты, FM/AM-прослушивание в браузере поверх rtl_tcp (:1234). Полноценный приёмник — модуль OpenWebRX.",
+  "builtin": true,
+  "type": "app",
+  "help": true,
+  "url": "/apps/sdr",
+  "prefixes": [
+    "/apps/sdr",
+    "/api/sdr"
+  ],
+  "deps": {
+    "ports": [
+      1234
+    ]
+  },
+  "app": {
+    "title": "SDR-радио",
+    "icon": "📻",
+    "category": "Медиа",
+    "order": 45
+  }
+}
