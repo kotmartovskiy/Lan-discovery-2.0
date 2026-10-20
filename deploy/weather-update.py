@@ -7,7 +7,7 @@
 
 Пишет в /opt/lan-discovery/devices.db:
   weather_observations   — текущий час (наблюдение для шапки/сейчас)
-  weather_hourly         — почасовой прогноз: остаток сегодня + завтра
+  weather_hourly         — почасовой прогноз: сегодня (24 ч) + завтра
   weather_daily          — агрегаты текущего дня из наблюдений
   weather_forecast       — прогноз на 7 дней (+ восход/заход)
   weather_forecast_history — архив ежедневных прогнозов
@@ -215,10 +215,10 @@ def metno_to_openmeteo(met, lat, lon, tzname, now):
         "cloud_cover": inst.get("cloud_area_fraction"),
     }
 
-    # --- hourly: остаток сегодня + завтра (пока есть next_1_hours) ---
+    # --- hourly: сегодня + завтра (для карточек «Утро/День/Вечер/Ночь»
+    # нужны все 24 часа дня, а не только остаток) ---
     today_s = now.strftime("%Y-%m-%d")
     tomorrow_s = (now + timedelta(days=1)).strftime("%Y-%m-%d")
-    now_h = now.strftime("%Y-%m-%dT%H:00")
     hourly = {
         "time": [], "temperature_2m": [], "weather_code": [],
         "precipitation": [], "precipitation_probability": [],
@@ -226,7 +226,7 @@ def metno_to_openmeteo(met, lat, lon, tzname, now):
     }
     for e in entries:
         th = e["t"].strftime("%Y-%m-%dT%H:%M")
-        if th[:10] not in (today_s, tomorrow_s) or th < now_h:
+        if th[:10] not in (today_s, tomorrow_s):
             continue
         if not e["h1"]:
             break
@@ -533,17 +533,14 @@ def main():
         (today,),
     )
 
-    # --- почасовой: остаток сегодня + завтра ---
+    # --- почасовой: сегодня (полные 24 часа) + завтра ---
     con.execute("DELETE FROM weather_hourly")
     times = hourly.get("time", [])
-    now_h = now.strftime("%Y-%m-%dT%H:00")
     for i, t in enumerate(times):
         if len(t) < 13:
             continue
         fdate, hour = t[:10], int(t[11:13])
         if fdate not in (today, tomorrow):
-            continue
-        if fdate == today and t < now_h:
             continue
         con.execute(
             """INSERT OR REPLACE INTO weather_hourly

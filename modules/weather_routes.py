@@ -474,6 +474,8 @@ def register_routes(app, ctx):
         tomorrow_str_db = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
         data["weather_hourly_today"] = weather_hourly(today_str_db)
         data["weather_hourly_tomorrow"] = weather_hourly(tomorrow_str_db)
+        # текущий час — шаблон выбирает: прошедшие «Утро/Ночь» брать с завтра
+        data["now_hour"] = datetime.now().hour
 
         if forecast:
             today_fc = forecast[0]

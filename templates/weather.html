@@ -79,18 +79,22 @@
 
 </div>
 
-{% if weather_hourly_today %}
+{% if weather_hourly_today or weather_hourly_tomorrow %}
 
+{# если период уже прошёл (например «Утро» после 12:00) — берём завтрашние
+   часы, иначе карточка исчезает в течение дня #}
+{% set nh = now_hour if now_hour is defined else 12 %}
 {% set periods = [
-  ("Утро", [6,7,8,9,10,11]),
-  ("День", [12,13,14,15,16,17]),
-  ("Вечер", [18,19,20,21,22,23]),
-  ("Ночь", [0,1,2,3,4,5])
+  ("Утро", [6,7,8,9,10,11], nh >= 12),
+  ("День", [12,13,14,15,16,17], nh >= 18),
+  ("Вечер", [18,19,20,21,22,23], false),
+  ("Ночь", [0,1,2,3,4,5], nh >= 6)
 ] %}
 
-{% for pname, phours in periods %}
+{% for pname, phours, use_tomorrow in periods %}
+{% set src = weather_hourly_tomorrow if (use_tomorrow and weather_hourly_tomorrow) else weather_hourly_today %}
 {% set ns = namespace(t_min=99, t_max=-99, precip=0, wind=0, wind_dir=0, cloud=0, cnt=0, code=0) %}
-{% for h in weather_hourly_today %}
+{% for h in src %}
 {% if h[0] in phours %}
 {% if h[1] is not none %}{% set ns.t_min = [ns.t_min, h[1]]|min %}{% set ns.t_max = [ns.t_max, h[1]]|max %}{% endif %}
 {% if h[3] is not none %}{% set ns.precip = ns.precip + h[3] %}{% endif %}
@@ -102,7 +106,7 @@
 
 {% if ns.t_min <= ns.t_max %}
 <div class="card" style="min-width:120px;">
-<h2>{{ pname }}</h2>
+<h2>{{ pname }}{% if use_tomorrow and weather_hourly_tomorrow %} <span style="font-size:11px; color:#8ab4f8;">завтра</span>{% endif %}</h2>
 <div class="info-row" style="font-size:13px;">
 {{ weather_code_name(ns.code) }}
 </div>
