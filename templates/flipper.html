@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+.fp-badge { display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 12px; font-weight: 600; }
+.fp-badge.ok { background: #14331c; color: #65d46e; }
+.fp-badge.no { background: #331414; color: #ff8a8a; }
+.fp-badge.warn { background: #332a00; color: #ffd24d; }
+.fp-tools td, .fp-tools th { font-size: 13px; padding: 6px 10px; }
+.fp-err { border: 1px solid #8b2020; background: #2a0d0d; color: #ff8a8a;
+  padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; }
+.fp-log { background: #101010; border: 1px solid #222; border-radius: 8px;
+  padding: 10px 12px; font-family: ui-monospace, monospace; font-size: 12px;
+  color: #9c9; max-height: 300px; overflow-y: auto; white-space: pre-wrap;
+  overflow-wrap: anywhere; }
+.fp-log .fp-hex { color: #88a; }
+.fp-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  margin-bottom: 10px; }
+.fp-row label { font-size: 12px; color: #888; display: block; margin-bottom: 3px; }
+.fp-row select, .fp-row input[type=text] { background: #181818; border: 1px solid #333;
+  color: #eee; border-radius: 6px; padding: 6px 9px; font-size: 13px; }
+.fp-sec { margin-bottom: 8px; }
+.fp-sec .card-title { cursor: default; }
+.fp-note { font-size: 12px; color: #777; margin: 6px 0 12px; }
+.fp-feed { background: #101010; border: 1px solid #222; border-radius: 8px;
+  max-height: 320px; overflow-y: auto; }
+.fp-msg { padding: 6px 10px; border-bottom: 1px solid #1c1c1c; font-size: 12px;
+  overflow-wrap: anywhere; }
+.fp-msg b { color: #7ab8ff; }
+.fp-msg span { color: #999; margin-left: 8px; }
+</style>
+
+<h2>Hardware-инструменты</h2>
+
+{% if error %}
+<div class="fp-err">{{ error }}</div>
+{% endif %}
+
+<div class="card fp-sec">
+  <div class="card-title">Оборудование и инструменты</div>
+  <div class="fp-note">Что подключено и установлено. Недостающее ставится кнопками
+    (нужен admin) — после установки обновите страницу.</div>
+  <div class="table-wrap"><table class="fp-tools"><thead><tr>
+    <th>Инструмент</th><th>Пакет</th><th>Статус</th>{% if is_admin %}<th></th>{% endif %}
+  </tr></thead><tbody id="fp-tools"></tbody></table></div>
+  <div style="margin-top:12px;" id="fp-devices"></div>
+  <div style="margin-top:12px;" class="fp-note" id="fp-serial-note"></div>
+  <div id="fp-install-log" class="fp-log" style="display:none; margin-top:10px;"></div>
+</div>
+
+<div class="card fp-sec">
+  <div class="card-title">SDR-пейджер (433 МГц, rtl_433)</div>
+  <div class="fp-note">Лента сообщений от датчиков: погода, TPMS, пульты, розетки.
+    Нужен RTL-SDR dongle + rtl-433.</div>
+  <div class="fp-row">
+    <button id="fp-pager-start" type="button">Старт</button>
+    <button id="fp-pager-stop" type="button">Стоп</button>
+    <span class="fp-badge no" id="fp-pager-badge">стоп</span>
+    <span class="fp-note" id="fp-pager-meta"></span>
+  </div>
+  <div class="fp-feed" id="fp-pager-feed"><div class="fp-msg">Сообщений нет</div></div>
+</div>
+
+<div class="card fp-sec">
+  <div class="card-title">Serial-консоль</div>
+  <div class="fp-note">USB-UART (CH340/CP2102/FT232) и встроенные ttyS*. Консольные
+    порты ядра отмечены и не открываются.</div>
+  <div class="fp-row">
+    <div><label for="fp-port">Порт</label>
+      <select id="fp-port"></select></div>
+    <div><label for="fp-baud">Скорость</label>
+      <select id="fp-baud">{% for b in bauds %}<option value="{{ b }}" {% if b == 115200 %}selected{% endif %}>{{ b }}</option>{% endfor %}</select></div>
+    <button id="fp-serial-open" type="button">Открыть</button>
+    <button id="fp-serial-close" type="button">Закрыть</button>
+    <span class="fp-badge no" id="fp-serial-badge">закрыт</span>
+  </div>
+  <div class="fp-row">
+    <input type="text" id="fp-serial-input" placeholder="строка для отправки"
+           style="min-width:260px;">
+    <button id="fp-serial-send" type="button">Отправить</button>
+  </div>
+  <div class="fp-log" id="fp-serial-log">Порт закрыт</div>
+</div>
+
+<div class="card fp-sec">
+  <div class="card-title">Программаторы</div>
+  <div class="fp-note">Загрузите файл прошивки, выберите параметры (только из
+    списков), запустите. Лог — ниже.</div>
+  <div class="fp-row">
+    <input type="file" id="fp-file">
+    <span class="fp-note" id="fp-file-info"></span>
+  </div>
+  <div class="fp-row">
+    <div><label>avrdude: programmer</label>
+      <select id="fp-avr-prog">{% for p in avr_programmers %}<option>{{ p }}</option>{% endfor %}</select></div>
+    <div><label>mcu</label>
+      <select id="fp-avr-mcu">{% for m in avr_mcus %}<option>{{ m }}</option>{% endfor %}</select></div>
+    <div><label>порт</label>
+      <select id="fp-avr-port" class="fp-port-sel"></select></div>
+    <button id="fp-avr-run" type="button">Прошить AVR</button>
+    <button id="fp-esp-id" type="button">ESP: chip_id</button>
+    <button id="fp-stm-info" type="button">STM32: инфо</button>
+  </div>
+  <div class="fp-row">
+    <div><label>esptool: chip</label>
+      <select id="fp-esp-chip">{% for c in esptool_chips %}<option>{{ c }}</option>{% endfor %}</select></div>
+    <div><label>адрес</label>
+      <input type="text" id="fp-esp-addr" value="0x0" style="width:90px;"></div>
+    <button id="fp-esp-run" type="button">Прошить ESP</button>
+    <div><label>stm32: baud</label>
+      <select id="fp-stm-baud">{% for b in stm32_bauds %}<option value="{{ b }}">{{ b }}</option>{% endfor %}</select></div>
+    <button id="fp-stm-run" type="button">Прошить STM32</button>
+  </div>
+  <div class="fp-log" id="fp-prog-log">Лог пуст</div>
+</div>
+
+<script>
+(function () {
+  var is_admin = {{ "true" if is_admin else "false" }};
+  var fpPath = "";
+  var pagerN = 0, serN = 0, progN = 0, installTick = 0;
+
+  function h(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c];
+  }); }
+  function badge(ok, yes, no) {
+    return '<span class="fp-badge ' + (ok ? "ok" : "no") + '">' + h(ok ? yes : no) + "</span>";
+  }
+  function post(url, body, isForm) {
+    var opt = { method: "POST" };
+    if (isForm) opt.body = body;
+    else { opt.headers = { "Content-Type": "application/json" };
+           opt.body = JSON.stringify(body || {}); }
+    return fetch(url, opt).then(function (r) { return r.json(); });
+  }
+  function get(url) { return fetch(url).then(function (r) { return r.json(); }); }
+
+  // ---------------------------------------------------------- detect
+  var TOOL_NAMES = { rtl_sdr: "RTL-SDR (dongle)", rtl_433: "rtl_433 (пейджер)",
+    avrdude: "avrdude (AVR)", esptool: "esptool (ESP)", stm32flash: "stm32flash (STM32)",
+    pyserial: "pyserial (serial)" };
+  var TOOL_PKG_KEY = { rtl_sdr: "rtl-sdr", rtl_433: "rtl-433", avrdude: "avrdude",
+    esptool: "esptool", stm32flash: "stm32flash", pyserial: "pyserial" };
+
+  function renderDetect(d) {
+    var rows = Object.keys(TOOL_NAMES).map(function (k) {
+      var t = (d.tools || {})[k] || {};
+      var btn = (is_admin && !t.present)
+        ? ' <button data-pkg="' + h(TOOL_PKG_KEY[k]) + '" class="fp-inst">Установить</button>' : "";
+      return "<tr><td>" + h(TOOL_NAMES[k]) + "</td><td><code>" + h(t.pkg || "") +
+        "</code></td><td>" + badge(!!t.present, "есть", "нет") + "</td>" +
+        (is_admin ? "<td>" + btn + "</td>" : "") + "</tr>";
+    }).join("");
+    document.getElementById("fp-tools").innerHTML = rows;
+
+    var devs = d.devices || {};
+    document.getElementById("fp-devices").innerHTML =
+      "Железо: RTL-SDR dongle " + badge(!!devs.rtl, "подключён", "не найден") + " · " +
+      "NFC " + badge(!!devs.nfc, "найден", "не найден") + " · " +
+      "IR " + badge(!!devs.ir, "найден", "не найден");
+
+    var ports = d.serial || [];
+    var opts = ports.map(function (p) {
+      var mark = p.console ? " (консоль)" : (p.busy ? " (занят)" : "");
+      return '<option value="' + h(p.path) + '"' + (p.console ? " disabled" : "") + ">" +
+        h(p.name) + mark + "</option>";
+    }).join("");
+    document.getElementById("fp-port").innerHTML = opts || "<option>нет портов</option>";
+    document.getElementById("fp-avr-port").innerHTML = opts;
+    document.querySelector(".fp-port-sel").innerHTML = opts;
+    document.getElementById("fp-serial-note").textContent =
+      "Портов: " + ports.length + (d.consoles && d.consoles.length
+        ? " · консоль ядра: " + d.consoles.join(", ") : "");
+
+    document.querySelectorAll(".fp-inst").forEach(function (b) {
+      b.addEventListener("click", function () {
+        b.disabled = true; b.textContent = "Ставим…";
+        post("/api/flipper/install", { pkg: b.getAttribute("data-pkg") })
+          .then(function (d2) { if (!d2.ok && window.toast) window.toast(d2.error || "ошибка", "error"); });
+        pollInstall();
+      });
+    });
+  }
+
+  function refreshDetect() { get("/api/flipper/detect").then(renderDetect).catch(function () {}); }
+
+  function pollInstall() {
+    get("/api/flipper/install/status").then(function (st) {
+      var logEl = document.getElementById("fp-install-log");
+      if (st.running || (st.log && st.log.length)) {
+        logEl.style.display = "block";
+        logEl.textContent = (st.log || []).join("\n") || "…";
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+      if (st.running) { installTick++; setTimeout(pollInstall, 2000); }
+      else if (installTick) { installTick = 0; refreshDetect();
+        if (window.toast) window.toast("Установка завершена: " + st.pkg, "info"); }
+    }).catch(function () {});
+  }
+
+  // ----------------------------------------------------------- pager
+  function renderMsg(m) {
+    var parts = [];
+    ["model", "id", "temperature_C", "humidity", "battery", "channel", "code", "brand", "state"]
+      .forEach(function (k) { if (m[k] != null) parts.push(h(k.replace(/_/g, " ")) + "=" + h(m[k])); });
+    return '<div class="fp-msg"><b>' + h(m.model || "?") + "</b>" +
+      (parts.length ? "<span>" + parts.join(" · ") + "</span>" : "") + "</div>";
+  }
+  function pollPager() {
+    get("/api/flipper/pager/messages?after=" + pagerN).then(function (d) {
+      var msgs = d.messages || [];
+      if (msgs.length) {
+        pagerN = msgs[msgs.length - 1]._n;
+        var feed = document.getElementById("fp-pager-feed");
+        if (feed.textContent.trim() === "Сообщений нет") feed.innerHTML = "";
+        msgs.forEach(function (m) { feed.insertAdjacentHTML("beforeend", renderMsg(m)); });
+        while (feed.children.length > 200) feed.removeChild(feed.firstChild);
+        feed.scrollTop = feed.scrollHeight;
+      }
+      var st = d.status || {};
+      var badgeEl = document.getElementById("fp-pager-badge");
+      badgeEl.className = "fp-badge " + (st.running ? "ok" : "no");
+      badgeEl.textContent = st.running ? "эфир" : "стоп";
+      document.getElementById("fp-pager-meta").textContent =
+        (st.started ? "запущен " + st.started + " · " : "") +
+        "сообщений: " + (st.count || 0) + (st.error ? " · ошибка: " + st.error : "");
+      setTimeout(pollPager, st.running ? 1500 : 8000);
+    }).catch(function () { setTimeout(pollPager, 8000); });
+  }
+
+  document.getElementById("fp-pager-start").addEventListener("click", function () {
+    post("/api/flipper/pager/start").then(function (d) {
+      if (!d.ok && window.toast) window.toast(d.error || "ошибка", "error");
+    });
+  });
+  document.getElementById("fp-pager-stop").addEventListener("click", function () {
+    post("/api/flipper/pager/stop");
+  });
+
+  // ---------------------------------------------------------- serial
+  function renderSerLine(ln) {
+    if (ln.text != null) return h(ln.t) + " " + h(ln.text);
+    return '<span class="fp-hex">' + h(ln.t) + " HEX " + h(ln.hex) + "</span>";
+  }
+  function pollSerial() {
+    get("/api/flipper/serial/read?after=" + serN).then(function (d) {
+      var lines = d.lines || [];
+      var logEl = document.getElementById("fp-serial-log");
+      if (lines.length) {
+        serN = lines[lines.length - 1]._n;
+        if (logEl.textContent === "Порт закрыт") logEl.innerHTML = "";
+        lines.forEach(function (ln) {
+          logEl.insertAdjacentHTML("beforeend", renderSerLine(ln) + "\n");
+        });
+        while (logEl.childNodes.length > 400) logEl.removeChild(logEl.firstChild);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+      var st = d.status || {};
+      var badgeEl = document.getElementById("fp-serial-badge");
+      badgeEl.className = "fp-badge " + (st.open ? "ok" : "no");
+      badgeEl.textContent = st.open ? ("открыт " + (st.port || "")) : "закрыт";
+      document.getElementById("fp-serial-open").disabled = !!st.open;
+      document.getElementById("fp-serial-close").disabled = !st.open;
+      setTimeout(pollSerial, st.open ? 1200 : 6000);
+    }).catch(function () { setTimeout(pollSerial, 8000); });
+  }
+
+  document.getElementById("fp-serial-open").addEventListener("click", function () {
+    post("/api/flipper/serial/open", {
+      path: document.getElementById("fp-port").value,
+      baud: parseInt(document.getElementById("fp-baud").value, 10)
+    }).then(function (d) {
+      if (!d.ok && window.toast) window.toast(d.error || "ошибка", "error");
+    });
+  });
+  document.getElementById("fp-serial-close").addEventListener("click", function () {
+    post("/api/flipper/serial/close");
+  });
+  document.getElementById("fp-serial-send").addEventListener("click", function () {
+    var inp = document.getElementById("fp-serial-input");
+    post("/api/flipper/serial/write", { text: inp.value }).then(function (d) {
+      if (!d.ok && window.toast) window.toast(d.error || "ошибка", "error");
+      else inp.value = "";
+    });
+  });
+
+  // ------------------------------------------------------------- prog
+  document.getElementById("fp-file").addEventListener("change", function () {
+    var f = this.files && this.files[0];
+    if (!f) { fpPath = ""; document.getElementById("fp-file-info").textContent = ""; return; }
+    var fd = new FormData();
+    fd.append("file", f);
+    fetch("/api/flipper/prog/upload", { method: "POST", body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) { if (window.toast) window.toast(d.error || "ошибка", "error"); fpPath = ""; return; }
+        fpPath = d.path;
+        document.getElementById("fp-file-info").textContent =
+          d.name + " (" + Math.round(d.size / 1024) + " КБ) → " + d.path;
+      });
+  });
+
+  function pollProg() {
+    get("/api/flipper/prog/log?after=" + progN).then(function (d) {
+      var lines = d.lines || [];
+      var logEl = document.getElementById("fp-prog-log");
+      if (lines.length) {
+        progN = lines[lines.length - 1]._n;
+        if (logEl.textContent === "Лог пуст") logEl.innerHTML = "";
+        lines.forEach(function (ln) { logEl.insertAdjacentHTML("beforeend", h(ln.line) + "\n"); });
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+      var st = d.status || {};
+      ["fp-avr-run", "fp-esp-run", "fp-stm-run", "fp-esp-id", "fp-stm-info"]
+        .forEach(function (id) { var b = document.getElementById(id); if (b) b.disabled = !!st.running; });
+      setTimeout(pollProg, st.running ? 1500 : 6000);
+    }).catch(function () { setTimeout(pollProg, 8000); });
+  }
+
+  function runProg(url, form) {
+    if (!fpPath && form.indexOf("action=chip_id") < 0 && form.indexOf("action=info") < 0) {
+      if (window.toast) window.toast("сначала загрузите файл прошивки", "error");
+      return;
+    }
+    var fd = new FormData();
+    form.split("&").forEach(function (kv) {
+      var p = kv.split("=");
+      fd.append(p[0], decodeURIComponent(p[1] || ""));
+    });
+    if (fpPath) fd.append("firmware", fpPath);
+    fetch(url, { method: "POST", body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (!d.ok && window.toast) window.toast(d.error || "ошибка", "error"); });
+  }
+
+  document.getElementById("fp-avr-run").addEventListener("click", function () {
+    runProg("/api/flipper/prog/avrdude",
+      "programmer=" + encodeURIComponent(document.getElementById("fp-avr-prog").value) +
+      "&mcu=" + encodeURIComponent(document.getElementById("fp-avr-mcu").value) +
+      "&port=" + encodeURIComponent(document.getElementById("fp-avr-port").value));
+  });
+  document.getElementById("fp-esp-run").addEventListener("click", function () {
+    runProg("/api/flipper/prog/esptool",
+      "chip=" + encodeURIComponent(document.getElementById("fp-esp-chip").value) +
+      "&address=" + encodeURIComponent(document.getElementById("fp-esp-addr").value) +
+      "&port=" + encodeURIComponent(document.getElementById("fp-avr-port").value) +
+      "&action=write_flash");
+  });
+  document.getElementById("fp-esp-id").addEventListener("click", function () {
+    runProg("/api/flipper/prog/esptool",
+      "chip=auto&port=" + encodeURIComponent(document.getElementById("fp-avr-port").value) +
+      "&action=chip_id");
+  });
+  document.getElementById("fp-stm-run").addEventListener("click", function () {
+    runProg("/api/flipper/prog/stm32flash",
+      "port=" + encodeURIComponent(document.getElementById("fp-avr-port").value) +
+      "&baud=" + document.getElementById("fp-stm-baud").value + "&action=write");
+  });
+  document.getElementById("fp-stm-info").addEventListener("click", function () {
+    runProg("/api/flipper/prog/stm32flash",
+      "port=" + encodeURIComponent(document.getElementById("fp-avr-port").value) +
+      "&baud=" + document.getElementById("fp-stm-baud").value + "&action=info");
+  });
+
+  refreshDetect();
+  setInterval(refreshDetect, 30000);
+  pollPager();
+  pollSerial();
+  pollProg();
+})();
+</script>
+{% endblock %}

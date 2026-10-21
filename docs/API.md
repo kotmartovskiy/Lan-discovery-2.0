@@ -255,6 +255,26 @@
 HTTP-пробы интернета → ping WAN (потери/задержки) → download-тест скорости.
 Один прогон за раз (singleton), результаты не сохраняются.
 
+## Hardware-инструменты (`modules/flipper_routes.py`) — 17
+
+| Метод | Путь | Доступ | Описание |
+|---|---|---|---|
+| GET | `/flipper` | login | Страница: детект + пейджер + serial + программаторы |
+| GET | `/api/flipper/detect` | login | Инструменты/железо/порты (JSON) |
+| POST | `/api/flipper/install` | admin | Установка пакета (whitelist apt/pip, async) |
+| GET | `/api/flipper/install/status` | login | Статус/лог установки |
+| POST | `/api/flipper/pager/start`, `/stop` | edit | rtl_433: старт/стоп live-ленты 433 МГц |
+| GET | `/api/flipper/pager/status`, `/messages` | login | Статус и сообщения (JSON, `after=<n>`) |
+| POST | `/api/flipper/serial/open`, `/close`, `/write` | edit | Монитор UART (pyserial); консольные порты запрещены |
+| GET | `/api/flipper/serial/status`, `/read` | login | Порты/статус/лог (JSON) |
+| POST | `/api/flipper/prog/upload` | edit | Загрузка файла прошивки (`/tmp/flipper/`, ≤32 МБ) |
+| POST | `/api/flipper/prog/avrdude`, `/esptool`, `/stm32flash` | edit | Запуск программатора (whitelist-поля) |
+| GET | `/api/flipper/prog/status`, `/log` | login | Статус/лог программатора |
+
+Команды программаторов собираются только из whitelist-полей (программисты/
+MCU/чипы — списки, порты — из детекта ttyUSB/ttyACM); произвольные аргументы
+не передаются. Установка пакетов — только admin.
+
 ## Менеджер модулей (`modules/module_manager.py`) — 11
 
 | Метод | Путь | Доступ | Описание |

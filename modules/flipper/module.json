@@ -1,0 +1,24 @@
+{
+  "id": "flipper",
+  "version": "2.0.0",
+  "name": "Hardware-инструменты",
+  "description": "SDR-пейджер (rtl_433 433 МГц), serial-консоль USB-UART, программаторы AVR/ESP/STM32, детект NFC/IR",
+  "builtin": true,
+  "type": "tab",
+  "help": true,
+  "url": "/flipper",
+  "prefixes": [
+    "/flipper",
+    "/api/flipper"
+  ],
+  "tab": {
+    "title": "Hardware",
+    "order": 60,
+    "group": "Прочее",
+    "section": "hardware"
+  },
+  "deps": {
+    "apt": [],
+    "ports": []
+  }
+}

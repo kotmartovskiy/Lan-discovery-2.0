@@ -522,6 +522,11 @@ register_portscan_routes(app, ctx)
 from modules.diagnose_routes import register_routes as register_diagnose_routes
 register_diagnose_routes(app, ctx)
 
+# ==================== Hardware tools (Flipper) ====================
+
+from modules.flipper_routes import register_routes as register_flipper_routes
+register_flipper_routes(app, ctx)
+
 # ==================== Core routes ====================
 
 from modules.core_routes import register_routes as register_core_routes
