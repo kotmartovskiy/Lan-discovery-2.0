@@ -1,0 +1,24 @@
+{
+  "id": "portscan",
+  "version": "2.0.0",
+  "name": "Сканер открытых портов",
+  "description": "Сканирование диапазона IP (все порты или выборочно) с записью результата в файл на HDD/SSD",
+  "builtin": true,
+  "type": "app",
+  "help": true,
+  "url": "/portscan",
+  "prefixes": [
+    "/portscan",
+    "/api/portscan"
+  ],
+  "app": {
+    "title": "Сканер портов",
+    "icon": "🛰️",
+    "category": "Система и сеть",
+    "order": 30
+  },
+  "deps": {
+    "apt": [],
+    "ports": []
+  }
+}

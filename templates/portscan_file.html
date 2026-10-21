@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>{{ file_name }}</h2>
+
+{% if truncated %}
+<div class="info" style="margin-bottom:12px;">Показаны первые 512 КБ файла.
+<a href="/portscan/download/{{ file_name }}">Скачать полностью</a></div>
+{% else %}
+<div style="margin-bottom:12px;">
+  <a href="/portscan/download/{{ file_name }}">Скачать файл</a> ·
+  <a href="/portscan">← к сканеру</a>
+</div>
+{% endif %}
+
+<div class="card">
+  <pre style="white-space:pre-wrap; word-break:break-all; font-size:12px; max-height:70vh; overflow:auto;">{{ file_content }}</pre>
+</div>
+{% endblock %}

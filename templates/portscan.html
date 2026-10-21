@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+.ps-progress { height: 18px; background: #222; border-radius: 8px; overflow: hidden; margin: 8px 0; }
+.ps-progress-bar { height: 100%; width: 0; background: var(--accent, #4a9eff); transition: width .4s; }
+.ps-stat { font-size: 13px; color: #aaa; margin: 2px 0; }
+.ps-warn { border: 1px solid #b8860b; background: #2a2200; color: #ffd24d; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
+.ps-err { border: 1px solid #8b2020; background: #2a0d0d; color: #ff8a8a; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; }
+.ps-form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 10px; }
+.ps-form-row label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; }
+.ps-form-row input[type=text], .ps-form-row select { background: #181818; border: 1px solid #333; color: #eee; border-radius: 6px; padding: 7px 10px; font-size: 14px; }
+.ps-form-row input[type=text] { min-width: 220px; }
+.ps-files-table td, .ps-files-table th { font-size: 13px; }
+</style>
+
+<h2>Сканер открытых портов</h2>
+
+{% if error %}
+<div class="ps-err">{{ error }}</div>
+{% endif %}
+
+{% if not storage.ok %}
+<div class="ps-warn">
+  <strong>Сканирование недоступно:</strong> {{ storage.reason }}.
+  Результаты записываются только на подключённый HDD/SSD.
+</div>
+{% else %}
+
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card-title">Новое сканирование</div>
+  <form method="post" action="/portscan/start">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="ps-form-row">
+      <div>
+        <label for="ps-range">Диапазон IP</label>
+        <input type="text" id="ps-range" name="range" value="{{ default_range }}"
+               placeholder="192.168.3.0/24, 192.168.3.1-192.168.3.50, 192.168.3.1-50" required>
+      </div>
+      <div>
+        <label for="ps-ports">Порты</label>
+        <input type="text" id="ps-ports" name="ports" value="{{ default_ports }}"
+               placeholder="top / all / 1-1024 / 22,80,443,8000-8100">
+      </div>
+      <div>
+        <label for="ps-timeout">Таймаут</label>
+        <select id="ps-timeout" name="timeout">
+          <option value="0.3">0.3 с</option>
+          <option value="0.5" selected>0.5 с</option>
+          <option value="1.0">1.0 с</option>
+          <option value="2.0">2.0 с</option>
+        </select>
+      </div>
+      <div>
+        <button type="submit" id="ps-start" {% if job.running %}disabled{% endif %}>Запустить</button>
+      </div>
+    </div>
+    <div style="font-size:12px; color:#888;">
+      Примеры: <code>top</code> (частые порты), <code>all</code> (1–65535), <code>1-1024</code>,
+      <code>22,80,443,8000-8100</code>. Формат IP: CIDR, <code>ip-ip</code>, <code>ip-N</code>, список через запятую (до 4096 хостов).
+      <label style="margin-left:8px;"><input type="checkbox" name="confirm" value="1"> Подтверждаю объём &gt; 500k комбинаций</label>
+    </div>
+  </form>
+  {% if job.running %}
+  <form method="post" action="/portscan/stop">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Остановить</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card-title">Статус</div>
+  <div id="ps-status-line" class="ps-stat">
+    {% if job.running %}Выполняется…{% else %}Ожидание{% endif %}
+  </div>
+  <div class="ps-progress"><div class="ps-progress-bar" id="ps-bar"></div></div>
+  <div class="ps-stat" id="ps-detail"></div>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card-title">Файлы результатов</div>
+  <div id="ps-files" class="ps-stat">Загрузка…</div>
+</div>
+
+{% endif %}
+
+<script>
+(function () {
+  var running = {{ 'true' if job.running else 'false' }};
+  var timer = null;
+
+  function csrf() {
+    return (document.querySelector('meta[name="csrf-token"]') || {}).content || "";
+  }
+
+  function h(n) { return String(n == null ? "" : n).replace(/[&<>"]/g, function (c) {
+    return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];
+  }); }
+
+  function renderFiles(files, storage) {
+    var el = document.getElementById("ps-files");
+    if (!el) return;
+    if (!files || !files.length) {
+      el.textContent = storage && storage.ok ? "Файлов пока нет" : "Нет HDD/SSD — файлы недоступны";
+      return;
+    }
+    var rows = files.map(function (f) {
+      return "<tr><td>" + h(f.name) + "</td><td>" + Math.round(f.size / 1024) + " КБ</td><td>" +
+        h(f.mtime) + "</td><td>" +
+        '<a href="/portscan/file/' + encodeURIComponent(f.name) + '">Просмотр</a> · ' +
+        '<a href="/portscan/download/' + encodeURIComponent(f.name) + '">Скачать</a> · ' +
+        '<form method="post" action="/portscan/delete" style="display:inline;">' +
+        '<input type="hidden" name="csrf_token" value="' + csrf() + '">' +
+        '<input type="hidden" name="name" value="' + h(f.name) + '">' +
+        '<button type="submit" onclick="return confirm(\'Удалить ' + h(f.name) + '?\')" ' +
+        'style="background:none;border:none;color:#c66;padding:0;cursor:pointer;font:inherit;">Удалить</button>' +
+        "</form></td></tr>";
+    }).join("");
+    el.innerHTML = '<div class="table-wrap"><table class="ps-files-table"><thead><tr>' +
+      "<th>Файл</th><th>Размер</th><th>Обновлён</th><th></th></tr></thead><tbody>" +
+      rows + "</tbody></table></div>";
+  }
+
+  function loadFiles() {
+    fetch("/api/portscan/files").then(function (r) { return r.json(); })
+      .then(function (d) { renderFiles(d.files, d.storage); }).catch(function () {});
+  }
+
+  function poll() {
+    fetch("/api/portscan/status").then(function (r) { return r.json(); }).then(function (st) {
+      var line = document.getElementById("ps-status-line");
+      var bar = document.getElementById("ps-bar");
+      var det = document.getElementById("ps-detail");
+      if (!line) return;
+      var pct = st.total ? Math.round(100 * (st.done || 0) / st.total) : 0;
+      if (st.running) {
+        running = true;
+        line.textContent = "Выполняется: " + h(st.range) + " · порты " + h(st.ports);
+        bar.style.width = pct + "%";
+        det.textContent = "Хостов " + (st.hosts_done || 0) + "/" + st.hosts +
+          " · проверено " + (st.done || 0) + "/" + st.total + " (" + pct + "%)" +
+          " · открыто: " + (st.open || 0) +
+          (st.current ? " · текущий: " + h(st.current) : "") +
+          (st.file ? " · файл: " + h(st.file) : "");
+        var sb = document.getElementById("ps-start");
+        if (sb) sb.disabled = true;
+      } else {
+        if (running || st.finished) {
+          running = false;
+          loadFiles();
+        }
+        bar.style.width = st.total ? "100%" : "0";
+        if (st.error) {
+          line.textContent = "Ошибка: " + h(st.error);
+        } else if (st.finished) {
+          line.textContent = (st.cancelled ? "Остановлено" : "Завершено") + " " + h(st.finished);
+          det.textContent = "Хостов " + st.hosts_done + "/" + st.hosts +
+            " · проверено " + st.done + "/" + st.total +
+            " · открыто: " + st.open + (st.file ? " · файл: " + h(st.file) : "");
+        } else {
+          line.textContent = "Ожидание";
+          det.textContent = "";
+        }
+        var sb2 = document.getElementById("ps-start");
+        if (sb2) sb2.disabled = false;
+      }
+      timer = setTimeout(poll, st.running ? 1500 : 6000);
+    }).catch(function () {
+      timer = setTimeout(poll, 5000);
+    });
+  }
+
+  loadFiles();
+  poll();
+})();
+</script>
+{% endblock %}

@@ -3,7 +3,7 @@
   "name": "Сеть и наблюдение",
   "description": "Инвентаризация, мониторинг, сетевые утилиты, Bluetooth.",
   "required_modules": [
-    "inventory", "monitoring", "nettools",
+    "inventory", "monitoring", "nettools", "portscan",
     "wifianalyzer", "bluetooth", "disks"
   ],
   "optional_modules": [],

@@ -225,6 +225,23 @@
 | GET | `/inventory/device/<ip>` | login | Redirect → `/device/<ip>` (мертвая заглушка удалена в 1.1) |
 | GET | `/api/inventory/<ip>` | login | Данные инвентаризации (JSON) |
 
+## Сканер открытых портов (`modules/portscan_routes.py`) — 8
+
+| Метод | Путь | Доступ | Описание |
+|---|---|---|---|
+| GET | `/portscan` | login | Страница сканера (диапазон IP + порты) |
+| POST | `/portscan/start` | edit | Запуск скана (range, ports, timeout; confirm > 500k комбинаций) |
+| POST | `/portscan/stop` | edit | Остановка текущего скана |
+| POST | `/portscan/delete` | edit | Удалить файл результата |
+| GET | `/portscan/file/<name>` | login | Просмотр файла результата |
+| GET | `/portscan/download/<name>` | login | Скачать файл результата |
+| GET | `/api/portscan/status` | login | Прогресс скана (JSON) |
+| GET | `/api/portscan/files` | login | Список файлов результатов (JSON) |
+
+Файлы пишутся только на смонтированный HDD/SSD (`/srv/lan-discovery/portscan`
+либо `portscan.results_dir` в settings.json); без диска старт отклоняется
+и на X96 (только eMMC) страница показывает предупреждение.
+
 ## Менеджер модулей (`modules/module_manager.py`) — 11
 
 | Метод | Путь | Доступ | Описание |

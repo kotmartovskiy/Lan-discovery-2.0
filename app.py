@@ -512,6 +512,11 @@ from modules.inventory import init_inventory_db
 from modules.inventory_routes import register_routes as register_inventory_routes
 register_inventory_routes(app, ctx)
 
+# ==================== Port scanner ====================
+
+from modules.portscan_routes import register_routes as register_portscan_routes
+register_portscan_routes(app, ctx)
+
 # ==================== Core routes ====================
 
 from modules.core_routes import register_routes as register_core_routes
