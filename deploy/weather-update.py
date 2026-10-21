@@ -66,6 +66,68 @@ def fetch(query, tries=2, timeout=12, pause=5):
     raise last
 
 
+def backfill_past_hours(con, lat, lon, tzname, today, now_hour):
+    """Дозаписать прошедшие часы сегодняшнего дня из historical-forecast-api.
+
+    met.no отдаёт только «сейчас и вперёд», а api.open-meteo с бокса
+    недоступен (429/блок) — без дозаписи после обеда пропадают карточки
+    «Утро/День» (данных за утро в БД нет). Исторический эндпоинт отвечает.
+    """
+    if now_hour <= 0:
+        return
+    have = {
+        r[0]
+        for r in con.execute(
+            "SELECT hour FROM weather_hourly WHERE forecast_date = ?", (today,)
+        )
+    }
+    missing = [h for h in range(now_hour) if h not in have]
+    if not missing:
+        return
+    url = (
+        "https://historical-forecast-api.open-meteo.com/v1/forecast?"
+        f"latitude={lat}&longitude={lon}"
+        f"&timezone={urllib.parse.quote(tzname)}"
+        "&hourly=temperature_2m,weather_code,precipitation,precipitation_probability,"
+        "wind_speed_10m,wind_direction_10m,cloud_cover"
+        f"&start_date={today}&end_date={today}"
+    )
+    try:
+        data = get_json(url, timeout=25)
+    except Exception as e:
+        print("=== HISTORY BACKFILL FAILED: %s" % e, file=sys.stderr)
+        return
+    h = data.get("hourly", {})
+    times = h.get("time", [])
+    filled = 0
+    for i, t in enumerate(times):
+        if len(t) < 13 or t[:10] != today:
+            continue
+        hour = int(t[11:13])
+        if hour not in missing:
+            continue
+        con.execute(
+            """INSERT OR REPLACE INTO weather_hourly
+               (forecast_date, hour, temperature, weather_code, precipitation,
+                precipitation_probability, wind_speed, wind_direction, cloud_cover)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                today,
+                hour,
+                h.get("temperature_2m", [None] * len(times))[i],
+                h.get("weather_code", [None] * len(times))[i],
+                h.get("precipitation", [None] * len(times))[i],
+                h.get("precipitation_probability", [None] * len(times))[i],
+                h.get("wind_speed_10m", [None] * len(times))[i],
+                h.get("wind_direction_10m", [None] * len(times))[i],
+                h.get("cloud_cover", [None] * len(times))[i],
+            ),
+        )
+        filled += 1
+    print("=== HISTORY BACKFILL: %d ч дозаписано (%d отсутствовало)" % (
+        filled, len(missing)))
+
+
 # --- Запасной источник: met.no (api.met.no) -------------------------------
 # open-meteo периодически отдаёт 429/таймауты по IP; met.no отвечает 200.
 # Ответ Locationforecast приводится к словарю формата open-meteo, чтобы
@@ -568,6 +630,9 @@ def main():
                 hourly.get("cloud_cover", [None] * len(times))[i],
             ),
         )
+
+    # прошедшие часы сегодня, которых нет в БД (met.no их не отдаёт)
+    backfill_past_hours(con, lat, lon, tzname, today, now.hour)
 
     # --- прогноз на 7 дней (направление ветра — с полудня) ---
     # Чистим просроченные даты, иначе LIMIT 7 в ридере отдаёт старые хвосты.
