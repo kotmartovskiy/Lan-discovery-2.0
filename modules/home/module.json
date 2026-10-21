@@ -1,0 +1,24 @@
+{
+  "id": "home",
+  "version": "2.0.0",
+  "name": "Дом и сигнализация",
+  "description": "GPIO-сигнализация: зоны (reed-датчики), сирена, охрана, MQTT-мост, CPU-температура",
+  "builtin": true,
+  "type": "tab",
+  "help": true,
+  "url": "/home",
+  "prefixes": [
+    "/home",
+    "/api/home"
+  ],
+  "tab": {
+    "title": "Дом",
+    "order": 70,
+    "group": "Прочее",
+    "section": "hardware"
+  },
+  "deps": {
+    "apt": [],
+    "ports": []
+  }
+}

@@ -54,6 +54,10 @@ NAMESPACE_EVENTS = {
     "module.failed": "critical",
     "system.warning": "warning",
     "system.error": "critical",
+    "home.alarm_armed": "info",
+    "home.alarm_disarmed": "info",
+    "home.alarm_triggered": "critical",
+    "home.zone_changed": "warning",
 }
 
 # legacy-имена (первая модель events, PHASE 7) <-> namespace (dual-read)

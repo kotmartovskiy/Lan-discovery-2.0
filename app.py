@@ -527,6 +527,11 @@ register_diagnose_routes(app, ctx)
 from modules.flipper_routes import register_routes as register_flipper_routes
 register_flipper_routes(app, ctx)
 
+# ==================== Home / alarm ====================
+
+from modules.home_routes import register_routes as register_home_routes
+register_home_routes(app, ctx)
+
 # ==================== Core routes ====================
 
 from modules.core_routes import register_routes as register_core_routes

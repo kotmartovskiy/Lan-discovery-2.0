@@ -275,6 +275,27 @@ HTTP-пробы интернета → ping WAN (потери/задержки) 
 MCU/чипы — списки, порты — из детекта ttyUSB/ttyACM); произвольные аргументы
 не передаются. Установка пакетов — только admin.
 
+## Дом/сигнализация (`modules/home_routes.py`) — 12
+
+| Метод | Путь | Доступ | Описание |
+|---|---|---|---|
+| GET | `/home` | login | Страница: охрана, зоны, сирена, MQTT |
+| GET | `/api/home/status` | login | Состояние: armed/triggered, зоны, temp, MQTT (JSON) |
+| POST | `/api/home/arm`, `/api/home/disarm` | edit | Поставить/снять охрану |
+| POST | `/api/home/siren` | edit | Ручной вкл/выкл сирены (тест) |
+| POST | `/api/home/zones` | edit | Добавить GPIO-зону (name, chip, line, trigger_level) |
+| DELETE | `/api/home/zones/<id>` | edit | Удалить зону |
+| POST | `/api/home/zones/<id>/test` | login | Текущее значение GPIO зоны |
+| POST | `/api/home/siren_zone` | edit | Настроить/убрать сирену (зона `__siren__`) |
+| POST | `/api/home/mqtt` | edit | Настройки MQTT (host, port, prefix, enabled) |
+| POST | `/api/home/mqtt/test` | edit | Тестовая публикация |
+| POST | `/api/home/install` | admin | Установка mosquitto-clients (whitelist) |
+
+Охрана: опрос зон 2 с (GPIO через gpioset/gpioget, валидация chip/line);
+тревога → сирена + `home.alarm_triggered` (critical) + MQTT retained
+`<prefix>/state`, события `<prefix>/event`. Тревога снимается только
+вручную. На боксах без gpiochip — зоны скрыты, arm/disarm работают.
+
 ## Менеджер модулей (`modules/module_manager.py`) — 11
 
 | Метод | Путь | Доступ | Описание |

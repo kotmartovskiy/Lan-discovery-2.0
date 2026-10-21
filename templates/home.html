@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+.hm-badge { display: inline-block; padding: 3px 10px; border-radius: 12px;
+  font-size: 13px; font-weight: 600; }
+.hm-badge.ok { background: #14331c; color: #65d46e; }
+.hm-badge.no { background: #331414; color: #ff8a8a; }
+.hm-badge.warn { background: #332a00; color: #ffd24d; }
+.hm-err { border: 1px solid #8b2020; background: #2a0d0d; color: #ff8a8a;
+  padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; }
+.hm-alarm { display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+  padding: 8px 0; }
+.hm-alarm .hm-status { font-size: 20px; font-weight: 700; }
+.hm-alarm .hm-status.armed { color: #65d46e; }
+.hm-alarm .hm-status.triggered { color: #ff8a8a; animation: hm-pulse 1s infinite; }
+.hm-alarm .hm-status.disarmed { color: #888; }
+@keyframes hm-pulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+.hm-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  margin-bottom: 10px; }
+.hm-row label { font-size: 12px; color: #888; display: block; margin-bottom: 3px; }
+.hm-row select, .hm-row input[type=text], .hm-row input[type=number] {
+  background: #181818; border: 1px solid #333; color: #eee;
+  border-radius: 6px; padding: 6px 9px; font-size: 13px; }
+.hm-zones td, .hm-zones th { font-size: 13px; padding: 6px 10px; }
+.hm-note { font-size: 12px; color: #777; margin: 6px 0 12px; }
+.hm-log { background: #101010; border: 1px solid #222; border-radius: 8px;
+  padding: 10px 12px; font-size: 12px; color: #9c9; max-height: 160px;
+  overflow-y: auto; white-space: pre-wrap; }
+</style>
+
+<h2>Дом и сигнализация</h2>
+
+{% if error %}
+<div class="hm-err">{{ error }}</div>
+{% endif %}
+
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card-title">Охрана</div>
+  <div class="hm-alarm">
+    <span class="hm-status" id="hm-status">…</span>
+    <button id="hm-arm" type="button">Поставить на охрану</button>
+    <button id="hm-disarm" type="button">Снять охрану</button>
+    <button id="hm-siren" type="button">Сирена вкл/выкл (тест)</button>
+    <span class="hm-note" id="hm-meta"></span>
+  </div>
+  <div class="hm-note" id="hm-temp"></div>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card-title">Зоны (GPIO-датчики)</div>
+  {% if not home.gpio %}
+  <div class="hm-note">GPIO-чип не найден на этом боксе — зоны недоступны.
+    Сигнализация работает без зон (события arm/disarm + MQTT).</div>
+  {% endif %}
+  <div class="hm-row">
+    <div><label>Имя</label><input type="text" id="hm-zname" placeholder="дверь"></div>
+    <div><label>chip</label>
+      <select id="hm-zchip">{% for c in home.chips %}<option>{{ c }}</option>{% endfor %}</select></div>
+    <div><label>line</label><input type="number" id="hm-zline" value="18" min="0" max="1023" style="width:80px;"></div>
+    <div><label>триггер</label>
+      <select id="hm-ztrig"><option value="0">0 (открыт = low)</option><option value="1">1 (открыт = high)</option></select></div>
+    <button id="hm-zadd" type="button">Добавить зону</button>
+  </div>
+  <div class="table-wrap"><table class="hm-zones"><thead><tr>
+    <th>Имя</th><th>Пин</th><th>Триггер</th><th>Значение</th><th>Статус</th><th></th>
+  </tr></thead><tbody id="hm-zrows"></tbody></table></div>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card-title">Сирена (GPIO-выход)</div>
+  <div class="hm-row">
+    <div><label>chip</label>
+      <select id="hm-schip">{% for c in home.chips %}<option>{{ c }}</option>{% endfor %}</select></div>
+    <div><label>line</label><input type="number" id="hm-sline" value="19" min="0" max="1023" style="width:80px;"></div>
+    <button id="hm-sset" type="button">Сохранить сирену</button>
+    <button id="hm-sdel" type="button">Убрать</button>
+    <span class="hm-note" id="hm-sinfo"></span>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card-title">MQTT-мост</div>
+  <div class="hm-note">Состояние (retained) → <code>&lt;prefix&gt;/state</code>,
+    события → <code>&lt;prefix&gt;/event</code>.
+    {% if not is_admin %}{% else %}Клиент ставится кнопкой (admin).{% endif %}</div>
+  <div class="hm-row">
+    <div><label>брокер</label><input type="text" id="hm-mhost" value="{{ home.mqtt.host }}" placeholder="192.168.3.10"></div>
+    <div><label>порт</label><input type="number" id="hm-mport" value="{{ home.mqtt.port }}" style="width:80px;"></div>
+    <div><label>prefix</label><input type="text" id="hm-mprefix" value="{{ home.mqtt.prefix }}"></div>
+    <label style="font-size:13px;color:#aaa;"><input type="checkbox" id="hm-menabled" {% if home.mqtt.enabled %}checked{% endif %}> включён</label>
+    <button id="hm-msave" type="button">Сохранить</button>
+    <button id="hm-mtest" type="button">Тест</button>
+  </div>
+  <div class="hm-row">
+    <span class="hm-note" id="hm-minfo"></span>
+    {% if is_admin %}<button id="hm-minstall" type="button">Установить mosquitto-clients</button>{% endif %}
+  </div>
+  <div class="hm-log" id="hm-instlog" style="display:none;"></div>
+</div>
+
+<script>
+(function () {
+  var is_admin = {{ "true" if is_admin else "false" }};
+
+  function h(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c];
+  }); }
+  function post(url, body) {
+    return fetch(url, { method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}) }).then(function (r) { return r.json(); });
+  }
+  function del(url) {
+    return fetch(url, { method: "DELETE" }).then(function (r) { return r.json(); });
+  }
+  function toast(msg, type) { if (window.toast) window.toast(msg, type || "error"); }
+
+  function render(st) {
+    var el = document.getElementById("hm-status");
+    var meta = [];
+    if (st.triggered) { el.className = "hm-status triggered"; el.textContent = "⚠ ТРЕВОГА"; }
+    else if (st.armed) { el.className = "hm-status armed"; el.textContent = "🛡 На охране"; }
+    else { el.className = "hm-status disarmed"; el.textContent = "Охрана снята"; }
+    if (st.triggered && st.triggered_zone) meta.push("зона: " + st.triggered_zone);
+    if (st.siren_on) meta.push("сирена ВКЛ");
+    if (st.updated_at) meta.push("изменено: " + st.updated_at);
+    document.getElementById("hm-meta").textContent = meta.join(" · ");
+    document.getElementById("hm-temp").textContent =
+      st.temp != null ? "CPU: " + st.temp + " °C" : "";
+    document.getElementById("hm-arm").disabled = !!st.armed;
+    document.getElementById("hm-disarm").disabled = !st.armed;
+
+    var rows = (st.zones || []).filter(function (z) { return z.name !== "__siren__"; });
+    var zhtml = rows.map(function (z) {
+      var badge = z.open == null ? '<span class="hm-badge no">нет данных</span>'
+        : z.open ? '<span class="hm-badge warn">ОТКРЫТА</span>'
+                 : '<span class="hm-badge ok">закрыта</span>';
+      return "<tr><td>" + h(z.name) + "</td><td>" + h(z.chip) + ":" + h(z.line) +
+        "</td><td>" + h(z.trigger_level) + "</td><td>" +
+        (z.value == null ? "—" : h(z.value)) + "</td><td>" + badge +
+        '</td><td><button data-id="' + z.id + '" class="hm-zdel" ' +
+        'style="background:none;border:none;color:#c66;cursor:pointer;font:inherit;">Удалить</button></td></tr>';
+    }).join("");
+    document.getElementById("hm-zrows").innerHTML =
+      zhtml || '<tr><td colspan="6" style="color:#666;">Зон нет</td></tr>';
+    document.querySelectorAll(".hm-zdel").forEach(function (b) {
+      b.onclick = function () { del("/api/home/zones/" + b.getAttribute("data-id"))
+        .then(function () { refresh(); }).catch(function () {}); };
+    });
+
+    document.getElementById("hm-sinfo").textContent =
+      st.siren_configured ? "сирена настроена" : "сирена не настроена";
+    document.getElementById("hm-minfo").textContent =
+      st.mqtt_tool ? (st.mqtt.enabled ? "клиент есть, MQTT включён" : "клиент установлен")
+                   : "mosquitto-clients не установлен";
+  }
+
+  function refresh() {
+    fetch("/api/home/status").then(function (r) { return r.json(); })
+      .then(render).catch(function () {});
+  }
+
+  document.getElementById("hm-arm").onclick = function () {
+    post("/api/home/arm").then(function (d) { if (!d.ok) toast(d.error); refresh(); });
+  };
+  document.getElementById("hm-disarm").onclick = function () {
+    post("/api/home/disarm").then(function (d) { if (!d.ok) toast(d.error); refresh(); });
+  };
+  document.getElementById("hm-siren").onclick = function () {
+    var on = !document.getElementById("hm-meta").textContent.includes("сирена ВКЛ");
+    post("/api/home/siren", { on: on }).then(function (d) { if (!d.ok) toast(d.error); refresh(); });
+  };
+
+  document.getElementById("hm-zadd").onclick = function () {
+    post("/api/home/zones", {
+      name: document.getElementById("hm-zname").value,
+      chip: document.getElementById("hm-zchip").value,
+      line: parseInt(document.getElementById("hm-zline").value, 10),
+      trigger_level: parseInt(document.getElementById("hm-ztrig").value, 10)
+    }).then(function (d) { if (!d.ok) toast(d.error); else refresh(); });
+  };
+
+  document.getElementById("hm-sset").onclick = function () {
+    post("/api/home/siren_zone", {
+      chip: document.getElementById("hm-schip").value,
+      line: parseInt(document.getElementById("hm-sline").value, 10)
+    }).then(function (d) { if (!d.ok) toast(d.error); else refresh(); });
+  };
+  document.getElementById("hm-sdel").onclick = function () {
+    post("/api/home/siren_zone", { chip: "", line: 0 })
+      .then(function (d) { if (!d.ok) toast(d.error); else refresh(); });
+  };
+
+  document.getElementById("hm-msave").onclick = function () {
+    post("/api/home/mqtt", {
+      host: document.getElementById("hm-mhost").value,
+      port: parseInt(document.getElementById("hm-mport").value, 10),
+      prefix: document.getElementById("hm-mprefix").value,
+      enabled: document.getElementById("hm-menabled").checked
+    }).then(function (d) { if (!d.ok) toast(d.error); else refresh(); });
+  };
+  document.getElementById("hm-mtest").onclick = function () {
+    post("/api/home/mqtt/test").then(function (d) {
+      if (!d.ok) toast(d.error); else toast("MQTT-тест отправлен", "info");
+    });
+  };
+  if (is_admin) {
+    document.getElementById("hm-minstall").onclick = function () {
+      var btn = this; btn.disabled = true; btn.textContent = "Ставим…";
+      post("/api/home/install", { pkg: "mosquitto-clients" }).then(function (d) {
+        if (!d.ok) { toast(d.error); btn.disabled = false; btn.textContent = "Установить mosquitto-clients"; return; }
+        pollInstall();
+      });
+    };
+  }
+  function pollInstall() {
+    fetch("/api/home/install/status").then(function (r) { return r.json(); })
+      .then(function (st) {
+        var logEl = document.getElementById("hm-instlog");
+        if (st.log && st.log.length) {
+          logEl.style.display = "block";
+          logEl.textContent = st.log.join("\n");
+          logEl.scrollTop = logEl.scrollHeight;
+        }
+        if (st.running) setTimeout(pollInstall, 2000);
+        else {
+          var btn = document.getElementById("hm-minstall");
+          if (btn) { btn.disabled = false; btn.textContent = "Установить mosquitto-clients"; }
+          refresh();
+          if (window.toast && st.log && st.log.some(function (l) { return l.indexOf("OK:") === 0; }))
+            window.toast("mosquitto-clients установлен", "info");
+        }
+      }).catch(function () {});
+  }
+
+  refresh();
+  setInterval(refresh, 4000);
+})();
+</script>
+{% endblock %}
