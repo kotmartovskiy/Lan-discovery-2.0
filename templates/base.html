@@ -32,7 +32,10 @@
 <title>LAN Discovery{% if panel_name %} ({{ panel_name }}){% endif %}</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 5 C55 5, 60 8, 62 12 L58 18 C56 14, 53 12, 50 12 C47 12, 44 14, 42 18 L38 12 C40 8, 45 5, 50 5Z' fill='%237cb342'/%3E%3Cpath d='M58 8 C62 5, 68 4, 72 6 L66 14 C63 12, 60 11, 58 12Z' fill='%239ccc65'/%3E%3Cpath d='M50 15 C68 15, 85 32, 85 50 C85 68, 68 85, 50 85 C32 85, 15 68, 15 50 C15 32, 32 15, 50 15Z' fill='%23ffa726'/%3E%3Cpath d='M50 15 C68 15, 85 32, 85 50 C85 68, 68 85, 50 85 C32 85, 15 68, 15 50 C15 32, 32 15, 50 15Z' fill='none' stroke='%23f57c00' stroke-width='2'/%3E%3Cpath d='M50 22 C64 22, 78 36, 78 50 C78 64, 64 78, 50 78 C36 78, 22 64, 22 50 C22 36, 36 22, 50 22Z' fill='%23fff9c4'/%3E%3Cpath d='M50 30 L50 70' stroke='%23ffcc02' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M50 30 L30 55' stroke='%23ffcc02' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M50 30 L70 55' stroke='%23ffcc02' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M50 30 L35 42' stroke='%23ffcc02' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M50 30 L65 42' stroke='%23ffcc02' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M50 30 L40 65' stroke='%23ffcc02' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M50 30 L60 65' stroke='%23ffcc02' stroke-width='2.5' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='30' r='3' fill='%23ffcc02'/%3E%3C/svg%3E">
 
-<link rel="stylesheet" href="/static/style.css?v=20261001d">
+<link rel="stylesheet" href="/static/style.css?v=20261021m">
+<meta name="theme-color" content="#111111">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
 
 </head>
 
@@ -45,7 +48,9 @@
 
 <header class="header">
 
-<div>
+<button class="nav-burger" id="nav-burger" type="button" aria-expanded="false" aria-controls="mobile-nav" aria-label="Открыть меню">☰</button>
+
+<div class="header-main">
 <h1><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="35" height="35" style="vertical-align:middle; margin-right:6px;" aria-hidden="true">
 <path d="M50 5 C55 5, 60 8, 62 12 L58 18 C56 14, 53 12, 50 12 C47 12, 44 14, 42 18 L38 12 C40 8, 45 5, 50 5Z" fill="#7cb342"/>
 <path d="M58 8 C62 5, 68 4, 72 6 L66 14 C63 12, 60 11, 58 12Z" fill="#9ccc65"/>
@@ -103,6 +108,31 @@
 
 </header>
 
+<div class="mobile-nav-backdrop" id="mobile-nav-backdrop"></div>
+<nav class="mobile-nav" id="mobile-nav" aria-label="Меню панели" aria-hidden="true">
+<div class="mobile-nav-head">
+<span>Меню</span>
+<button class="mobile-nav-close" id="mobile-nav-close" type="button" aria-label="Закрыть меню">&times;</button>
+</div>
+<div class="mobile-nav-title">Разделы</div>
+{% for s in nav_sections %}
+<a href="{{ s.url }}" class="mobile-nav-link{{ ' active' if s.active else '' }}"{% if s.active %} aria-current="page"{% endif %}>
+<span aria-hidden="true">{{ s.icon }}</span> {{ s.name }}
+</a>
+{% endfor %}
+<div class="mobile-nav-title">Панель</div>
+{% for g in shell_groups %}
+{% for it in g.entries %}
+<a href="{{ it.url }}" class="mobile-nav-link{{ ' active' if page == it.page else '' }}">{{ it.title }}</a>
+{% endfor %}
+{% endfor %}
+<div class="mobile-nav-title">Статус</div>
+<div class="mobile-nav-status">
+<div id="internet-status-m" class="internet {{ 'online' if internet else 'offline' }}">● Интернет: {{ 'доступен' if internet else 'нет доступа' }}</div>
+<div style="margin-top:4px; font-size:13px; color:#9fb7d0;">● <span id="clock-time-m">--:--:--</span> <span id="clock-date-m" style="color:#6ba3d6;">--.--.----</span></div>
+</div>
+</nav>
+
 <main id="main" tabindex="-1">
 {% block content %}{% endblock %}
 </main>
@@ -124,6 +154,10 @@ function updateClock() {
     const timeEl = document.getElementById("clock-time");
     if (dateEl) dateEl.textContent = day + "." + month + "." + year;
     if (timeEl) timeEl.textContent = hours + ":" + minutes + ":" + seconds;
+    const dateM = document.getElementById("clock-date-m");
+    const timeM = document.getElementById("clock-time-m");
+    if (dateM) dateM.textContent = day + "." + month + "." + year;
+    if (timeM) timeM.textContent = hours + ":" + minutes + ":" + seconds;
 }
 
 function weatherIcon(code) {
@@ -1824,6 +1858,31 @@ window.confirmDialog = function (text, title) {
         dlg.showModal();
     });
 };
+</script>
+<script>
+/* Mobile app shell: бургер-меню (разделы + панель + статус) на узких экранах. */
+(function () {
+    var burger = document.getElementById("nav-burger");
+    var nav = document.getElementById("mobile-nav");
+    var bd = document.getElementById("mobile-nav-backdrop");
+    if (!burger || !nav) return;
+    function setNav(open) {
+        nav.classList.toggle("open", open);
+        if (bd) bd.classList.toggle("open", open);
+        burger.setAttribute("aria-expanded", open ? "true" : "false");
+        nav.setAttribute("aria-hidden", open ? "false" : "true");
+        document.body.classList.toggle("nav-open", open);
+    }
+    burger.addEventListener("click", function () {
+        setNav(!nav.classList.contains("open"));
+    });
+    var closeBtn = document.getElementById("mobile-nav-close");
+    if (closeBtn) closeBtn.addEventListener("click", function () { setNav(false); });
+    if (bd) bd.addEventListener("click", function () { setNav(false); });
+    window.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") setNav(false);
+    });
+})();
 </script>
 
 </body>
