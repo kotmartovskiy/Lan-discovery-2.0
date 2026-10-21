@@ -125,6 +125,7 @@ def register_routes(app, ctx):
             )
 
         def sort_key(inv):
+            # правило сортировки: устройства с открытыми портами — вверху
             online = int(inv.get("online", 0) if isinstance(inv, dict) else getattr(inv, "online", 0) or 0)
             has_web = inv.get("has_web", False) if isinstance(inv, dict) else getattr(inv, "has_web", False)
             open_ports = inv.get("open_ports") if isinstance(inv, dict) else getattr(inv, "open_ports", None)
@@ -135,9 +136,9 @@ def register_routes(app, ctx):
                     has_ports = len(ports) > 0
                 except Exception:
                     pass
-            if online and has_web:
+            if online and has_ports:
                 return 0
-            elif online and has_ports:
+            elif online and has_web:
                 return 1
             elif online:
                 return 2

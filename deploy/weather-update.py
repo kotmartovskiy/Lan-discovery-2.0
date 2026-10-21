@@ -534,7 +534,16 @@ def main():
     )
 
     # --- почасовой: сегодня (полные 24 часа) + завтра ---
-    con.execute("DELETE FROM weather_hourly")
+    # met.no отдаёт только «сейчас и вперёд», поэтому уже собранные прошедшие
+    # часы сегодняшнего дня НЕ затираем — копим в течение дня (утренние часы
+    # остаются к вечеру, карточки «Утро/День/Вечер/Ночь» всегда за сегодня)
+    con.execute(
+        """DELETE FROM weather_hourly
+           WHERE forecast_date < ?
+              OR forecast_date > ?
+              OR (forecast_date = ? AND hour >= ?)""",
+        (today, today, today, now.hour),
+    )
     times = hourly.get("time", [])
     for i, t in enumerate(times):
         if len(t) < 13:
