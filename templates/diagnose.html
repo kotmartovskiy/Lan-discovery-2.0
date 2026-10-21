@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+.dg-verdict { display: flex; align-items: center; gap: 14px; padding: 18px 20px;
+  border-radius: 10px; margin-bottom: 20px; border: 1px solid #333; background: #181818; }
+.dg-verdict .dg-icon { font-size: 34px; line-height: 1; }
+.dg-verdict .dg-text { font-size: 17px; font-weight: 600; }
+.dg-verdict.ok { border-color: #2a6b3a; background: #0e2213; color: #65d46e; }
+.dg-verdict.warn { border-color: #b8860b; background: #2a2200; color: #ffd24d; }
+.dg-verdict.fail { border-color: #8b2020; background: #2a0d0d; color: #ff8a8a; }
+.dg-verdict.pending { color: #888; }
+.dg-step { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px;
+  border-bottom: 1px solid #222; }
+.dg-step:last-child { border-bottom: none; }
+.dg-step .dg-sicon { font-size: 18px; line-height: 1.3; flex: 0 0 24px; text-align: center; }
+.dg-step .dg-stitle { font-weight: 600; font-size: 14px; }
+.dg-step .dg-summary { font-size: 13px; color: #bbb; margin-top: 2px; }
+.dg-step .dg-details { font-size: 12px; color: #888; margin-top: 4px; white-space: pre-line; overflow-wrap: anywhere; }
+.dg-step.s-ok .dg-sicon { color: #65d46e; }
+.dg-step.s-warn .dg-sicon { color: #ffd24d; }
+.dg-step.s-fail .dg-sicon { color: #ff8a8a; }
+.dg-step.s-skip .dg-sicon { color: #666; }
+.dg-step.s-pending .dg-sicon { color: #555; }
+.dg-step.s-running { background: #141820; }
+.dg-meta { font-size: 12px; color: #666; margin-top: 10px; }
+.dg-ctl { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+.dg-ctl label { font-size: 13px; color: #aaa; display: flex; gap: 6px; align-items: center; }
+.dg-err { border: 1px solid #8b2020; background: #2a0d0d; color: #ff8a8a;
+  padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; }
+@keyframes dg-pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+.dg-step.s-running .dg-sicon, .dg-step.s-running .dg-summary { animation: dg-pulse 1.2s infinite; }
+</style>
+
+<h2>Диагностика — что сломано?</h2>
+
+{% if error %}
+<div class="dg-err">{{ error }}</div>
+{% endif %}
+
+<div class="card" style="margin-bottom: 20px;">
+  <div id="dg-verdict" class="dg-verdict pending">
+    <div class="dg-icon">⏳</div>
+    <div class="dg-text">Проверка не запускалась</div>
+  </div>
+  <div class="dg-ctl">
+    <button id="dg-run" type="button">Запустить проверку</button>
+    <label><input type="checkbox" id="dg-speed" checked> Со скоростью (качает ~10 с)</label>
+  </div>
+  <div class="dg-meta" id="dg-meta"></div>
+</div>
+
+<div class="card" style="margin-bottom: 20px; padding: 0;">
+  <div id="dg-steps"></div>
+</div>
+
+<script>
+(function () {
+  var running = {{ 'true' if diag.running else 'false' }};
+  var timer = null;
+  var lastFinished = {{ (diag.finished or "") | tojson }};
+
+  var ICONS = { pending: "○", running: "◉", ok: "✓", warn: "⚠", fail: "✗", skip: "—" };
+  var VERDICT = { ok: ["", "✓"], warn: ["warn", "⚠"], fail: ["fail", "✗"],
+                  pending: ["pending", "⏳"] };
+
+  function h(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c];
+  }); }
+
+  function render(st) {
+    var v = st.verdict || { status: "pending", text: "…" };
+    var cls = (VERDICT[v.status] || VERDICT.pending)[0];
+    var icon = (VERDICT[v.status] || VERDICT.pending)[1];
+    var vEl = document.getElementById("dg-verdict");
+    vEl.className = "dg-verdict " + cls;
+    vEl.innerHTML = '<div class="dg-icon">' + icon + '</div><div class="dg-text">' +
+      h(st.running ? "Проверка выполняется…" : v.text) + "</div>";
+
+    var stepsHtml = (st.steps || []).map(function (s) {
+      var status = (st.running && st.current === s.id) ? "running" : s.status;
+      var det = (s.details || []).length
+        ? '<div class="dg-details">' + h(s.details.join("\n")) + "</div>" : "";
+      return '<div class="dg-step s-' + status + '">' +
+        '<div class="dg-sicon">' + (ICONS[status] || "?") + "</div>" +
+        "<div><div class=\"dg-stitle\">" + h(s.title) + "</div>" +
+        '<div class="dg-summary">' + h(s.summary || (status === "running"
+          ? "проверяется…" : status === "pending" ? "ожидание" : "")) + "</div>" +
+        det + "</div></div>";
+    }).join("");
+    document.getElementById("dg-steps").innerHTML = stepsHtml || "Нет шагов";
+
+    var meta = [];
+    if (st.started) meta.push("запущено: " + st.started);
+    if (st.finished) meta.push("завершено: " + st.finished);
+    if (st.error) meta.push("ошибка: " + st.error);
+    document.getElementById("dg-meta").textContent = meta.join(" · ");
+
+    var btn = document.getElementById("dg-run");
+    btn.disabled = !!st.running;
+    btn.textContent = st.running ? "Выполняется…" : "Запустить проверку";
+  }
+
+  function poll() {
+    fetch("/api/diagnose/status").then(function (r) { return r.json(); })
+      .then(function (st) {
+        render(st);
+        if (st.running) timer = setTimeout(poll, 1500);
+        else if (lastFinished !== (st.finished || "")) {
+          lastFinished = st.finished || "";
+          timer = setTimeout(poll, 4000);
+        } else timer = setTimeout(poll, 10000);
+      }).catch(function () { timer = setTimeout(poll, 5000); });
+  }
+
+  document.getElementById("dg-run").addEventListener("click", function () {
+    var body = JSON.stringify({ speed: document.getElementById("dg-speed").checked });
+    fetch("/api/diagnose/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: body })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d.ok) { running = true; if (timer) clearTimeout(timer); poll(); }
+        else if (d.error && window.toast) window.toast(d.error, "error"); })
+      .catch(function () {});
+  });
+
+  render({{ diag | tojson }});
+  poll();
+})();
+</script>
+{% endblock %}

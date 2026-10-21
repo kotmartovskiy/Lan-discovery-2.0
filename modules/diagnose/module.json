@@ -1,0 +1,23 @@
+{
+  "id": "diagnose",
+  "version": "2.0.0",
+  "name": "Диагностика сети",
+  "description": "Единый экран «Что сломано?»: LAN-адрес, шлюз, DNS, интернет, потери/задержки, скорость канала",
+  "builtin": true,
+  "type": "tab",
+  "help": true,
+  "url": "/diagnose",
+  "prefixes": [
+    "/diagnose",
+    "/api/diagnose"
+  ],
+  "tab": {
+    "title": "Диагностика",
+    "order": 25,
+    "group": "Устройства"
+  },
+  "deps": {
+    "apt": [],
+    "ports": []
+  }
+}

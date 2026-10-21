@@ -242,6 +242,19 @@
 либо `portscan.results_dir` в settings.json); без диска старт отклоняется
 и на X96 (только eMMC) страница показывает предупреждение.
 
+## Диагностика сети (`modules/diagnose_routes.py`) — 4
+
+| Метод | Путь | Доступ | Описание |
+|---|---|---|---|
+| GET | `/diagnose` | login | Страница «Что сломано?» (вердикт + шаги) |
+| POST | `/diagnose/run` | edit | Запуск прогона (форма; speed=0 — без теста скорости) |
+| POST | `/api/diagnose/run` | edit | Запуск прогона (JSON `{speed: bool}`) |
+| GET | `/api/diagnose/status` | login | Прогресс/результаты шагов (JSON) |
+
+Шаги: LAN (адрес/шлюз/DNS/DHCP-источник) → ping шлюза → DNS-резолв →
+HTTP-пробы интернета → ping WAN (потери/задержки) → download-тест скорости.
+Один прогон за раз (singleton), результаты не сохраняются.
+
 ## Менеджер модулей (`modules/module_manager.py`) — 11
 
 | Метод | Путь | Доступ | Описание |

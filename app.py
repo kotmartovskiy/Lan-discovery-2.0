@@ -517,6 +517,11 @@ register_inventory_routes(app, ctx)
 from modules.portscan_routes import register_routes as register_portscan_routes
 register_portscan_routes(app, ctx)
 
+# ==================== Network diagnostics ====================
+
+from modules.diagnose_routes import register_routes as register_diagnose_routes
+register_diagnose_routes(app, ctx)
+
 # ==================== Core routes ====================
 
 from modules.core_routes import register_routes as register_core_routes
