@@ -502,6 +502,7 @@ def app_items():
                 "order": int(app.get("order", 500)),
                 "description": m.get("description", ""),
                 "module": m["id"],
+                "url": m.get("url") or "",
             })
     return out
 

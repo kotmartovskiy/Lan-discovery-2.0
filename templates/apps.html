@@ -256,7 +256,7 @@
 <div class="desktop-cat">
 <div class="cat-label">{{ cat.name }}</div>
 {% for it in cat.tiles %}
-<div class="desktop-icon" onclick="openApp('{{ it.key }}')"{% if it.description %} title="{{ it.description }}"{% endif %}>
+<div class="desktop-icon" onclick="openApp('{{ it.key }}'{% if it.url %}, '{{ it.url }}'{% endif %})"{% if it.description %} title="{{ it.description }}"{% endif %}>
 <div class="icon">{{ it.icon }}</div>
 <div class="label">{{ it.title }}</div>
 </div>
@@ -687,7 +687,11 @@
 </div>
 
 <script>
-function openApp(name) { document.getElementById('app-'+name).classList.add('open'); }
+function openApp(name, url) {
+  var el = document.getElementById('app-' + name);
+  if (el) { el.classList.add('open'); return; }
+  if (url) { window.open(url, '_blank'); }
+}
 function closeApp(name) { document.getElementById('app-'+name).classList.remove('open'); }
 
 /* === Calculator === */
