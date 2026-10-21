@@ -33,6 +33,7 @@ def _read_file(path):
 
 def init_inventory_db():
     con = sqlite3.connect(DB, timeout=10)
+    con.execute("PRAGMA busy_timeout=30000")
     con.execute("PRAGMA journal_mode=WAL")
 
     con.execute("""
@@ -72,7 +73,7 @@ def nmap_os_detection(ip):
     try:
         output = _cmd(
             ["nmap", "-O", "-sV", "--top-ports", "20", ip],
-            timeout=30
+            timeout=120
         )
 
         os_match = re.search(r"Running: (.+)", output)
@@ -215,6 +216,44 @@ def upnp_discover(ip):
     return result
 
 
+def _local_ips():
+    """IP-адреса самого хоста — для self-инвентаря."""
+    ips = set()
+    try:
+        out = _cmd(["ip", "-4", "-o", "addr", "show", "scope", "global"],
+                   timeout=5)
+        for line in out.splitlines():
+            parts = line.split()
+            if "inet" in parts:
+                ips.add(parts[parts.index("inet") + 1].split("/")[0])
+    except Exception:
+        pass
+    return ips
+
+
+def listening_ports():
+    """Фактически слушающие TCP-порты локальной машины (ss -tln).
+
+    nmap -O -sV на самом себе идёт >100 секунд и нередко обрывается по
+    таймауту (пустой список портов у self-устройства) — для себя порты
+    берём из ss: мгновенно и без пропусков.
+    """
+    ports = {}
+    try:
+        out = _cmd(["ss", "-tln"], timeout=5)
+        for line in out.splitlines()[1:]:
+            cols = line.split()
+            if len(cols) < 4:
+                continue
+            port = cols[3].rsplit(":", 1)[-1]
+            if port.isdigit() and port not in ports:
+                ports[port] = {"port": port, "proto": "tcp",
+                               "state": "open", "service": ""}
+    except Exception:
+        pass
+    return sorted(ports.values(), key=lambda p: int(p["port"]))
+
+
 def scan_device_full(ip):
     init_inventory_db()
 
@@ -307,8 +346,22 @@ def scan_device_full(ip):
         except Exception:
             pass
 
+    # self-устройство: nmap на самом себе медленный/ненадёжный —
+    # порты дополняем из фактически слушающих (ss), service — из nmap
+    if ip in _local_ips():
+        merged = {}
+        for p in inventory.get("open_ports") or []:
+            if p.get("port"):
+                merged[str(p["port"])] = p
+        for p in listening_ports():
+            merged.setdefault(p["port"], p)
+        inventory["open_ports"] = sorted(
+            merged.values(), key=lambda p: int(p["port"])
+        )
+
     try:
         con = sqlite3.connect(DB, timeout=10)
+        con.execute("PRAGMA busy_timeout=30000")
         con.execute("PRAGMA journal_mode=WAL")
 
         con.execute("""
@@ -352,6 +405,7 @@ def get_inventory(ip=None):
     init_inventory_db()
 
     con = sqlite3.connect(DB, timeout=10)
+    con.execute("PRAGMA busy_timeout=30000")
 
     if ip:
         row = con.execute(

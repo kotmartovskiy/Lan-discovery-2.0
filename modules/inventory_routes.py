@@ -133,7 +133,8 @@ def register_routes(app, ctx):
             if open_ports:
                 try:
                     ports = json.loads(open_ports) if isinstance(open_ports, str) else open_ports
-                    has_ports = len(ports) > 0
+                    # только реально открытые: массив хранит и closed из nmap
+                    has_ports = any(p.get("state") == "open" for p in ports)
                 except Exception:
                     pass
             if online and has_ports:
