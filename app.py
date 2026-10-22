@@ -347,8 +347,13 @@ def _inject_user():
     u = get_current_user()
     if not u:
         u = SimpleNamespace(username="", role="guest", enabled=False, display_name="Гость")
+    ui = None
+    try:
+        ui = (load_settings().get("ui") or {}) or None
+    except Exception:
+        ui = None
     return {"current_user": u, "current_username": get_current_username(),
-            "blocks_for": block_items}
+            "blocks_for": block_items, "ui": ui}
 
 
 # ==================== Demo mode (§28) ====================

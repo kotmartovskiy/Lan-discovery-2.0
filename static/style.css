@@ -16,12 +16,14 @@
 :root {
     /* поверхности */
     --bg: #111;
+    --bg-image: none;
     --surface: #181818;
     --surface-2: #252525;
     --surface-3: #333;
     --border: #2a2a2a;
     --border-2: #333;
     --border-strong: #3a3a3a;
+    --shadow: 0 2px 10px rgba(0, 0, 0, .35);
     /* текст */
     --text: #eee;
     --text-2: #ddd;
@@ -40,8 +42,8 @@
     /* акцент */
     --accent: #4d96ff;
     /* геометрия */
-    --radius: 6px;
-    --radius-lg: 10px;
+    --radius: 8px;
+    --radius-lg: 14px;
     /* кнопки (значения совпадают с legacy button{}) */
     --btn-bg: #333;
     --btn-bg-hover: #444;
@@ -143,11 +145,13 @@
 
 /* ---------- 3. Legacy: перенесено из base.html ---------- */
 body {
-    font-family: Arial, sans-serif;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
     margin: 0;
     padding: 0 25px 25px 25px;
-    background: #111;
-    color: #eee;
+    background: var(--bg);
+    background-image: var(--bg-image);
+    background-attachment: fixed;
+    color: var(--text);
     scrollbar-width: none;
 }
 ::-webkit-scrollbar { width: 0; height: 0; }
@@ -165,7 +169,7 @@ h1 {
     top: 0;
     z-index: 100;
 
-    background: #111;
+    background: var(--bg);
     margin: 0 -25px;
     padding: 25px 25px 15px 25px;
 }
@@ -208,8 +212,8 @@ h1 {
     bottom: 0;
     z-index: 1000;
 
-    background: #111;
-    border-top: 1px solid #333;
+    background: var(--surface);
+    border-top: 1px solid var(--border-2);
 
     padding: 7px 15px;
     box-sizing: border-box;
@@ -228,14 +232,17 @@ body {
     margin-left: 0;
     text-align: left;
     flex: 1;
-    color: #b8c4d1;
+    color: var(--text-2);
     font-size: 14px;
     font-weight: 400;
     white-space: nowrap;
     width: 100%;
     max-width: 100%;
     text-align: left;
+    overflow-x: auto;
+    scrollbar-width: none;
 }
+.system-status::-webkit-scrollbar { display: none; }
 
 .system-status .status-label {
     font-weight: 600;
@@ -337,7 +344,7 @@ table {
 
 th, td {
     padding: 8px 10px;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid var(--border-2);
     text-align: left;
 }
 
@@ -348,7 +355,7 @@ th {
        него, а не от окна, поэтому var(--header-height) прижимал th к верху
        обёртки и смещал строку заголовка вниз на высоту шапки поверх данных */
     top: 0;
-    background: #111;
+    background: var(--surface-2);
     z-index: 10;
 }
 
@@ -514,7 +521,7 @@ th {
 }
 
 button {
-    background: #252525;
+    background: var(--surface-2);
     color: #ddd;
     border: 1px solid #3a3a3a;
     border-radius: 6px;
@@ -563,7 +570,7 @@ a {
 }
 
 input[type="text"] {
-    background: #222;
+    background: var(--surface-2);
     color: #eee;
     border: 1px solid #555;
     padding: 8px;
@@ -682,9 +689,27 @@ input[type="text"] {
 }
 
 @media (max-width: 700px) {
-    /* Нижний статус-бар: длинная строка метрик скроллится, не обрезается. */
+    /* Нижний статус-бар: две строки — метрики скроллятся, юзер-блок
+       (Restore/имя/выйти) больше не наезжает на показания. */
     .system-status-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 2px;
+        overflow-x: visible;
+        padding: 5px 10px;
+    }
+    .system-status {
+        font-size: 11px;
         overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .system-status-bar > div:last-child {
+        justify-content: center;
+        gap: 14px !important;
+        font-size: 11px !important;
+    }
+    body {
+        padding-bottom: 56px;
     }
     .device {
         max-width: 100%;
@@ -706,7 +731,7 @@ input[type="text"] {
 .skip-link:focus {
     left: 10px;
     top: 10px;
-    background: #111;
+    background: var(--bg);
     color: #8ab4f8;
     padding: 8px 14px;
     border: 1px solid #8ab4f8;
@@ -1111,5 +1136,182 @@ textarea:focus-visible,
 
     .header {
         margin: 0 -12px;
+    }
+}
+
+/* ============================================================
+   8. Themes (Фаза UI-редизайна): data-theme / data-bg / data-accent
+   на <html>; выбор сохраняется в localStorage (base.html ui-init.js).
+   ============================================================ */
+
+/* ---------- Светлая тема ---------- */
+html[data-theme="light"] {
+    --bg: #f4f5f7;
+    --bg-image: none;
+    --surface: #ffffff;
+    --surface-2: #eceef1;
+    --surface-3: #dfe3e8;
+    --border: #d9dde3;
+    --border-2: #e4e7ec;
+    --border-strong: #c3c9d2;
+    --shadow: 0 2px 10px rgba(20, 30, 50, .10);
+    --text: #1b1f26;
+    --text-2: #2b313b;
+    --text-muted: #566070;
+    --text-dim: #7a8494;
+    --text-faint: #9aa3b0;
+    --link: #1a73e8;
+    --btn-bg: #e8eaed;
+    --btn-bg-hover: #dde1e6;
+    --btn-bg-active: #d3d7dd;
+    --btn-border: #b8bec7;
+    --btn-text: #1b1f26;
+}
+html[data-theme="light"] body { background: var(--bg); color: var(--text); }
+html[data-theme="light"] .system-status-bar {
+    background: var(--surface);
+    border-top: 1px solid var(--border-2);
+}
+html[data-theme="light"] th { background: var(--surface-2); color: var(--text); }
+html[data-theme="light"] .header h1,
+html[data-theme="light"] .header h1 span { color: var(--text); }
+html[data-theme="light"] .mobile-nav { box-shadow: 4px 0 24px rgba(20, 30, 50, .18); }
+html[data-theme="light"] .btn-primary { color: #fff; }
+html[data-theme="light"] .card h2 { color: var(--text-2); border-bottom-color: var(--border); }
+html[data-theme="light"] .card h3 { color: var(--text-muted); }
+html[data-theme="light"] .jobs-widget,
+html[data-theme="light"] #jobs-widget { background: rgba(255, 255, 255, .97); color: var(--text-2); border-color: var(--border); }
+html[data-theme="light"] .toast { background: var(--surface-2); color: var(--text); box-shadow: 0 4px 16px rgba(20, 30, 50, .18); }
+html[data-theme="light"] .modal-box { background: var(--surface); border-color: var(--border); box-shadow: 0 8px 32px rgba(20, 30, 50, .25); }
+html[data-theme="light"] .modal { background: rgba(30, 40, 60, .45); }
+html[data-theme="light"] .skip-link:focus { background: var(--surface); color: var(--link); }
+
+/* ---------- Фоны (data-bg) ---------- */
+html[data-bg="aurora"] body {
+    --bg-image:
+        radial-gradient(1000px 500px at 12% -8%, rgba(77, 150, 255, .20), transparent 60%),
+        radial-gradient(900px 480px at 88% 0%, rgba(155, 89, 182, .16), transparent 60%),
+        radial-gradient(800px 600px at 50% 110%, rgba(26, 188, 156, .12), transparent 60%);
+}
+html[data-bg="aurora"][data-theme="light"] body {
+    --bg-image:
+        radial-gradient(1000px 500px at 12% -8%, rgba(77, 150, 255, .14), transparent 60%),
+        radial-gradient(900px 480px at 88% 0%, rgba(155, 89, 182, .10), transparent 60%),
+        radial-gradient(800px 600px at 50% 110%, rgba(26, 188, 156, .10), transparent 60%);
+}
+html[data-bg="sunset"] body {
+    --bg-image:
+        radial-gradient(1000px 520px at 10% -10%, rgba(255, 120, 50, .18), transparent 60%),
+        radial-gradient(900px 500px at 90% 5%, rgba(255, 61, 130, .14), transparent 60%),
+        radial-gradient(900px 620px at 55% 115%, rgba(255, 193, 7, .10), transparent 60%);
+}
+html[data-bg="forest"] body {
+    --bg-image:
+        radial-gradient(1000px 520px at 8% -8%, rgba(56, 142, 60, .18), transparent 60%),
+        radial-gradient(900px 500px at 92% 0%, rgba(0, 150, 136, .14), transparent 60%),
+        radial-gradient(800px 600px at 50% 112%, rgba(139, 195, 74, .10), transparent 60%);
+}
+html[data-bg="mono"] body { --bg-image: none; }
+
+/* ---------- Акценты (data-accent) ---------- */
+html[data-accent="violet"] {
+    --accent: #8b5cf6; --link: #a78bfa;
+    --info: #8b5cf6;
+}
+html[data-accent="green"] {
+    --accent: #22c55e; --link: #4ade80;
+    --info: #22c55e;
+}
+html[data-accent="orange"] {
+    --accent: #f59e0b; --link: #fbbf24;
+    --info: #f59e0b;
+}
+html[data-accent="rose"] {
+    --accent: #f43f5e; --link: #fb7185;
+    --info: #f43f5e;
+}
+html[data-accent="teal"] {
+    --accent: #14b8a6; --link: #2dd4bf;
+    --info: #14b8a6;
+}
+html[data-accent="blue"] { --accent: #4d96ff; --link: #8ab4f8; --info: #4d96ff; }
+
+html[data-accent="violet"] .btn-primary:hover { background: #9d75f7; border-color: #9d75f7; }
+html[data-accent="green"] .btn-primary:hover { background: #2fd96f; border-color: #2fd96f; }
+html[data-accent="orange"] .btn-primary:hover { background: #fbbf24; border-color: #fbbf24; }
+html[data-accent="rose"] .btn-primary:hover { background: #fb7185; border-color: #fb7185; }
+html[data-accent="teal"] .btn-primary:hover { background: #2dd4bf; border-color: #2dd4bf; }
+
+/* ---------- 9. UI-theme modal (внешний вид) ---------- */
+.ui-theme-btn {
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 16px;
+    line-height: 1;
+    padding: 7px 9px;
+    cursor: pointer;
+    margin: 4px 0 0;
+    transition: background .15s, transform .1s;
+}
+.ui-theme-btn:hover { background: var(--surface-3); transform: translateY(-1px); }
+.ui-modal-title { font-size: 16px; font-weight: 600; margin-bottom: 14px; color: var(--text); }
+.ui-group { margin-bottom: 14px; }
+.ui-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+}
+.ui-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.ui-opts button {
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    color: var(--text-2);
+    font-size: 13px;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+}
+.ui-opts button:hover { background: var(--surface-3); }
+.ui-opts button.active {
+    border-color: var(--accent);
+    background: var(--surface-3);
+    color: var(--text);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+.ui-swatches button {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    padding: 0;
+}
+.ui-swatches button[data-v="blue"] { background: #4d96ff; }
+.ui-swatches button[data-v="violet"] { background: #8b5cf6; }
+.ui-swatches button[data-v="green"] { background: #22c55e; }
+.ui-swatches button[data-v="orange"] { background: #f59e0b; }
+.ui-swatches button[data-v="rose"] { background: #f43f5e; }
+.ui-swatches button[data-v="teal"] { background: #14b8a6; }
+.ui-swatches button.active { outline: 2px solid var(--text); outline-offset: 2px; }
+.ui-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.ui-hint { font-size: 11px; color: var(--text-faint); margin-top: 10px; }
+
+@media (max-width: 700px) {
+    .ui-theme-btn { padding: 8px 10px; font-size: 17px; }
+    .mobile-nav-link.ui-theme-open {
+        width: 100%;
+        text-align: left;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        margin-top: 10px;
+        cursor: pointer;
+        color: var(--text-2);
+        font: inherit;
+        font-size: 14px;
+        padding: 10px 12px;
     }
 }
