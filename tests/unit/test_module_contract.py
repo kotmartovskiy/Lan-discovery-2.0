@@ -30,6 +30,7 @@ ROUTE_MODULES = (
     "inventory_routes",
     "sdr_routes",
     "core_routes",
+    "tv_routes",
 )
 
 # builtin-манифесты с hardware-требованиями (§24)

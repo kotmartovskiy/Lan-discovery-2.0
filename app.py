@@ -542,6 +542,11 @@ register_home_routes(app, ctx)
 from modules.rescue_routes import register_routes as register_rescue_routes
 register_rescue_routes(app, ctx)
 
+# ==================== TV mode (Kodi / CRT) ====================
+
+from modules.tv_routes import register_routes as register_tv_routes
+register_tv_routes(app, ctx)
+
 # ==================== Core routes ====================
 
 from modules.core_routes import register_routes as register_core_routes

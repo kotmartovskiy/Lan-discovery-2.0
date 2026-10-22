@@ -1,0 +1,23 @@
+{
+  "id": "tv",
+  "version": "1.0.0",
+  "name": "TV-режим",
+  "description": "Крупный пульт-дружелюбный интерфейс для ТВ (Kodi/браузер, CRT и LCD): большие шрифты, safe-зона, D-pad навигация, масштаб",
+  "builtin": true,
+  "type": "app",
+  "help": true,
+  "url": "/tv",
+  "prefixes": [
+    "/tv"
+  ],
+  "app": {
+    "title": "TV-режим",
+    "icon": "📺",
+    "category": "Система и сеть",
+    "order": 55
+  },
+  "deps": {
+    "apt": [],
+    "ports": []
+  }
+}

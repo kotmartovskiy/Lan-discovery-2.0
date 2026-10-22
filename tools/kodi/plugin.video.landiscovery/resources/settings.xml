@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<settings>
+  <category label="Панель">
+    <setting id="panel_url" type="text" label="URL панели (без /tv)" default="http://192.168.3.243:8080"/>
+  </category>
+</settings>
