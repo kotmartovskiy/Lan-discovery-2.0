@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+.rs-badge { display: inline-block; padding: 3px 10px; border-radius: 12px;
+  font-size: 13px; font-weight: 600; }
+.rs-badge.ok { background: #14331c; color: #65d46e; }
+.rs-badge.no { background: #331414; color: #ff8a8a; }
+.rs-badge.warn { background: #332a00; color: #ffd24d; }
+.rs-err { border: 1px solid #8b2020; background: #2a0d0d; color: #ff8a8a;
+  padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; }
+.rs-status { display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+  padding: 8px 0; }
+.rs-status .rs-st { font-size: 20px; font-weight: 700; }
+.rs-status .rs-st.up { color: #65d46e; }
+.rs-status .rs-st.down { color: #888; }
+.rs-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  margin-bottom: 10px; }
+.rs-row label { font-size: 12px; color: #888; display: block; margin-bottom: 3px; }
+.rs-row select, .rs-row input[type=text], .rs-row input[type=number] {
+  background: #181818; border: 1px solid #333; color: #eee;
+  border-radius: 6px; padding: 6px 9px; font-size: 13px; }
+.rs-table td, .rs-table th { font-size: 13px; padding: 6px 10px; }
+.rs-note { font-size: 12px; color: #777; margin: 6px 0 12px; }
+.rs-log { background: #101010; border: 1px solid #222; border-radius: 8px;
+  padding: 10px 12px; font-size: 12px; color: #9c9; max-height: 160px;
+  overflow-y: auto; white-space: pre-wrap; }
+</style>
+
+<h2>Спасательный AP</h2>
+<p class="rs-note">Wi-Fi точка доступа на боксе — доступ к панели, когда
+падает основная сеть. Подключаетесь к SSID <b id="rs-ssid-hint"></b>
+и заходите на <code id="rs-url-hint">http://192.168.4.1:8080</code>.</p>
+
+{% if error %}
+<div class="rs-err">{{ error }}</div>
+{% endif %}
+
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card-title">Статус AP</div>
+  <div class="rs-status">
+    <span class="rs-st" id="rs-st">…</span>
+    <span id="rs-badges"></span>
+    <button id="rs-start" type="button">Запустить AP</button>
+    <button id="rs-stop" type="button">Остановить</button>
+  </div>
+  <div class="rs-note" id="rs-meta"></div>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card-title">Интерфейсы (wlan)</div>
+  {% if not st.ifaces %}
+  <div class="rs-note">Нет wlan-интерфейсов — спасательный AP невозможен
+    на этом боксе.</div>
+  {% endif %}
+  <div class="table-wrap"><table class="rs-table"><thead><tr>
+    <th>Интерфейс</th><th>IP</th><th>Роль</th>
+  </tr></thead><tbody id="rs-rows"></tbody></table></div>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card-title">Конфигурация</div>
+  <div class="rs-row">
+    <div><label>SSID</label><input type="text" id="rs-ssid" value="{{ st.config.ssid }}"></div>
+    <div><label>пароль WPA2 (пусто = открытая)</label><input type="text" id="rs-pass" placeholder="мин. 8 символов"></div>
+    <div><label>канал</label><input type="number" id="rs-ch" value="{{ st.config.channel }}" min="1" max="16" style="width:70px;"></div>
+    <div><label>подсеть AP</label><input type="text" id="rs-sub" value="{{ st.config.subnet }}"></div>
+    <div><label>DHCP</label><input type="text" id="rs-dhcp" value="{{ st.config.dhcp_start }}–{{ st.config.dhcp_end }}" readonly style="width:150px;"></div>
+    <button id="rs-save" type="button">Сохранить</button>
+  </div>
+  <div class="rs-note" id="rs-cfginfo"></div>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card-title">Установка пакетов (admin)</div>
+  <div class="rs-row">
+    {% if is_admin %}
+    <button id="rs-inst-hostapd" type="button">Установить hostapd</button>
+    <button id="rs-inst-dnsmasq" type="button">Установить dnsmasq</button>
+    {% endif %}
+    <span class="rs-note" id="rs-instinfo"></span>
+  </div>
+  <div class="rs-log" id="rs-instlog" style="display:none;"></div>
+</div>
+
+<script>
+(function () {
+  var is_admin = {{ "true" if is_admin else "false" }};
+  var cur_ifaces = {{ st.ifaces | tojson }};
+
+  function h(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c];
+  }); }
+  function post(url, body) {
+    return fetch(url, { method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}) }).then(function (r) { return r.json(); });
+  }
+  function toast(msg, type) { if (window.toast) window.toast(msg, type || "error"); }
+
+  function render(st) {
+    var up = st.running;
+    var el = document.getElementById("rs-st");
+    el.className = "rs-st " + (up ? "up" : "down");
+    el.textContent = up ? "🟢 AP запущен" : "AP остановлен";
+    var b = [];
+    b.push(st.hostapd ? '<span class="rs-badge ok">hostapd</span>'
+                      : '<span class="rs-badge no">hostapd off</span>');
+    b.push(st.dnsmasq ? '<span class="rs-badge ok">dnsmasq</span>'
+                      : '<span class="rs-badge no">dnsmasq off</span>');
+    b.push(st.tools.hostapd ? '<span class="rs-badge ok">hostapd есть</span>'
+                            : '<span class="rs-badge warn">hostapd нет</span>');
+    b.push(st.tools.dnsmasq ? '<span class="rs-badge ok">dnsmasq есть</span>'
+                            : '<span class="rs-badge warn">dnsmasq нет</span>');
+    document.getElementById("rs-badges").innerHTML = b.join(" ");
+
+    var meta = [];
+    if (st.config.ssid) meta.push("SSID: " + st.config.ssid);
+    if (st.iface_ip) meta.push("IP: " + st.iface_ip);
+    if (st.uplink) meta.push("аплинк (не трогаем): " + st.uplink);
+    document.getElementById("rs-meta").textContent = meta.join(" · ");
+
+    document.getElementById("rs-start").disabled = !!up;
+    document.getElementById("rs-stop").disabled = !up;
+
+    document.getElementById("rs-ssid-hint").textContent = st.config.ssid;
+    document.getElementById("rs-url-hint").textContent =
+      "http://" + (st.config.subnet || "").split("/")[0] + ":8080";
+
+    var rows = (st.ifaces || []).map(function (it) {
+      var role = it.uplink ? '<span class="rs-badge warn">аплинк (default route)</span>'
+        : (it.has_ip ? '<span class="rs-badge no">занят</span>'
+                     : '<span class="rs-badge ok">свободен</span>');
+      return "<tr><td>" + h(it.name) + "</td><td>" + h(it.ip || "—") +
+        "</td><td>" + role + "</td></tr>";
+    }).join("");
+    document.getElementById("rs-rows").innerHTML =
+      rows || '<tr><td colspan="3" style="color:#666;">wlan нет</td></tr>';
+
+    document.getElementById("rs-cfginfo").textContent =
+      st.has_pass ? "сеть защищена WPA2" : "сеть открытая (пароль не задан)";
+  }
+
+  function refresh() {
+    fetch("/api/rescue/status").then(function (r) { return r.json(); })
+      .then(render).catch(function () {});
+  }
+
+  document.getElementById("rs-start").onclick = function () {
+    post("/api/rescue/start", {}).then(function (d) {
+      if (!d.ok) { toast(d.error); return; }
+      refresh();
+    });
+  };
+  document.getElementById("rs-stop").onclick = function () {
+    post("/api/rescue/stop").then(function () { refresh(); });
+  };
+  document.getElementById("rs-save").onclick = function () {
+    post("/api/rescue/config", {
+      ssid: document.getElementById("rs-ssid").value,
+      passphrase: document.getElementById("rs-pass").value,
+      channel: parseInt(document.getElementById("rs-ch").value, 10),
+      subnet: document.getElementById("rs-sub").value
+    }).then(function (d) { if (!d.ok) toast(d.error); else refresh(); });
+  };
+
+  function bindInstall(btnId, pkg, label) {
+    var btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.onclick = function () {
+      btn.disabled = true; btn.textContent = "Ставим…";
+      post("/api/rescue/install", { pkg: pkg }).then(function (d) {
+        if (!d.ok) { toast(d.error); btn.disabled = false; btn.textContent = label; return; }
+        pollInstall(label);
+      });
+    };
+  }
+  bindInstall("rs-inst-hostapd", "hostapd", "Установить hostapd");
+  bindInstall("rs-inst-dnsmasq", "dnsmasq", "Установить dnsmasq");
+
+  function pollInstall(label) {
+    fetch("/api/rescue/install/status").then(function (r) { return r.json(); })
+      .then(function (st) {
+        var logEl = document.getElementById("rs-instlog");
+        if (st.log && st.log.length) {
+          logEl.style.display = "block";
+          logEl.textContent = st.log.join("\n");
+          logEl.scrollTop = logEl.scrollHeight;
+        }
+        if (st.running) setTimeout(function () { pollInstall(label); }, 2000);
+        else {
+          var btns = document.querySelectorAll("[id^=rs-inst-]");
+          btns.forEach(function (b) {
+            b.disabled = false;
+            b.textContent = b.id === "rs-inst-hostapd" ? "Установить hostapd"
+                                                       : "Установить dnsmasq";
+          });
+          refresh();
+          if (window.toast && st.log && st.log.some(function (l) { return l.indexOf("OK:") === 0; }))
+            window.toast("пакет установлен", "info");
+        }
+      }).catch(function () {});
+  }
+
+  refresh();
+  setInterval(refresh, 5000);
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,10 @@
+{
+  "id": "rescue",
+  "title": "Спасательный AP",
+  "version": "1.0.0",
+  "order": 80,
+  "group": "system",
+  "section": "system",
+  "enabled": true,
+  "api": ["/rescue", "/api/rescue/*"]
+}

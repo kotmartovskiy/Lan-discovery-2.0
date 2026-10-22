@@ -123,6 +123,7 @@ def _stream_alive():
 
 def register_routes(app, ctx):
     login_required = ctx.login_required
+    can_edit = ctx.can_edit
 
     @app.route("/apps/sdr")
     @login_required
@@ -148,6 +149,7 @@ def register_routes(app, ctx):
         })
 
     @app.route("/api/sdr/freq", methods=["POST"])
+    @can_edit
     @login_required
     def sdr_freq():
         data = request.get_json(silent=True) or {}
@@ -162,6 +164,7 @@ def register_routes(app, ctx):
         return jsonify({"ok": True, "freq": freq, "applied": applied})
 
     @app.route("/api/sdr/rtl/start", methods=["POST"])
+    @can_edit
     @login_required
     def sdr_rtl_start():
         unit = "rtl_tcp.service"

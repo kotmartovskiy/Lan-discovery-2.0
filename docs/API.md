@@ -296,6 +296,20 @@ MCU/чипы — списки, порты — из детекта ttyUSB/ttyACM)
 `<prefix>/state`, события `<prefix>/event`. Тревога снимается только
 вручную. На боксах без gpiochip — зоны скрыты, arm/disarm работают.
 
+## Спасательный AP (`modules/rescue_routes.py`) — 7
+
+| Метод | Путь | Доступ | Описание |
+|---|---|---|---|
+| GET | `/rescue` | login | Страница спасательного Wi-Fi AP |
+| GET | `/api/rescue/status` | login | Интерфейсы/аплинк/hostapd/dnsmasq/конфиг |
+| POST | `/api/rescue/config` | edit | Сохранить SSID/WPA2/канал/подсеть (валидация: SSID ≤32, пароль 8–63, канал 1–16, подсеть /24) |
+| POST | `/api/rescue/start` | edit | Поднять AP (dnsmasq+hostapd, IP интерфейсу); отказ, если iface = default route |
+| POST | `/api/rescue/stop` | edit | Остановить AP, снять IP |
+| POST | `/api/rescue/install` | admin | Установить hostapd/dnsmasq (whitelist apt, async+лог) |
+| GET | `/api/rescue/install/status` | login | Статус/лог установки |
+
+---
+
 ## Менеджер модулей (`modules/module_manager.py`) — 11
 
 | Метод | Путь | Доступ | Описание |
@@ -314,7 +328,7 @@ MCU/чипы — списки, порты — из детекта ttyUSB/ttyACM)
 
 ---
 
-Итого таблиц: 2, 7, 31, 29, 21, 64, 2, 2, 4, 11 = 173
+Итого таблиц: 2, 7, 30, 29, 21, 64, 2, 2, 4, 8, 4, 17, 12, 7, 11 = 218
 
 Роуты без `def`-декоратора `login_required`/`admin_required`
 помечены `открытый` — их белый список: `/login`, `/logout`,

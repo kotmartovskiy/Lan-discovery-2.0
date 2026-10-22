@@ -532,6 +532,11 @@ register_flipper_routes(app, ctx)
 from modules.home_routes import register_routes as register_home_routes
 register_home_routes(app, ctx)
 
+# ==================== Rescue AP ====================
+
+from modules.rescue_routes import register_routes as register_rescue_routes
+register_rescue_routes(app, ctx)
+
 # ==================== Core routes ====================
 
 from modules.core_routes import register_routes as register_core_routes

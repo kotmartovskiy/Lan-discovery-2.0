@@ -82,6 +82,7 @@ def register_routes(app, ctx):
         return jsonify({"ok": ok}), 200 if ok else 404
 
     @app.route("/api/home/zones/<int:zid>/test", methods=["POST"])
+    @can_edit
     @login_required
     def home_zone_test(zid):
         zones = engine.list_zones()
