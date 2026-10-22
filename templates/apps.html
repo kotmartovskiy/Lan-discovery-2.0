@@ -16,7 +16,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 34px;
+    font-size: 40px;
     background: linear-gradient(145deg, #4d96ff, #2b5fc4);
     border: 1px solid rgba(255, 255, 255, .22);
     box-shadow: 0 9px 20px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .35), inset 0 -8px 14px rgba(0, 0, 0, .16);
@@ -38,7 +38,7 @@
 }
 .desktop-icon .icon > * { position: relative; z-index: 1; }
 .desktop-icon .icon .tile-emoji { filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .35)); line-height: 1; }
-.desktop-icon .icon .tile-svg { width: 36px; height: 36px; display: block; }
+.desktop-icon .icon .tile-svg { width: 48px; height: 48px; display: block; }
 .desktop-cat[data-cat="Утилиты"] .icon { background: linear-gradient(145deg, #60a5fa, #2563eb); }
 .desktop-cat[data-cat="Медиа"] .icon { background: linear-gradient(145deg, #a78bfa, #7c3aed); }
 .desktop-cat[data-cat="Игры"] .icon { background: linear-gradient(145deg, #34d399, #0f9f6e); }
@@ -451,7 +451,7 @@
 <div class="cat-label">{{ cat.name }}</div>
 {% for it in cat.tiles %}
 <div class="desktop-icon" onclick="openApp('{{ it.key }}'{% if it.url %}, '{{ it.url }}'{% endif %})"{% if it.description %} title="{{ it.description }}"{% endif %}>
-{% if it.key in svg_keys %}<div class="icon"><svg class="tile-svg" viewBox="0 0 48 48" aria-hidden="true"><use href="#ic-{{ it.key }}"></use></svg></div>{% else %}<div class="icon"><span class="tile-emoji">{{ it.icon }}</span></div>{% endif %}
+{% if it.key in svg_keys %}<div class="icon"><svg class="tile-svg" viewBox="3 3 42 42" aria-hidden="true"><use href="#ic-{{ it.key }}"></use></svg></div>{% else %}<div class="icon"><span class="tile-emoji">{{ it.icon }}</span></div>{% endif %}
 <div class="label">{{ it.title }}</div>
 </div>
 {% endfor %}
