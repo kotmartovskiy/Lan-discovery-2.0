@@ -59,8 +59,8 @@ def test_inventory_device_redirects(client):
 
 def test_help_api_points_to_docs(client):
     html = client.get("/help").get_data(as_text=True)
-    assert "8. API (JSON)" in html
-    seg = html[html.index('id="api"'):html.index('id="admin"')]
+    assert "API (JSON)" in html
+    seg = html[html.index('id="api"'):html.index('id="admin-ops"')]
     assert "docs/API.md" in seg
     # ручная копия каталога (таблица) убрана из секции
     assert "help-table" not in seg

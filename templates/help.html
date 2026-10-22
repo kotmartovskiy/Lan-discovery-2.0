@@ -3,25 +3,46 @@
 {% block content %}
 <style>
 .help-layout { display:flex; gap:24px; align-items:flex-start; }
-.help-sidebar { position:sticky; top:100px; flex:0 0 260px; background:#181818; border:1px solid #2a2a2a; border-radius:10px; padding:16px; max-height:calc(100vh - 130px); overflow-y:auto; }
-.help-sidebar a { color:#8ab4f8; text-decoration:none; display:block; padding:4px 8px; font-size:13px; border-radius:4px; margin-bottom:2px; }
-.help-sidebar a:hover { background:#1a1a2e; color:#fff; }
-.help-sidebar .toc-group { color:#888; font-size:11px; text-transform:uppercase; letter-spacing:1px; margin:12px 0 4px 8px; font-weight:600; }
-.help-main { flex:1; min-width:0; }
-.help-section { margin-bottom:28px; }
-.help-section h3 { color:#8ab4f8; border-bottom:1px solid #333; padding-bottom:8px; margin-bottom:14px; font-size:16px; }
-.help-section h4 { color:#ccc; margin:16px 0 8px; font-size:14px; }
-.help-section p, .help-section li { color:#bbb; line-height:1.7; font-size:14px; }
-.help-section ul { padding-left:20px; }
-.help-section li { margin-bottom:4px; }
-.help-section code { background:#1a1a2e; padding:2px 6px; border-radius:4px; font-size:13px; color:#8ab4f8; }
+.help-sidebar { position:sticky; top:100px; flex:0 0 260px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px; max-height:calc(100vh - 130px); overflow-y:auto; }
+.help-sidebar a { color:var(--link); text-decoration:none; display:block; padding:4px 8px; font-size:13px; border-radius:4px; margin-bottom:2px; }
+.help-sidebar a:hover { background:var(--surface-2); color:#fff; }
+.help-sidebar .toc-group { color:var(--text-dim); font-size:11px; text-transform:uppercase; letter-spacing:1px; margin:12px 0 4px 8px; font-weight:600; }
+.help-main { flex:1; min-width:0; min-width:0; }
+.help-toolbar { display:flex; gap:8px; margin-bottom:12px; }
+.help-toolbar button { background:var(--surface-2); border:1px solid var(--border-strong); border-radius:var(--radius); color:var(--text-2); font-size:12px; padding:6px 12px; cursor:pointer; }
+.help-toolbar button:hover { background:var(--surface-3); }
+
+/* --- аккордеон --- */
+.help-acc { border:1px solid var(--border); border-radius:12px; margin-bottom:10px; background:var(--surface); overflow:hidden; box-shadow:var(--shadow); }
+.help-acc > summary { cursor:pointer; padding:14px 18px; font-weight:600; color:var(--text); font-size:15px; display:flex; align-items:center; gap:10px; list-style:none; user-select:none; transition: background .15s; }
+.help-acc > summary::-webkit-details-marker { display:none; }
+.help-acc > summary::before { content:"▸"; color:var(--accent); font-size:14px; transition: transform .15s; flex:none; }
+.help-acc[open] > summary::before { transform: rotate(90deg); }
+.help-acc > summary:hover { background:var(--surface-2); }
+.help-acc .acc-sub { border-top:1px solid var(--border); padding:14px 20px 8px; }
+.help-acc .acc-sub:last-child { padding-bottom:16px; }
+
+/* вложенные пункты (вкладки, приложения) */
+details.help-item { border:1px solid var(--border); border-radius:8px; margin-bottom:8px; background:var(--surface-2); }
+details.help-item > summary { cursor:pointer; padding:9px 14px; font-size:14px; font-weight:600; color:var(--text-2); list-style:none; display:flex; gap:9px; align-items:center; user-select:none; }
+details.help-item > summary::-webkit-details-marker { display:none; }
+details.help-item > summary::before { content:"▸"; color:var(--accent); transition: transform .15s; flex:none; font-size:12px; }
+details.help-item[open] > summary::before { transform: rotate(90deg); }
+details.help-item > summary:hover { color:var(--text); background:var(--surface-3); }
+details.help-item .item-body { padding:2px 16px 14px; border-top:1px solid var(--border); }
+
+.help-sec-h { color:var(--accent); font-size:13px; text-transform:uppercase; letter-spacing:.06em; margin:16px 0 8px; }
+.help-section h4 { color:var(--text-2); margin:14px 0 6px; font-size:14px; }
+.help-section p, .acc-sub p, .item-body p, .acc-sec p { color:var(--text-muted); line-height:1.65; font-size:14px; margin:6px 0; }
+.help-section ul, .acc-sub ul, .item-body ul, .acc-sec ul { padding-left:20px; margin:6px 0; }
+.help-section li, .acc-sub li, .item-body li, .acc-sec li { color:var(--text-muted); line-height:1.6; font-size:14px; margin-bottom:4px; }
+.help-section code, .acc-sub code, .item-body code, .acc-sec code { background:var(--surface-3); padding:2px 6px; border-radius:4px; font-size:13px; color:var(--link); }
 .help-table { width:100%; border-collapse:collapse; margin:12px 0; }
-.help-table th { text-align:left; padding:8px 12px; background:#1a1a2e; color:#8ab4f8; border:1px solid #333; font-size:13px; }
-.help-table td { padding:8px 12px; border:1px solid #333; font-size:13px; color:#bbb; }
-.help-badge { display:inline-block; background:#2563eb; color:#fff; padding:2px 8px; border-radius:4px; font-size:11px; margin-left:6px; }
-.help-badge.green { background:#2e7d32; }
-.help-badge.orange { background:#e65100; }
-.help-badge.purple { background:#6a1b9a; }
+.help-table th { text-align:left; padding:8px 12px; background:var(--surface-2); color:var(--link); border:1px solid var(--border-2); font-size:13px; }
+.help-table td { padding:8px 12px; border:1px solid var(--border-2); font-size:13px; color:var(--text-muted); }
+.help-badge { display:inline-block; background:var(--accent); color:#fff; padding:2px 8px; border-radius:4px; font-size:11px; margin-left:6px; font-weight:500; }
+.how { background:var(--surface-3); border-left:3px solid var(--accent); border-radius:0 6px 6px 0; padding:6px 12px; margin:8px 0 4px; font-size:13px; color:var(--text-2); }
+.how strong { color:var(--accent); }
 
 @media (max-width: 900px) {
     .help-layout { flex-direction:column; }
@@ -31,26 +52,31 @@
 
 <div class="page-title">
     <h2>📖 Справка</h2>
-    <div class="muted">Полное руководство по панели управления LAN Discovery</div>
+    <div class="muted">Руководство по панели LAN Discovery — разделы раскрываются кликом</div>
 </div>
 
 <div class="help-layout">
 
 <nav class="help-sidebar">
-    <div class="toc-group">Обзор</div>
-    <a href="#overview">1. Обзор проекта</a>
-    <a href="#hardware">2. Оборудование</a>
-    <a href="#pages">3. Страницы панели</a>
-    <div class="toc-group">Функции</div>
-    <a href="#network">4. Сетевые функции</a>
-    <a href="#apps">5. Приложения и утилиты</a>
-    <a href="#games">6. Игры</a>
-    <a href="#system-features">7. Системные функции</a>
+    <div class="toc-group">Начало</div>
+    <a href="#overview">Обзор панели</a>
+    <a href="#hw">Эта панель (факты)</a>
+    <div class="toc-group">Вкладки</div>
+    <a href="#tab-home">🏠 Home</a>
+    <a href="#tab-network">🌐 Network</a>
+    <a href="#tab-monitoring">📊 Monitoring</a>
+    <a href="#tab-storage">💾 Storage</a>
+    <a href="#tab-apps">🧩 Applications</a>
+    <a href="#tab-hardware">🔧 Hardware</a>
+    <a href="#tab-system">⚙️ System</a>
+    <a href="#tab-admin">🛡 Admin</a>
+    <div class="toc-group">Приложения</div>
+    <a href="#apps-list">Все приложения (28)</a>
     <div class="toc-group">Справочник</div>
-    <a href="#api">8. API (JSON)</a>
-    <a href="#admin">9. Администрирование</a>
-    <a href="#troubleshoot">10. Решение проблем</a>
-    <a href="#faq">11. FAQ</a>
+    <a href="#api">API (JSON)</a>
+    <a href="#admin-ops">Администрирование</a>
+    <a href="#troubleshoot">Решение проблем</a>
+    <a href="#faq">FAQ</a>
     {% if help_sections %}
     <div class="toc-group">Модули</div>
     {% for s in help_sections %}<a href="#mod-{{ s.id }}">{{ s.title }}</a>{% endfor %}
@@ -59,30 +85,47 @@
 
 <div class="help-main">
 
-<!-- 1. Обзор -->
-<div class="help-section" id="overview">
-<h3>1. Обзор проекта</h3>
-<p>
-Веб-панель управления домашней инфраструктурой на базе {{ hf.board }} ({{ hf.os }}, hostname <code>{{ hf.hostname }}</code>).
-Единое приложение (Flask + SQLite) для мониторинга сети, устройств, погоды, валют,
-управления мультимедией, встроенных утилит и игр.
-</p>
-
-<h4>Технологии</h4>
-<ul>
-<li><strong>Сервер:</strong> Python 3 + Flask (порт {{ hf.port }})</li>
-<li><strong>База данных:</strong> SQLite (<code>/opt/lan-discovery/devices.db</code>)</li>
-<li><strong>Сканирование сети:</strong> nmap (ARP-сканирование)</li>
-<li><strong>Погода:</strong> Open-Meteo API ({{ hf.coords }})</li>
-<li><strong>Валюты:</strong> CoinGecko + Frankfurter + Yahoo Finance</li>
-<li><strong>Модули:</strong> вкл/выкл разделов, установка зависимостей — страница «Модули»</li>
-<li><strong>Системный сервис:</strong> <code>lan-discovery.service</code> (systemd)</li>
-</ul>
+<div class="help-toolbar">
+    <button type="button" onclick="helpExpand(true)">Раскрыть всё</button>
+    <button type="button" onclick="helpExpand(false)">Свернуть всё</button>
 </div>
 
-<!-- 2. Оборудование -->
-<div class="help-section" id="hardware">
-<h3>2. Оборудование</h3>
+<!-- ===== Обзор ===== -->
+<details class="help-acc" id="overview" open>
+<summary>👋 Обзор панели</summary>
+<div class="acc-sub">
+<p><strong>LAN Discovery</strong> — самодельная домашняя панель-«прошивка» для одноплатника
+({{ hf.board }}): сеть, устройства, мониторинг, хранилище, приложения, автоматизация
+и системные инструменты в одном веб-интерфейсе.</p>
+
+<h4>Как войти</h4>
+<ul>
+<li>Откройте <code>{{ hf.panel_url }}</code> (порт <code>{{ hf.web_port }}</code>) с любого устройства в LAN.</li>
+<li>Пароль задан при установке; без логина часть страниц закрыта (перенаправление на вход).</li>
+<li>Аварийный доступ: <code>{{ hf.restore_url }}</code> — минималистичный сервер, работает когда панель легла.</li>
+</ul>
+
+<h4>Как устроена навигация</h4>
+<ul>
+<li>Сверху — <strong>8 вкладок</strong> (Home, Network, Monitoring, Storage, Applications, Hardware, System, Admin): они группируют страницы по смыслу.</li>
+<li>Внутри вкладки — пункты меню (например, Network → Устройства, Инвентаризация, Диагностика).</li>
+<li>Вкладка <strong>Applications</strong> — плитки встроенных приложений и игр.</li>
+<li>Внизу — строка состояния: CPU, RAM, eMMC, HDD, LAN/Wi-Fi трафик (сразу видно, всё ли в порядке).</li>
+<li>Шапка: часы, погода, «Интернет: доступен/нет», здоровье системы; справа в шапке — бейджи задач (jobs), если что-то выполняется.</li>
+</ul>
+
+<div class="how"><strong>С чего начать:</strong> откройте Home — это сводка; потом Network → Устройства
+для обзора LAN; всё остальное — по необходимости. Эту справку можно читать сверху вниз
+или переходить по оглавлению слева; наверху есть «Раскрыть всё / Свернуть всё».</div>
+</div>
+</details>
+
+<!-- ===== Факты об этой панели ===== -->
+<details class="help-acc" id="hw">
+<summary>🖥 Эта панель: оборудование и адреса (факты)</summary>
+<div class="acc-sub">
+<p>Данные ниже панель собирает автоматически с самого устройства (device-tree, <code>ip</code>,
+<code>lsblk</code>, настройки) — корректны на любой плате.</p>
 
 <h4>Основное устройство</h4>
 <table class="help-table">
@@ -115,130 +158,447 @@
 </table>
 {% endif %}
 </div>
+</details>
 
-<!-- 3. Страницы панели -->
-<div class="help-section" id="pages">
-<h3>3. Страницы панели</h3>
+<!-- ===== HOME ===== -->
+<details class="help-acc" id="tab-home">
+<summary>🏠 Вкладка HOME</summary>
+<div class="acc-sub">
+<p>Рабочий стол панели: одна страница, с которой видно общее состояние дома/сервера.</p>
 
-<h4>🏠 Главная (<code>/</code>)</h4>
-<p>Обзор: состояние системы, активные задачи и ключевые метрики.</p>
+<h4>Главная (<code>/</code>)</h4>
+<p><strong>Что это:</strong> сводный дашборд — здоровье системы (CPU, RAM, диск, температура),
+счётчики устройств онлайн/офлайн, последние события, погода и курсы валют.</p>
+<div class="how"><strong>Как пользоваться:</strong> смотрите карточки сверху; клик по блоку
+здоровья открывает детали; события прокручиваются ниже — там видно, что устройство выходило
+в сеть или появлялось. Обновляется автоматически.</div>
+</div>
+</details>
 
-<h4>🌐 Устройства (<code>/devices</code>)</h4>
-<p>Автоматическое сканирование сети (ARP via nmap).</p>
+<!-- ===== NETWORK ===== -->
+<details class="help-acc" id="tab-network">
+<summary>🌐 Вкладка NETWORK — сеть и устройства</summary>
+<div class="acc-sub">
+
+<h4>Устройства (<code>/devices</code>)</h4>
+<p><strong>Что это:</strong> главный список устройств LAN: сканирование (ARP/nmap), IP, MAC,
+имя, статус онлайн/офлайн, веб-порты устройств.</p>
 <ul>
-<li>Список всех найденных устройств с IP, MAC, именем, статусом онлайн/офлайн</li>
-<li>Цветовая индикация: зелёный — онлайн, серый — оффлайн, жёлтый — новое устройство</li>
-<li>Клик по устройству → детальная страница с историей</li>
-<li>Возможность задать имя устройству</li>
+<li>Зелёный — онлайн, серый — офлайн, жёлтый — новое устройство (ещё не встречалось).</li>
+<li>Клик по строке — карточка устройства: история, открытые порты, веб-интерфейс.</li>
+<li>Имя устройству задаётся вручную (потом не сбрасывается при сканах).</li>
+<li>Ручной запуск скана кнопкой; фоновый скан по расписанию настраивается в System → Настройки.</li>
+</ul>
+<div class="how"><strong>Как пользоваться:</strong> откройте вкладку → дождитесь скана
+(или нажмите «Сканировать») → кликните устройство, чтобы посмотреть детали.</div>
+
+<h4>Инвентаризация (<code>/inventory</code>)</h4>
+<p><strong>Что это:</strong> учётная таблица техники: что за устройство, серийники, комментарии,
+привязка к месту — чтобы не терять, где что лежит.</p>
+<div class="how"><strong>Как пользоваться:</strong> добавьте запись → заполните поля →
+при сканировании сети устройство сопоставляется по MAC/IP с записью инвентаря.</div>
+
+<h4>Диагностика сети (<code>/diagnose</code>)</h4>
+<p><strong>Что это:</strong> набор проверок связности: ping, доступность портов, DNS,
+HTTP-ответы — одним нажатием видно, что сломалось.</p>
+<div class="how"><strong>Как пользоваться:</strong> выберите проверку → запустите →
+смотрите вердикт (зелёный/красный) и подробности; при отказе HTTP есть fallback на TCP.</div>
+</div>
+</details>
+
+<!-- ===== MONITORING ===== -->
+<details class="help-acc" id="tab-monitoring">
+<summary>📊 Вкладка MONITORING — история и метрики</summary>
+<div class="acc-sub">
+
+<h4>История (<code>/history</code>)</h4>
+<p><strong>Что это:</strong> лента событий панели: устройства появлялись/исчезали,
+смены MAC, результаты сканов, системные уведомления. Фильтры по типу и времени.</p>
+<div class="how"><strong>Как пользоваться:</strong> выберите период/фильтр → смотрите ленту;
+клик по событию открывает контекст (устройство, результат).</div>
+
+<h4>Мониторинг (<code>/monitoring</code>)</h4>
+<p><strong>Что это:</strong> метрики этой панели во времени: CPU, RAM, диск, температура,
+сеть — в виде карточек и графиков.</p>
+<div class="how"><strong>Как пользоваться:</strong> откройте страницу — графики рисуются сами;
+за пределами встроенного мониторинга — вкладка приложения Netdata (полный мониторинг).</div>
+
+<h4>Валюты (<code>/currencies</code>)</h4>
+<p><strong>Что это:</strong> курсы в одном месте: криптовалюты (CoinGecko), fiat-валюты
+(Frankfurter), металлы (Yahoo Finance), цены приёмных пунктов (ЦФО).</p>
+<div class="how"><strong>Как пользоваться:</strong> просто откройте вкладку — данные
+подтягиваются автоматически; карточки обновляются фоном (кэш).</div>
+
+<h4>Погода (<code>/weather</code>)</h4>
+<p><strong>Что это:</strong> текущая погода и прогноз (Open-Meteo) по координатам
+{{ hf.coords }}; виджет погоды также стоит в шапке.</p>
+<div class="how"><strong>Как пользоваться:</strong> координаты/регион меняются в
+System → Настройки (блок «Местоположение»); дальше всё обновляется само.</div>
+</div>
+</details>
+
+<!-- ===== STORAGE ===== -->
+<details class="help-acc" id="tab-storage">
+<summary>💾 Вкладка STORAGE — диски</summary>
+<div class="acc-sub">
+<h4>Хранилище (<code>/storage</code>)</h4>
+<p><strong>Что это:</strong> все накопители системы: корень ({{ hf.root_kind_label }}), SD, eMMC, HDD —
+разделы, точки монтирования, занятое/свободное место.</p>
+<ul>
+<li>Видно, где система, а где данные (загрузки, бэкапы).</li>
+<li>Подсказки по заполненности — чтобы вовремя чистить или переносить на HDD.</li>
+</ul>
+<div class="how"><strong>Как пользоваться:</strong> откройте вкладку и смотрите таблицы;
+подробнее о дисках — приложение «Диски» и вкладка System (клонирование, бэкапы).</div>
+</div>
+</details>
+
+<!-- ===== APPLICATIONS ===== -->
+<details class="help-acc" id="tab-apps">
+<summary>🧩 Вкладка APPLICATIONS — приложения и игры</summary>
+<div class="acc-sub">
+<p><strong>Что это:</strong> «рабочий стол» со встроенными приложениями: утилиты, медиа,
+игры, сетевые инструменты. Всего {{ 9 + 19 }} плиток, каждая открывает встроенный виджет
+или отдельную страницу модуля.</p>
+<ul>
+<li>Иконки-плитки сгруппированы по категориям: Утилиты, Медиа, Игры, Система и сеть.</li>
+<li>Наведение — плитка приподнимается; клик — открывает приложение.</li>
+<li>Полное описание каждого приложения — в разделе «Все приложения» ниже в этой справке.</li>
 </ul>
 
-<h4>💾 Хранилище (<code>/storage</code>)</h4>
-<p>Диски и точки монтирования: корень, SD, eMMC, HDD, свободное место.</p>
+<h4>Торрент (<code>/torrent</code>)</h4>
+<p><strong>Что это:</strong> веб-интерфейс торрент-клиента Transmission: добавление
+магнит-ссылок, список раздач, скорость, статус.</p>
+<div class="how"><strong>Как пользоваться:</strong> вставьте магнит → файлы попадут
+в <code>/srv/downloads/</code>; управляйте раздачами прямо из списка.</div>
+</div>
+</details>
 
-<h4>🖥 Система (<code>/system</code>)</h4>
-<p>Управление сервером {{ hf.board }}.</p>
+<!-- ===== HARDWARE ===== -->
+<details class="help-acc" id="tab-hardware">
+<summary>🔧 Вкладка HARDWARE — железо и дом</summary>
+<div class="acc-sub">
+
+<h4>Возможности (<code>/capabilities</code>)</h4>
+<p><strong>Что это:</strong> паспорт аппаратуры этой панели: архитектура, доступные шины
+и инструменты (GPIO, serial, i2c…), накопители, что модулям разрешено использовать.</p>
+<div class="how"><strong>Как пользоваться:</strong> смотрите, что есть на плате, прежде
+чем включать модули, требующие железо (SDR, DVB, GPIO); здесь же видно, чего нет.</div>
+
+<h4>Hardware-инструменты (<code>/flipper</code>)</h4>
+<p><strong>Что это:</strong> низкоуровневые инструменты для отладки железа: тесты GPIO-ножек,
+шины i2c/spi/serial, шлюз к Flipper Zero-подобным проверкам.</p>
+<div class="how"><strong>Как пользоваться:</strong> выберите интерфейс/ножку → запустите тест
+→ смотрите результат; удобно перед подключением датчиков.</div>
+
+<h4>Дом и сигнализация (<code>/home</code>)</h4>
+<p><strong>Что это:</strong> домашняя сигнализация: GPIO-зоны (контактные датчики reed),
+сирена, режим «под охраной», MQTT-мост (состояние/события в умный дом), датчик температуры CPU.</p>
 <ul>
-<li>Карточки: uptime, нагрузка, температура, RAM, SD, eMMC</li>
-<li>Управление сервисами (Transmission, MiniDLNA, Samba, LAN Discovery, Netdata)</li>
-<li>Гостевой доступ Samba — доступ к шарам без пароля в LAN (переключается здесь же, только admin)</li>
-<li>Резервное копирование (файлы панели, база данных)</li>
-<li>Проверка сети, зоны RU, провайдера</li>
-<li>Клонирование SD ↔ eMMC</li>
-<li>IPTV: управление плейлистами</li>
-<li>Управление питанием (перезагрузка, выключение)</li>
+<li>Зоны привязываются к GPIO-ножкам платы (chip/line), опрос раз в 2 секунды.</li>
+<li>Открытие зоны под охраной → тревога: сирена + событие <code>home.alarm_triggered</code> + MQTT retained-состояние.</li>
+<li>MQTT: клиент ставится кнопкой (admin), работает с внешним брокером.</li>
 </ul>
-
-<h4>📱 Приложения (<code>/apps</code>)</h4>
-<p>Встроенные утилиты и игры — подробнее в разделах 5 и 6.</p>
-
-<h4>ℹ️ О системе (<code>/about</code>)</h4>
-<p>Подробная информация о сервере: плата, процессор, память, накопители, сеть, USB, файловые системы, ПО, сервисы.</p>
-
-<h4>📖 Справка (<code>/help</code>)</h4>
-<p>Эта страница.</p>
+<div class="how"><strong>Как пользоваться:</strong> добавьте зону (chip/line) → включите сирену
+при необходимости → «Поставить под охрану» → при открытии датчика сработает тревога;
+«Снять» — отключает. События видны в Истории.</div>
 </div>
+</details>
 
-<!-- 4. Сетевые функции -->
-<div class="help-section" id="network">
-<h3>4. Сетевые функции <span class="help-badge">Сеть</span></h3>
+<!-- ===== SYSTEM ===== -->
+<details class="help-acc" id="tab-system">
+<summary>⚙️ Вкладка SYSTEM — сервер целиком</summary>
+<div class="acc-sub">
 
-<h4>Сканирование LAN</h4>
+<h4>Система (<code>/system</code>)</h4>
+<p><strong>Что это:</strong> «пульт» сервера — главная административная страница.
+Карточки состояния и блоки управления:</p>
 <ul>
-<li><code>nmap -sn</code> — быстрое сканирование (обнаружение хостов)</li>
-<li><code>nmap -sV</code> — полное сканирование (определение сервисов и версий)</li>
-<li>ARP-таблица для построения топологии сети</li>
+<li><strong>Состояние:</strong> uptime, нагрузка, температура, RAM, SD, eMMC.</li>
+<li><strong>Сервисы:</strong> старт/стоп/рестарт (Transmission, MiniDLNA, Samba, панель, Netdata…).</li>
+<li><strong>Гостевой доступ Samba:</strong> доступ к шарам без пароля в LAN (только admin).</li>
+<li><strong>Бэкапы:</strong> файлы панели и базы данных (создание/восстановление).</li>
+<li><strong>Клонирование SD ↔ eMMC:</strong> перенос системы между картами (с проверками).</li>
+<li><strong>IPTV:</strong> добавление/обновление плейлистов m3u.</li>
+<li><strong>Сеть:</strong> подсеть, интерфейсы скана, фоновый скан, тестовые адреса.</li>
+<li><strong>Местоположение и погода:</strong> координаты, часовой пояс, регион.</li>
+<li><strong>Настройки вида</strong> и <strong>Внешний вид</strong>: тема/фон/акцент панели.</li>
+<li><strong>Питание:</strong> перезагрузка и выключение (с подтверждением).</li>
 </ul>
+<div class="how"><strong>Как пользоваться:</strong> каждая карточка самодостаточна —
+меняете значение и жмёте «Сохранить/Применить»; опасные действия просят подтверждение.</div>
 
-<h4>Топология и устройства</h4>
-<ul>
-<li>Количество устройств: online / offline</li>
-<li>История событий (за 24 часа)</li>
-<li>Цветовая индикация статусов</li>
-</ul>
+<h4>О системе (<code>/about</code>)</h4>
+<p><strong>Что это:</strong> полный паспорт: плата, процессор, память, накопители, сеть, USB,
+файловые системы, установленное ПО и версии сервисов.</p>
+<div class="how"><strong>Как пользоваться:</strong> страница для справки и отчётов —
+ничего не меняет, только показывает.</div>
+
+<h4>Справка (<code>/help</code>)</h4>
+<p><strong>Что это:</strong> эта страница — раскрывающееся руководство по всему.</p>
 </div>
+</details>
 
-<!-- 5. Приложения и утилиты -->
-<div class="help-section" id="apps">
-<h3>5. Приложения и утилиты <span class="help-badge green">Утилиты</span></h3>
+<!-- ===== ADMIN ===== -->
+<details class="help-acc" id="tab-admin">
+<summary>🛡 Вкладка ADMIN — управление (только admin)</summary>
+<div class="acc-sub">
+<p>Вкладка видна только администратору; без роли admin пункты скрыты.</p>
 
-<h4>🧮 Калькулятор</h4>
-<p>Обычный + инженерный режимы. Поддержка тригонометрии, логарифмов, степеней.</p>
+<h4>Роли (<code>/roles</code>)</h4>
+<p><strong>Что это:</strong> профили доступа — <em>default</em>, <em>media</em>, <em>network</em>:
+пакетное включение/выключение модулей «под роль» (например, «домашний медиа-центр» —
+только медиа-приложения). Есть compat-check: несовместимые модули пропускаются.</p>
+<div class="how"><strong>Как пользоваться:</strong> выберите профиль → «Применить» →
+панель переключит набор модулей; изменения вступают в силу сразу.</div>
 
-<h4>⏱ Таймер</h4>
-<p>Обратный отсчёт с настраиваемым временем. Звуковое оповещение по окончании.</p>
+<h4>Модули (<code>/modules</code>)</h4>
+<p><strong>Что это:</strong> менеджер модульной системы: включение/выключение разделов,
+установка зависимостей (apt/pip/сервисы), версии, а также каталог модулей с GitHub
+(установка/обновление/удаление внешних модулей).</p>
+<div class="how"><strong>Как пользоваться:</strong> включите нужный модуль → если требуется,
+нажмите «Установить зависимости»; выключенный модуль исчезает из навигации и гасит свои URL.</div>
 
-<h4>⏳ Секундомер</h4>
-<p>Точный секундомер с функцией фиксации кругов (laps).</p>
-
-<h4>📅 Календарь</h4>
-<p>Ежедневные задачи с хранением в localStorage. Создание, редактирование, удаление задач.</p>
-
-<h4>⏰ Будильник</h4>
-<p>Выбор времени, настройка повторения (одноразовый / ежедневный / по дням недели), мелодия.</p>
+<h4>Automation (<code>/automation</code>)</h4>
+<p><strong>Что это:</strong> правила «событие → действие»: например, «устройство вышло
+в сеть → записать в лог/отправить событие». Реестр действий расширяется модулями.</p>
+<div class="how"><strong>Как пользоваться:</strong> «Добавить правило» → выберите
+триггер (событие) и действие → сохраните; правилом можно включать/выключать (toggle)
+и удалять. Логи событий — во вкладке Monitoring → История.</div>
 </div>
+</details>
 
-<!-- 6. Игры -->
-<div class="help-section" id="games">
-<h3>6. Игры <span class="help-badge purple">Игры</span></h3>
+<!-- ===== ВСЕ ПРИЛОЖЕНИЯ ===== -->
+<details class="help-acc" id="apps-list">
+<summary>📱 Все приложения: описание и как пользоваться</summary>
+<div class="acc-sub">
 
-<h4>🐍 Змейка</h4>
-<p>Классическая игра «Змейка». Управление: WASD или стрелки клавиатуры.</p>
+<p>Плитки вкладки Applications открываются кликом. Ниже — каждое приложение:
+что это и как пользоваться. Модульные приложения (Сеть, Wi-Fi, Bluetooth…) работают
+только когда их модуль включён (Admin → Модули).</p>
 
-<h4>🟦 Тетрис</h4>
-<p>Фигуры, уровни сложности, удержание (hold) фигуры. Нарастающая скорость.</p>
+<div class="help-sec-h">Утилиты</div>
 
-<h4>🟩 2048</h4>
-<p>Объединение чисел на поле 4×4. Цель — собрать плитку 2048.</p>
+<details class="help-item"><summary>🔢 Калькулятор</summary><div class="item-body">
+<p><strong>Описание:</strong> обычный и инженерный режимы: тригонометрия, логарифмы, степени, скобки.</p>
+<p class="how"><strong>Как пользоваться:</strong> набирайте выражение кнопками → результат
+в дисплее; кнопка режима переключает между простым и инженерным.</p>
+</div></details>
 
-<h4>🟪 Арканоид</h4>
-<p>Разрушение блоков мячом с ракеткой. Управление мышью или клавиатурой.</p>
+<details class="help-item"><summary>📅 Календарь</summary><div class="item-body">
+<p><strong>Описание:</strong> месячная сетка с ежедневными задачами; задачи хранятся
+в браузере (localStorage) — не пропадают после перезагрузки страницы.</p>
+<p class="how"><strong>Как пользоваться:</strong> выберите день → «Добавить задачу» →
+текст; редактирование и удаление — кликом по задаче.</p>
+</div></details>
+
+<details class="help-item"><summary>⏳ Таймер</summary><div class="item-body">
+<p><strong>Описание:</strong> обратный отсчёт с настраиваемым временем и звуковым сигналом
+по окончании.</p>
+<p class="how"><strong>Как пользоваться:</strong> задайте часы/минуты/секунды → «Старт»;
+по нулю — звук. «Сброс» возвращает время.</p>
+</div></details>
+
+<details class="help-item"><summary>⏱ Секундомер</summary><div class="item-body">
+<p><strong>Описание:</strong> точный отсчёт и фиксация промежуточных кругов (laps).</p>
+<p class="how"><strong>Как пользоваться:</strong> «Старт» → «Круг» фиксирует время круга
+(список ниже) → «Стоп»; «Сброс» обнуляет всё.</p>
+</div></details>
+
+<details class="help-item"><summary>⏰ Будильник</summary><div class="item-body">
+<p><strong>Описание:</strong> пробуждение по времени: однократно, ежедневно или по дням недели,
+со звуковой мелодией.</p>
+<p class="how"><strong>Как пользоваться:</strong> задайте время → выберите повтор →
+«Включить». Будильник сработает, пока вкладка открыта.</p>
+</div></details>
+
+<details class="help-item"><summary>📝 Заметки</summary><div class="item-body">
+<p><strong>Описание:</strong> быстрые текстовые заметки с хранением в базе панели —
+доступны с любого устройства после входа.</p>
+<p class="how"><strong>Как пользоваться:</strong> «Новая» → заголовок и текст → сохранить;
+редактирование и удаление — из списка.</p>
+</div></details>
+
+<details class="help-item"><summary>🔐 Пароли</summary><div class="item-body">
+<p><strong>Описание:</strong> генератор стойких паролей с настройкой длины и наборов символов.</p>
+<p class="how"><strong>Как пользоваться:</strong> выставьте длину и типы символов →
+«Сгенерировать» → «Копировать». Хранение паролей — в зашифрованном виде (вкладка Paroli/секреты).</p>
+</div></details>
+
+<details class="help-item"><summary>📁 Файлы</summary><div class="item-body">
+<p><strong>Описание:</strong> файловый менеджер панели: просмотр каталогов, чтение файлов,
+создание/переименование/копирование/удаление (права admin).</p>
+<p class="how"><strong>Как пользоваться:</strong> переходите по каталогам как в проводнике;
+действия — кнопками строки; аккуратно с системными путями.</p>
+</div></details>
+
+<div class="help-sec-h">Медиа</div>
+
+<details class="help-item"><summary>📻 Радио</summary><div class="item-body">
+<p><strong>Описание:</strong> плеер онлайн-радио: свои станции (URL потока + название)
+и предустановки.</p>
+<p class="how"><strong>Как пользоваться:</strong> выберите станцию из списка → «Play»;
+новую добавьте кнопкой «Добавить» (вставьте URL <code>http(s)://…/stream</code>).</p>
+</div></details>
+
+<details class="help-item"><summary>🎵 Плеер</summary><div class="item-body">
+<p><strong>Описание:</strong> воспроизведение локальных медиафайлов с накопителей панели
+(аудио/видео), список файлов, перемотка, громкость.</p>
+<p class="how"><strong>Как пользоваться:</strong> откройте папку с файлами → клик по файлу —
+воспроизведение; управление — панелью плеера.</p>
+</div></details>
+
+<details class="help-item"><summary>📷 Камеры</summary><div class="item-body">
+<p><strong>Описание:</strong> подключение IP-веб-камер по потокам RTSP/HTTP: просмотр
+в панели одним местом.</p>
+<p class="how"><strong>Как пользоваться:</strong> «Добавить» → введите URL потока
+(<code>rtsp://…</code> или <code>http://…/video</code>) → имя → сохранить; поток появится
+в списке.</p>
+</div></details>
+
+<details class="help-item"><summary>📺 TVheadend</summary><div class="item-body">
+<p><strong>Описание:</strong> тюнер DVB-T2: просмотр каналов и запись ТВ прямо в панели
+(встроенный iframe TVheadend).</p>
+<p class="how"><strong>Как пользоваться:</strong> откройте приложение → выберите канал;
+настройки тюнера — внутри TVheadend.</p>
+</div></details>
+
+<details class="help-item"><summary>📻 SDR-радио</summary><div class="item-body">
+<p><strong>Описание:</strong> приёмник RTL-SDR: настройка частоты, демодуляция,
+просмотр спектра — радиолюбительские эфиры и локальные передатчики.</p>
+<p class="how"><strong>Как пользоваться:</strong> подключите RTL-SDR (USB) → задайте
+частоту и режим → «Старт»; управление частотой доступно и кнопками.</p>
+</div></details>
+
+<div class="help-sec-h">Игры</div>
+
+<details class="help-item"><summary>🐍 Змейка</summary><div class="item-body">
+<p><strong>Описание:</strong> классическая «змейка»: собирайте еду, не врезайтесь в стену/хвост.</p>
+<p class="how"><strong>Как пользоваться:</strong> управление — <kbd>WASD</kbd> или стрелки;
+кнопки старта/паузы в окне игры.</p>
+</div></details>
+
+<details class="help-item"><summary>🟦 Тетрис</summary><div class="item-body">
+<p><strong>Описание:</strong> падающие фигуры, уровни сложности, удержание (hold) фигуры,
+нарастающая скорость.</p>
+<p class="how"><strong>Как пользоваться:</strong> стрелки — движение/поворот;
+<kbd>Space</kbd> — сброс; удержание фигуры — клавишей hold.</p>
+</div></details>
+
+<details class="help-item"><summary>🟩 2048</summary><div class="item-body">
+<p><strong>Описание:</strong> складывайте одинаковые числа на поле 4×4, цель — плитка 2048.</p>
+<p class="how"><strong>Как пользоваться:</strong> стрелки сдвигают всё поле; слияние
+одинаковых чисел даёт их сумму.</p>
+</div></details>
+
+<details class="help-item"><summary>🟪 Арканоид</summary><div class="item-body">
+<p><strong>Описание:</strong> разрушение кирпичей мячом с ракеткой, несколько уровней.</p>
+<p class="how"><strong>Как пользоваться:</strong> мышь или стрелки двигают ракетку;
+мяч отскакивает, пока не упадёт.</p>
+</div></details>
+
+<div class="help-sec-h">Система и сеть</div>
+
+<details class="help-item"><summary>📈 Netdata</summary><div class="item-body">
+<p><strong>Описание:</strong> полный мониторинг системы в реальном времени (CPU, RAM,
+диск, сеть, процессы) — встроенный Netdata, порт 19999.</p>
+<p class="how"><strong>Как пользоваться:</strong> просто откройте приложение — дашборды
+рисуются сами; сервис должен быть запущен (System → Сервисы).</p>
+</div></details>
+
+<details class="help-item"><summary>💻 Терминал</summary><div class="item-body">
+<p><strong>Описание:</strong> веб-терминал: shell этой панели прямо в браузере (аналог SSH).</p>
+<p class="how"><strong>Как пользоваться:</strong> откройте → подключитесь → работайте
+с командами как в консоли. Осторожно: это root-доступ.</p>
+</div></details>
+
+<details class="help-item"><summary>🔌 Сеть</summary><div class="item-body">
+<p><strong>Описание:</strong> сетевые утилиты: ping, traceroute, DNS-резолвинг, whois,
+проверка портов — все проверки в одном окне.</p>
+<p class="how"><strong>Как пользоваться:</strong> выберите утилиту → введите адрес →
+«Запустить» → смотрите вывод и время ответа.</p>
+</div></details>
+
+<details class="help-item"><summary>🛰 Сканер портов</summary><div class="item-body">
+<p><strong>Описание:</strong> сканирование открытых портов цели (nmap): какие сервисы
+запущены на устройстве.</p>
+<p class="how"><strong>Как пользоваться:</strong> введите IP → диапазон портов
+(или весь) → «Сканировать» → результат таблицей.</p>
+</div></details>
+
+<details class="help-item"><summary>📡 Wi-Fi</summary><div class="item-body">
+<p><strong>Описание:</strong> анализатор Wi-Fi-эфира: доступные сети, каналы,
+уровень сигнала (RSSI) — чтобы выбрать свободный канал роутера.</p>
+<p class="how"><strong>Как пользоваться:</strong> запустите анализ → смотрите список сетей
+и занятость каналов (чем меньше сетей на канале — тем лучше).</p>
+</div></details>
+
+<details class="help-item"><summary>💾 Диски</summary><div class="item-body">
+<p><strong>Описание:</strong> детальная информация о дисках и разделах: размеры, ФС,
+свободное место, точки монтирования.</p>
+<p class="how"><strong>Как пользоваться:</strong> откройте приложение — данные по всем
+дискам сразу; для действий с дисками — вкладка Storage/System.</p>
+</div></details>
+
+<details class="help-item"><summary>📦 Загрузки</summary><div class="item-body">
+<p><strong>Описание:</strong> менеджер загрузок: файлы, которые качает панель
+(в т.ч. результаты торрент-клиента — <code>/srv/downloads/</code>).</p>
+<p class="how"><strong>Как пользоваться:</strong> откройте — список и прогресс;
+подробнее управление раздачами — приложение Торрент.</p>
+</div></details>
+
+<details class="help-item"><summary>📶 Bluetooth</summary><div class="item-body">
+<p><strong>Описание:</strong> работа с Bluetooth-адаптером панели: поиск устройств,
+подключение/отключение пар.</p>
+<p class="how"><strong>Как пользоваться:</strong> включите адаптер → «Сканировать» →
+выберите устройство → подключить; отключение — из списка пар.</p>
+</div></details>
+
+<details class="help-item"><summary>📺 DLNA</summary><div class="item-body">
+<p><strong>Описание:</strong> браузер DLNA/UPnP-серверов в сети: просмотр и воспроизведение
+общих папок с мультимедиа.</p>
+<p class="how"><strong>Как пользоваться:</strong> откройте — панель найдёт серверы
+(например, MiniDLNA) → переходите по папкам → клик по файлу открывает просмотр.</p>
+</div></details>
+
+<details class="help-item"><summary>📡 UPnP</summary><div class="item-body">
+<p><strong>Описание:</strong> UPnP Control Point: обнаружение устройств (ТВ, ресиверы)
+и отправка команд (play/pause) по DLNA/UPnP.</p>
+<p class="how"><strong>Как пользоваться:</strong> запустите поиск → выберите устройство →
+управляйте воспроизведением.</p>
+</div></details>
+
+<details class="help-item"><summary>✈️ ADS-B</summary><div class="item-body">
+<p><strong>Описание:</strong> карта бортов: данные ADS-B (dump1090) — какие самолёты
+над головой, маршрут, высота (нужен ADS-B приёмник и запущенный dump1090).</p>
+<p class="how"><strong>Как пользоваться:</strong> откройте приложение — карта и список
+бортов; без приёмника окно будет пустым.</p>
+</div></details>
+
 </div>
+</details>
 
-<!-- 7. Системные функции -->
-<div class="help-section" id="system-features">
-<h3>7. Системные функции <span class="help-badge orange">Система</span></h3>
-
-<h4>Rate Limiting</h4>
-<p>Ограничение количества запросов для защиты от злоупотреблений API.</p>
-</div>
-
-<!-- 8. API -->
-<div class="help-section" id="api">
-<h3>8. API (JSON)</h3>
+<!-- ===== API ===== -->
+<details class="help-acc" id="api">
+<summary>🔌 Справочник: API (JSON)</summary>
+<div class="acc-sub">
 <p>Полный и поддерживаемый каталог эндпоинтов — документация
-<a href="https://github.com/kotmartovskiy/Lan-discovery-1.1/blob/main/docs/API.md">docs/API.md</a>
-в репозитории проекта (та же копия — в публичном
+<a href="https://github.com/kotmartovskiy/Lan-discovery-2.0/blob/main/docs/API.md">docs/API.md</a>
+в репозитории 2.0 (та же копия — в публичном
 <a href="https://github.com/kotmartovskiy/Lan-discovery-docs">Lan-discovery-docs</a>).
-Ручная копия каталога в справке больше не ведётся: она расходилась с кодом.</p>
-<p class="small">Опорные эндпоинты: <code>GET /api/status</code> — общий статус;
+Ручная копия каталога в справке не ведётся: она расходится с кодом.</p>
+<p>Опорные эндпоинты: <code>GET /api/status</code> — общий статус;
 <code>GET /api/dashboard</code> — агрегат для шапки (система/здоровье/устройства/события);
 <code>GET /api/health</code> — версия/аптайм/бэкапы. Авторизация — сессионная cookie,
 mutation-запросы требуют CSRF-токен (заголовок <code>X-CSRFToken</code>).</p>
+<p>Счётчики: 15 таблиц каталога, ~218 роутов (включая модули).</p>
 </div>
+</details>
 
-<!-- 9. Администрирование -->
-<div class="help-section" id="admin">
-<h3>9. Администрирование</h3>
+<!-- ===== Администрирование ===== -->
+<details class="help-acc" id="admin-ops">
+<summary>🛠 Справочник: администрирование</summary>
+<div class="acc-sub">
 
 <h4>Структура файлов</h4>
 <table class="help-table">
@@ -257,7 +617,7 @@ mutation-запросы требуют CSRF-токен (заголовок <code
 <h4>Systemd-сервисы</h4>
 <table class="help-table">
 <tr><th>Сервис</th><th>Описание</th></tr>
-<tr><td><code>lan-discovery</code></td><td>Веб-панель (Flask, порт 8080)</td></tr>
+<tr><td><code>lan-discovery</code></td><td>Веб-панель (Flask, порт {{ hf.web_port }})</td></tr>
 <tr><td><code>restore-server</code></td><td>Аварийный HTTP-сервер (порт 8081)</td></tr>
 <tr><td><code>transmission-daemon</code></td><td>Торрент-клиент (web: 9091)</td></tr>
 <tr><td><code>minidlna</code></td><td>DLNA-сервер (порт 8200)</td></tr>
@@ -285,17 +645,20 @@ mutation-запросы требуют CSRF-токен (заголовок <code
 <li>Восстановление — из файлов <code>.backup-*</code> или через страницу «Система»</li>
 </ul>
 </div>
+</details>
 
-<!-- 10. Решение проблем -->
-<div class="help-section" id="troubleshoot">
-<h3>10. Решение проблем</h3>
+<!-- ===== Решение проблем ===== -->
+<details class="help-acc" id="troubleshoot">
+<summary>🚨 Справочник: решение проблем</summary>
+<div class="acc-sub">
 
 <h4>Панель не открывается</h4>
 <ul>
 <li>Проверьте статус: <code>systemctl status lan-discovery</code></li>
 <li>Посмотрите логи: <code>journalctl -u lan-discovery -n 50</code></li>
-<li>Проверьте порт: <code>ss -tlnp | grep 8080</code></li>
+<li>Проверьте порт: <code>ss -tlnp | grep {{ hf.web_port }}</code></li>
 <li>Перезапустите: <code>systemctl restart lan-discovery</code></li>
+<li>Если не помогло — аварийный доступ: <code>{{ hf.restore_url }}</code></li>
 </ul>
 
 <h4>Устройства не обнаруживаются</h4>
@@ -331,65 +694,95 @@ mutation-запросы требуют CSRF-токен (заголовок <code
 <li>Если система загружена с eMMC: нажмите «Проверить SD» и убедитесь, что разделы SD не смонтированы: {% if hf.sd_dev %}<code>umount /dev/{{ hf.sd_dev }}*</code>{% else %}SD-карта не обнаружена{% endif %}</li>
 {% if hf.emmc_dev %}<li>eMMC = <code>/dev/{{ hf.emmc_dev }}</code></li>{% endif %}
 </ul>
-</div>
 
-<!-- 11. FAQ -->
-<div class="help-section" id="faq">
-<h3>11. FAQ</h3>
+<h4>Тема/фон панели не применяется</h4>
+<ul>
+<li>Выбор хранится в браузере (localStorage) — проверьте на том же устройстве/браузере</li>
+<li>Обновите страницу (Ctrl+F5): старый <code>style.css</code> мог быть в кэше</li>
+<li>Глобальный дефолт задаётся блоком «Внешний вид» (System → Внешний вид)</li>
+</ul>
+</div>
+</details>
+
+<!-- ===== FAQ ===== -->
+<details class="help-acc" id="faq">
+<summary>❓ Справочник: FAQ</summary>
+<div class="acc-sub">
 
 <h4>Как добавить IPTV-плейлист?</h4>
-<p>На странице «Система» → блок «IPTV» → введите URL m3u-файла → нажмите «Добавить».</p>
+<p>Вкладка System → блок «IPTV» → введите URL m3u-файла → «Добавить».</p>
 
 <h4>Как добавить веб-камеру?</h4>
-<p>На странице «Система» или в разделе «Мультимедиа» → введите URL потока (RTSP/HTTP) → нажмите «Добавить».</p>
+<p>Приложения → 📷 Камеры → «Добавить» → URL потока (RTSP/HTTP) → сохранить.</p>
 
 <h4>Как добавить онлайн-радио?</h4>
-<p>В разделе «Приложения» → Radio → введите URL потока и название станции → «Добавить».</p>
-
-<h4>Как пользоваться калькулятором?</h4>
-<p>Откройте вкладку «Приложения» → Калькулятор. Переключайтесь между обычным и инженерным режимами кнопкой.</p>
+<p>Приложения → 📻 Радио → «Добавить» → URL потока и название станции.</p>
 
 <h4>Как работает генератор паролей?</h4>
-<p>Откройте «Приложения» → Пароли → настройте длину и типы символов → нажмите «Сгенерировать». Пароли хранятся в зашифрованном виде.</p>
-
-<h4>Как добавить тестовый адрес для проверки сети?</h4>
-<p>На странице «Система» → блок «Сеть» → нажмите «Изменить» рядом с нужным адресом.</p>
+<p>Приложения → 🔐 Пароли → настройте длину и типы символов → «Сгенерировать».</p>
 
 <h4>Как сделать полный backup системы?</h4>
-<p>Файловые бэкапы создаются вручную (см. раздел 9, «Резервные копии»), БД — через страницу «Система» или <code>cp</code>. Образ SD можно сделать утилитой <code>dd</code> на другой диск.</p>
+<p>Файловые бэкапы — вручную (раздел «Администрирование»), БД — через System →
+«Backup БД». Образ SD — утилитой <code>dd</code> на другой диск.</p>
 
 <h4>Как восстановить систему из backup?</h4>
-<p>Восстановление файлов — из <code>.backup-*</code> рядом с файлами; БД — через страницу «Система» («Восстановить БД»). Аварийный доступ — <code>restore-server.service</code> (порт 8081).</p>
+<p>Файлы — из <code>.backup-*</code> рядом с оригиналами; БД — System → «Восстановить БД»;
+аварийный доступ — <code>restore-server.service</code> (порт 8081).</p>
 
-<h4>Как подключиться к серверу по SSH?</h4>
-<p><code>ssh root@{{ hf.primary_ip }}</code> (пароль — от root-аккаунта; не храните его в открытом виде). Рекомендуется настроить SSH-ключи для безопасности.</p>
+<h4>Как подключиться по SSH?</h4>
+<p><code>ssh root@{{ hf.primary_ip }}</code> (пароль — от root; не храните его в открытом виде).
+Рекомендуется настроить SSH-ключи.</p>
 
-<h4>Как перезагрузить сервер через веб-панель?</h4>
-<p>Страница «Система» → «Управление питанием» → «Перезагрузить». Подтвердите действие.</p>
-
-<h4>Как выключить сервер?</h4>
-<p>Страница «Система» → «Управление питанием» → «Выключить питание». После команды можно отключить кабель питания.</p>
+<h4>Как перезагрузить/выключить сервер из панели?</h4>
+<p>System → «Управление питанием» → «Перезагрузить» / «Выключить» — с подтверждением.</p>
 
 <h4>Где хранятся данные torrent-клиента?</h4>
-<p><code>/srv/downloads/</code> — загруженные файлы (системный раздел {{ hf.root_kind_label }}); конфигурация Transmission — в <code>/etc/transmission-daemon/</code>.</p>
+<p><code>/srv/downloads/</code>; конфигурация Transmission — в <code>/etc/transmission-daemon/</code>.</p>
 
 <h4>Как обновить панель?</h4>
-<p>Отредактируйте <code>/opt/lan-discovery/app.py</code>, затем: <code>systemctl restart lan-discovery</code>. Перед изменением обязательно сделайте бэкап!</p>
+<p>Измените код, затем <code>systemctl restart lan-discovery</code>. Перед изменением
+обязательно сделайте бэкап!</p>
 
-<h4>Как играть в Змейку?</h4>
-<p>Откройте «Приложения» → Змейка. Управление: клавиши WASD или стрелки.</p>
+<h4>Как включить/выключить раздел?</h4>
+<p>Admin → Модули → переключатель модуля; выключенный модуль исчезает из меню
+и гасит свои страницы.</p>
 
-<h4>Как работает секундомер?</h4>
-<p>Откройте «Приложения» → Секундомер. Нажмите «Старт» для запуска, «Круг» для фиксации промежуточного времени, «Стоп» для остановки.</p>
+<h4>Как сменить вид панели (тема/фон/акцент)?</h4>
+<p>System → блок «Внешний вид»: тема (авто/тёмная/светлая), фон, акцент — применяется
+сразу; админ может сделать выбор стартовым для всех («По умолчанию для всех»).</p>
 </div>
+</details>
 
 {% for s in help_sections %}
-<div class="help-section" id="mod-{{ s.id }}">
-<h3>📦 {{ s.title }}</h3>
+<details class="help-acc" id="mod-{{ s.id }}">
+<summary>📦 {{ s.title }}</summary>
+<div class="acc-sub acc-sec">
 {{ s.html | safe }}
 </div>
+</details>
 {% endfor %}
 
 </div>
 </div>
+
+<script>
+function helpExpand(open) {
+    document.querySelectorAll(".help-main details.help-acc, .help-main details.help-item")
+        .forEach(function (d) { d.open = open; });
+}
+/* раскрыть секцию по якорю (в т.ч. при клике из сайдбара) */
+function helpOpenHash() {
+    var h = location.hash;
+    if (!h || h.length < 2) return;
+    var el = document.querySelector(h);
+    if (!el) return;
+    var d = el.tagName === "DETAILS" ? el : el.closest("details");
+    while (d) { d.open = true; d = d.parentElement ? d.parentElement.closest("details") : null; }
+}
+window.addEventListener("hashchange", helpOpenHash);
+document.querySelectorAll(".help-sidebar a").forEach(function (a) {
+    a.addEventListener("click", function () { setTimeout(helpOpenHash, 10); });
+});
+helpOpenHash();
+</script>
 {% endblock %}

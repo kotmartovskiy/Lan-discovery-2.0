@@ -98,4 +98,4 @@ def test_help_module_toggle_hides_section(client, monkeypatch):
     assert 'href="#mod-weather"' not in body
     assert "Радиационный фон" not in body
     # ядро справки не задето
-    assert 'id="hardware"' in body
+    assert 'id="hw"' in body
