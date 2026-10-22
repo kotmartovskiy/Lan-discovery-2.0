@@ -1,0 +1,15 @@
+{
+  "id": "sys-appearance",
+  "version": "2.0.0",
+  "name": "Внешний вид",
+  "description": "Тема, фон и акцент панели (персонально, admin — глобальный дефолт)",
+  "builtin": true,
+  "type": "block",
+  "block": {
+    "slot": "system",
+    "order": 85,
+    "title": "Внешний вид"
+  },
+  "help": true,
+  "prefixes": []
+}

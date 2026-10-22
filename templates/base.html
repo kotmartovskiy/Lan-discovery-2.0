@@ -60,7 +60,7 @@
 <title>LAN Discovery{% if panel_name %} ({{ panel_name }}){% endif %}</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 5 C55 5, 60 8, 62 12 L58 18 C56 14, 53 12, 50 12 C47 12, 44 14, 42 18 L38 12 C40 8, 45 5, 50 5Z' fill='%237cb342'/%3E%3Cpath d='M58 8 C62 5, 68 4, 72 6 L66 14 C63 12, 60 11, 58 12Z' fill='%239ccc65'/%3E%3Cpath d='M50 15 C68 15, 85 32, 85 50 C85 68, 68 85, 50 85 C32 85, 15 68, 15 50 C15 32, 32 15, 50 15Z' fill='%23ffa726'/%3E%3Cpath d='M50 15 C68 15, 85 32, 85 50 C85 68, 68 85, 50 85 C32 85, 15 68, 15 50 C15 32, 32 15, 50 15Z' fill='none' stroke='%23f57c00' stroke-width='2'/%3E%3Cpath d='M50 22 C64 22, 78 36, 78 50 C78 64, 64 78, 50 78 C36 78, 22 64, 22 50 C22 36, 36 22, 50 22Z' fill='%23fff9c4'/%3E%3Cpath d='M50 30 L50 70' stroke='%23ffcc02' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M50 30 L30 55' stroke='%23ffcc02' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M50 30 L70 55' stroke='%23ffcc02' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M50 30 L35 42' stroke='%23ffcc02' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M50 30 L65 42' stroke='%23ffcc02' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M50 30 L40 65' stroke='%23ffcc02' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M50 30 L60 65' stroke='%23ffcc02' stroke-width='2.5' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='30' r='3' fill='%23ffcc02'/%3E%3C/svg%3E">
 
-<link rel="stylesheet" href="/static/style.css?v=20261022t">
+<link rel="stylesheet" href="/static/style.css?v=20261022u">
 <meta name="theme-color" content="#111111">
 <link rel="manifest" href="/static/manifest.json">
 <link rel="apple-touch-icon" href="/static/icon-192.png">
@@ -123,8 +123,6 @@
 
 <div id="clock"><span id="clock-date">--.--.----</span> <span id="clock-time">--:--:--</span></div>
 
-<button class="ui-theme-btn" id="ui-theme-btn" type="button" title="Внешний вид" aria-label="Настройки внешнего вида">🎨</button>
-
 <div id="weather-status" style="font-size:13px; color:#8ab4f8; margin:2px 0;"></div>
 
 <div id="internet-status" class="internet {{ 'online' if internet else 'offline' }}">
@@ -161,129 +159,11 @@
 <div id="internet-status-m" class="internet {{ 'online' if internet else 'offline' }}">● Интернет: {{ 'доступен' if internet else 'нет доступа' }}</div>
 <div style="margin-top:4px; font-size:13px; color:#9fb7d0;">● <span id="clock-time-m">--:--:--</span> <span id="clock-date-m" style="color:#6ba3d6;">--.--.----</span></div>
 </div>
-<button class="mobile-nav-link ui-theme-open" id="ui-theme-open-m" type="button">🎨 Внешний вид</button>
 </nav>
 
 <main id="main" tabindex="-1">
 {% block content %}{% endblock %}
 </main>
-
-<!-- Внешний вид (тема/фон/акцент): персонально в localStorage,
-     глобальный дефолт — settings.json секция ui (admin, /api/settings). -->
-<div class="modal" id="ui-modal" role="dialog" aria-modal="true" aria-label="Внешний вид">
-<div class="modal-box">
-<div class="ui-modal-title">Внешний вид</div>
-
-<div class="ui-group">
-<div class="ui-label">Тема</div>
-<div class="ui-opts" data-key="theme">
-<button type="button" data-v="auto">Авто</button>
-<button type="button" data-v="dark">Тёмная</button>
-<button type="button" data-v="light">Светлая</button>
-</div>
-</div>
-
-<div class="ui-group">
-<div class="ui-label">Фон</div>
-<div class="ui-opts" data-key="bg">
-<button type="button" data-v="mono">Нейтральный</button>
-<button type="button" data-v="aurora">Аврора</button>
-<button type="button" data-v="sunset">Закат</button>
-<button type="button" data-v="forest">Лес</button>
-</div>
-</div>
-
-<div class="ui-group">
-<div class="ui-label">Акцент</div>
-<div class="ui-opts ui-swatches" data-key="accent">
-<button type="button" data-v="blue" title="Синий"></button>
-<button type="button" data-v="violet" title="Фиолетовый"></button>
-<button type="button" data-v="green" title="Зелёный"></button>
-<button type="button" data-v="orange" title="Оранжевый"></button>
-<button type="button" data-v="rose" title="Розовый"></button>
-<button type="button" data-v="teal" title="Бирюзовый"></button>
-</div>
-</div>
-
-<div class="ui-actions">
-<button type="button" class="btn btn-ghost" id="ui-reset">Сбросить</button>
-<button type="button" class="btn btn-primary" id="ui-close">Готово</button>
-</div>
-<div class="ui-hint">Сохраняется для этого браузера. Глобальный дефолт
-панели задаёт администратор через настройки.</div>
-</div>
-</div>
-<script>
-(function () {
-    var modal = document.getElementById("ui-modal");
-    if (!modal) return;
-    var KEY = "ld_ui";
-    function read() {
-        try { return JSON.parse(localStorage.getItem(KEY) || "{}"); }
-        catch (e) { return {}; }
-    }
-    function save(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
-    function apply() {
-        var s = read(), d = document.documentElement;
-        d.dataset.theme = s.theme || "{{ (ui.get('theme') or 'dark') if ui else 'dark' }}";
-        d.dataset.bg = s.bg || "{{ (ui.get('bg') or 'mono') if ui else 'mono' }}";
-        d.dataset.accent = s.accent || "{{ (ui.get('accent') or 'blue') if ui else 'blue' }}";
-        if (d.dataset.theme === "auto") {
-            d.dataset.theme = window.matchMedia &&
-                window.matchMedia("(prefers-color-scheme: light)").matches
-                ? "light" : "dark";
-        }
-        render();
-    }
-    function render() {
-        var s = read();
-        modal.querySelectorAll(".ui-opts").forEach(function (g) {
-            var key = g.dataset.key;
-            var val = s[key];
-            if (!val) {
-                var html = document.documentElement.dataset[
-                    key === "bg" ? "bg" : key === "accent" ? "accent" : "theme"];
-                val = html;
-            }
-            g.querySelectorAll("button").forEach(function (b) {
-                b.classList.toggle("active", b.dataset.v === val);
-            });
-        });
-    }
-    modal.querySelectorAll(".ui-opts button").forEach(function (b) {
-        b.onclick = function () {
-            var g = b.closest(".ui-opts");
-            var s = read();
-            s[g.dataset.key] = b.dataset.v;
-            save(s);
-            apply();
-        };
-    });
-    document.getElementById("ui-reset").onclick = function () {
-        try { localStorage.removeItem(KEY); } catch (e) {}
-        apply();
-    };
-    document.getElementById("ui-close").onclick = function () {
-        modal.classList.remove("open");
-    };
-    function open() { modal.classList.add("open"); render(); }
-    var btn = document.getElementById("ui-theme-btn");
-    if (btn) btn.onclick = open;
-    var btnM = document.getElementById("ui-theme-open-m");
-    if (btnM) btnM.onclick = function () {
-        var nav = document.getElementById("mobile-nav");
-        if (nav) nav.classList.remove("open");
-        var bd = document.getElementById("mobile-nav-backdrop");
-        if (bd) bd.classList.remove("open");
-        open();
-    };
-    modal.addEventListener("click", function (e) {
-        if (e.target === modal) modal.classList.remove("open");
-    });
-    apply();
-})();
-</script>
-
 <script>
 var USER_ROLE = "{{ current_user.role }}";
 function updateClock() {

@@ -1,0 +1,146 @@
+<div class="card">
+
+<h2>🎨 Внешний вид</h2>
+
+<div id="ui-status" style="margin-bottom:8px; color:#888; font-size:12px; min-height:16px;"></div>
+
+<div class="ui-group">
+<div class="ui-label">Тема</div>
+<div class="ui-opts" data-key="theme" id="ua-theme">
+<button type="button" data-v="auto">Авто</button>
+<button type="button" data-v="dark">Тёмная</button>
+<button type="button" data-v="light">Светлая</button>
+</div>
+</div>
+
+<div class="ui-group">
+<div class="ui-label">Фон</div>
+<div class="ui-opts" data-key="bg" id="ua-bg">
+<button type="button" data-v="mono">Нейтральный</button>
+<button type="button" data-v="aurora">Аврора</button>
+<button type="button" data-v="sunset">Закат</button>
+<button type="button" data-v="forest">Лес</button>
+</div>
+</div>
+
+<div class="ui-group">
+<div class="ui-label">Акцент</div>
+<div class="ui-opts ui-swatches" data-key="accent" id="ua-accent">
+<button type="button" data-v="blue" title="Синий"></button>
+<button type="button" data-v="violet" title="Фиолетовый"></button>
+<button type="button" data-v="green" title="Зелёный"></button>
+<button type="button" data-v="orange" title="Оранжевый"></button>
+<button type="button" data-v="rose" title="Розовый"></button>
+<button type="button" data-v="teal" title="Бирюзовый"></button>
+</div>
+</div>
+
+<div class="ui-actions" style="justify-content:space-between; align-items:center;">
+<button type="button" class="btn btn-ghost" id="ua-reset">Сбросить</button>
+<div style="display:flex; gap:8px; align-items:center;">
+{% if current_user.role == 'admin' %}
+<button type="button" class="btn" id="ua-default">По умолчанию для всех</button>
+{% endif %}
+</div>
+</div>
+
+<div class="ui-hint">Настройки сохраняются для этого браузера.{% if current_user.role == 'admin' %}
+Кнопка «по умолчанию» запишет выбранный вид в настройки панели — он станет
+стартовым для всех пользователей, пока у них нет своих.{% endif %}</div>
+
+</div>
+
+<script>
+(function () {
+    var KEY = "ld_ui";
+    var wrap = document.getElementById("ua-theme");
+    if (!wrap) return;
+
+    function read() {
+        try { return JSON.parse(localStorage.getItem(KEY) || "{}"); }
+        catch (e) { return {}; }
+    }
+    function save(s) {
+        try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
+    }
+    function eff(key, attr, dflt) {
+        var v = read()[key];
+        if (v) return v;
+        var a = document.documentElement.getAttribute("data-" + attr);
+        if (key === "theme") {
+            if (a === "light" || a === "dark") {
+                var pref = read().theme;
+                if (pref === "auto") return "auto";
+                return a;
+            }
+        }
+        return a || dflt;
+    }
+    function apply() {
+        var s = read(), d = document.documentElement;
+        var theme = s.theme || "dark", bg = s.bg || "mono", accent = s.accent || "blue";
+        d.setAttribute("data-bg", bg);
+        d.setAttribute("data-accent", accent);
+        if (theme === "auto") {
+            theme = (window.matchMedia &&
+                window.matchMedia("(prefers-color-scheme: light)").matches)
+                ? "light" : "dark";
+        }
+        d.setAttribute("data-theme", theme);
+        render();
+    }
+    function render() {
+        document.querySelectorAll("#ua-theme button, #ua-bg button, #ua-accent button")
+            .forEach(function (b) {
+                var g = b.closest("[data-key]");
+                var key = g ? g.getAttribute("data-key") : "";
+                b.classList.toggle("active", b.dataset.v === eff(
+                    key, key === "bg" ? "bg" : key === "accent" ? "accent" : "theme",
+                    key === "bg" ? "mono" : key === "accent" ? "blue" : "dark"));
+            });
+    }
+    document.querySelectorAll("#ua-theme button, #ua-bg button, #ua-accent button")
+        .forEach(function (b) {
+            b.addEventListener("click", function () {
+                var g = b.closest("[data-key]");
+                if (!g) return;
+                var s = read();
+                s[g.getAttribute("data-key")] = b.dataset.v;
+                save(s);
+                apply();
+            });
+        });
+    document.getElementById("ua-reset").addEventListener("click", function () {
+        try { localStorage.removeItem(KEY); } catch (e) {}
+        apply();
+        status("Сброшено до настроек панели", "#65d46e");
+    });
+    var def = document.getElementById("ua-default");
+    if (def) {
+        def.addEventListener("click", function () {
+            var cur = read();
+            var body = { ui: {
+                theme: cur.theme || "dark",
+                bg: cur.bg || "mono",
+                accent: cur.accent || "blue"
+            } };
+            fetch("/api/settings", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(body)
+            }).then(function (r) { return r.json(); }).then(function (d) {
+                if (d.ok) status("Записано в настройки панели", "#65d46e");
+                else status("Ошибка сохранения", "#ff6666");
+            }).catch(function () { status("Ошибка сети", "#ff6666"); });
+        });
+    }
+    function status(msg, color) {
+        var el = document.getElementById("ui-status");
+        if (!el) return;
+        el.textContent = msg;
+        el.style.color = color || "#888";
+        setTimeout(function () { el.textContent = ""; }, 4000);
+    }
+    apply();
+})();
+</script>
