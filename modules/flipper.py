@@ -51,7 +51,7 @@ PIP_TOOLS = {
     "pyserial": ("pyserial", "serial"),
 }
 
-# Консольные порты ядра (Amlogic и пр.) — не открывать в мониторе.
+# Консольные порты (последовательные консоли пр.) — не открывать в мониторе.
 _CONSOLE_RE = re.compile(r"(\S*console\S*|\bttyS\d+\b)")
 
 RTL_USB_IDS = ("0bda:2832", "0bda:2838", "0bda:2834", "0bda:2836",
