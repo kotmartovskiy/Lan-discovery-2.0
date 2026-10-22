@@ -31,6 +31,7 @@ ROUTE_MODULES = (
     "sdr_routes",
     "core_routes",
     "tv_routes",
+    "disktool_routes",
 )
 
 # builtin-манифесты с hardware-требованиями (§24)

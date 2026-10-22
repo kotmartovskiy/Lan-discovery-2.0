@@ -103,6 +103,22 @@
 | GET | `/api/clone/status` | login | Прогресс клонирования |
 | GET | `/apps/disks` | login | Диски (страница) |
 | GET | `/api/disks` | login | Список дисков (JSON) |
+| GET | `/api/disktool/disks` | login | Disk Manager: диски с guard-флагами (system/mounted/operable) |
+| GET | `/api/disktool/partitions?dev=` | login | Таблица разделов (parted -m) |
+| GET | `/api/disktool/smart?dev=` | login | SMART: здоровье/температура/атрибуты (smartctl -j) |
+| GET | `/api/disktool/images` | login | Образы: каталог FreeDOS + загруженные .img/.iso |
+| GET | `/api/disktool/status` | login | Прогресс долгой операции (клон/запись/скачивание) |
+| POST | `/api/disktool/wipe` | admin | Очистка целого диска (wipefs -a) |
+| POST | `/api/disktool/part` | admin | Создание раздела (parted mkpart, байты) |
+| POST | `/api/disktool/part-del` | admin | Удаление раздела (parted rm) |
+| POST | `/api/disktool/format` | admin | Формат раздела (mkfs.ext4/vfat/ntfs/exfat/…) |
+| POST | `/api/disktool/fsck` | admin | Проверка ФС (e2fsck -n) |
+| POST | `/api/disktool/clone` | admin | Клон диска→диск (dd с прогрессом, фон) |
+| POST | `/api/disktool/write` | admin | Запись образа на диск (dd с прогрессом, фон) |
+| POST | `/api/disktool/op/stop` | admin | Остановка фоновой операции |
+| POST | `/api/disktool/images/freedos` | admin | Скачивание/извлечение FreeDOS-образа (фон) |
+| POST | `/api/disktool/images/upload` | admin | Загрузка своего .img/.iso (multipart, ≤700МБ) |
+| GET | `/tv` | login | TV-режим (Kodi/CRT/LCD): крупные шрифты, D-pad |
 | GET | `/capabilities` | login | Страница «Возможности»: hardware-снимок платформы (1.1, STEP 7) |
 | GET | `/api/capabilities` | login | Возможности платформы: CPU/RAM/диски/сеть/аппаратура + reliability (1.1, JSON) |
 

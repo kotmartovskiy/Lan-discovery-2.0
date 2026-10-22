@@ -2,221 +2,422 @@
 
 {% block content %}
 <style>
-  
-
-  .section {
-    background: #16213e;
-    border-radius: 10px;
-    padding: 16px;
-    margin-bottom: 20px;
-  }
-
-  .section-header {
-    font-size: 16px;
-    color: #8ab4f8;
-    margin-bottom: 12px;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-  }
-
-  thead th {
-    background: #111;
-    color: #8ab4f8;
-    padding: 8px;
-    text-align: left;
-    border-bottom: 2px solid #333;
-  }
-
-  tbody td {
-    padding: 6px 8px;
-    border-bottom: 1px solid #222;
-  }
-
-  .indicator {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin-right: 6px;
-  }
-
-  .indicator.mounted {
-    background: #22c55e;
-  }
-
-  .indicator.unmounted {
-    background: #6b7280;
-  }
-
-  .usage-bar {
-    height: 12px;
-    border-radius: 6px;
-    background: #222;
-    position: relative;
-    min-width: 100px;
-  }
-
-  .usage-bar-fill {
-    height: 100%;
-    border-radius: 6px;
-    transition: width 0.3s;
-  }
-
-  .usage-low {
-    background: #22c55e;
-  }
-
-  .usage-medium {
-    background: #eab308;
-  }
-
-  .usage-high {
-    background: #ef4444;
-  }
-
-  .health-pre {
-    background: #111;
-    color: #ccc;
-    padding: 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    overflow-x: auto;
-    white-space: pre-wrap;
-    word-break: break-all;
-  }
-
-  .refresh-btn {
-    background: #2563eb;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    padding: 8px 16px;
-    cursor: pointer;
-    font-size: 13px;
-    margin-bottom: 12px;
-  }
-
-  .refresh-btn:hover {
-    background: #1d4ed8;
-  }
-
-  .loading {
-    color: #666;
-    font-style: italic;
-  }
+.section {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.section h3 {
+  font-size: 15px;
+  color: #e6edf3;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #21262d;
+}
+.disk {
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: #0d1117;
+}
+.disk-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.disk-name { font-size: 16px; font-weight: 700; color: #e6edf3; }
+.disk-meta { color: #8b949e; font-size: 13px; }
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge-red { background: rgba(218,54,51,.25); color: #f85149; }
+.badge-yellow { background: rgba(187,128,9,.25); color: #d29922; }
+.badge-green { background: rgba(35,134,54,.25); color: #3fb950; }
+.badge-gray { background: rgba(110,118,129,.25); color: #8b949e; }
+.part-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 6px 0; border-top: 1px solid #21262d; font-size: 13px;
+}
+.part-row .mono { color: #8ab4f8; }
+.part-row .muted { color: #8b949e; }
+.btn {
+  background: #21262d; color: #e6edf3; border: 1px solid #30363d;
+  border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer;
+}
+.btn:hover { background: #30363d; }
+.btn-danger { border-color: #f8514944; color: #f85149; }
+.btn-danger:hover { background: #f8514922; }
+.btn-primary { background: #238636; border-color: #2ea04344; }
+.btn-primary:hover { background: #2ea043; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+select, input[type="text"], input[type="number"] {
+  background: #0d1117; color: #c9d1d9; border: 1px solid #30363d;
+  border-radius: 6px; padding: 5px 8px; font-size: 12px;
+}
+.progress {
+  height: 16px; background: #21262d; border-radius: 8px; overflow: hidden;
+  margin: 8px 0;
+}
+.progress > span { display: block; height: 100%; background: #238636; transition: width .4s; }
+.muted { color: #8b949e; font-size: 12px; }
+.health-pre {
+  background: #0d1117; color: #c9d1d9; padding: 10px; border-radius: 6px;
+  font-size: 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-all;
+  max-height: 320px; overflow-y: auto;
+}
+table.mini th, table.mini td { font-size: 12px; padding: 4px 8px; }
+.img-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid #21262d; }
+.img-row:first-child { border-top: 0; }
+.toast2 {
+  position: fixed; bottom: 16px; right: 16px; padding: 10px 16px;
+  border-radius: 8px; color: #fff; font-size: 13px; z-index: 9999;
+  display: none;
+}
+.toast2.show { display: block; }
+.toast2.ok { background: #238636; }
+.toast2.err { background: #da3633; }
+.row-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
 </style>
 
 <div class="section">
-  <div class="section-header">📂 Информация о дисках (lsblk)</div>
-  <div id="lsblk-container"><span class="loading">Загрузка...</span></div>
+  <h3>💾 Диски и накопители
+    <button class="btn" style="float:right" onclick="loadAll()">🔄 Обновить</button>
+  </h3>
+  <div id="disks"><span class="muted">Загрузка…</span></div>
 </div>
 
 <div class="section">
-  <div class="section-header">📊 Использование дисков (df -h)</div>
-  <div id="df-container"><span class="loading">Загрузка...</span></div>
+  <h3>⚙️ Фоновые операции</h3>
+  <div id="op-box" class="muted">Нет активных операций</div>
 </div>
 
 <div class="section">
-  <div class="section-header">🏥 Состояние дисков (S.M.A.R.T.)</div>
-  <button class="refresh-btn" onclick="loadData()">🔄 Обновить</button>
-  <div id="smart-container"><span class="loading">Загрузка...</span></div>
+  <h3>💿 Клонирование (dd, целый диск → целый диск)</h3>
+  <div class="row-form">
+    <span class="muted">Источник:</span>
+    <select id="clone-src"></select>
+    <span class="muted">→ Приёмник:</span>
+    <select id="clone-dst"></select>
+    <button class="btn btn-danger" onclick="startClone()">Записать образ диска</button>
+  </div>
+  <div class="muted" style="margin-top:6px">Оба диска должны быть свободны (без смонтированных разделов, не системные).</div>
 </div>
+
+<div class="section">
+  <h3>🥾 Загрузочные образы (FreeDOS / свои .img)</h3>
+  <div id="images"><span class="muted">Загрузка…</span></div>
+  <div class="row-form" style="margin-top:12px">
+    <span class="muted">Записать образ на диск:</span>
+    <select id="write-img"></select>
+    <span class="muted">→</span>
+    <select id="write-dst"></select>
+    <button class="btn btn-danger" onclick="startWrite()">Записать (dd)</button>
+  </div>
+  <div class="row-form">
+    <span class="muted">Свой образ (.img/.iso до 700МБ):</span>
+    <input type="file" id="upload-file" accept=".img,.ima,.iso,.bin">
+    <button class="btn" onclick="uploadImage()">Загрузить</button>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🏥 S.M.A.R.T.</h3>
+  <div id="smart" class="muted">Нажмите «SMART» на диске выше</div>
+</div>
+
+<div class="section">
+  <h3>🛠 Техническая информация (lsblk / df)</h3>
+  <div id="lsblk" class="health-pre">Загрузка…</div>
+  <div id="df" class="health-pre" style="margin-top:8px"></div>
+</div>
+
+<div class="toast2" id="toast"></div>
 
 <script>
-  function parseLsblk(text) {
-    const lines = text.trim().split('\n');
-    if (lines.length === 0) return '';
-    const header = lines[0];
-    const rows = lines.slice(1);
-    let html = '<table><thead><tr>';
-    const cols = header.split(/\s{2,}/);
-    cols.forEach(c => { html += '<th>' + c.trim() + '</th>'; });
-    html += '</tr></thead><tbody>';
-    rows.forEach(row => {
-      const cells = row.split(/\s{2,}/);
-      const name = cells[0] ? cells[0].trim() : '';
-      const mounted = row.includes('part') || row.includes('lvm') || (cells[3] && cells[3].trim() !== '');
-      const indicatorClass = mounted ? 'mounted' : 'unmounted';
-      html += '<tr>';
-      cells.forEach((cell, i) => {
-        if (i === 0) {
-          html += '<td><span class="indicator ' + indicatorClass + '"></span>' + cell.trim() + '</td>';
-        } else {
-          html += '<td>' + (cell ? cell.trim() : '') + '</td>';
-        }
-      });
-      html += '</tr>';
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function hsize(b) {
+  if (!b && b !== 0) return '—';
+  var u = ['Б','КБ','МБ','ГБ','ТБ'], i = 0;
+  b = Number(b);
+  while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+  return (i ? b.toFixed(1) : b) + ' ' + u[i];
+}
+function toast(msg, ok) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast2 show ' + (ok ? 'ok' : 'err');
+  setTimeout(function () { t.className = 'toast2'; }, 4000);
+}
+function apiPost(url, body) {
+  return fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body || {})
+  }).then(function (r) { return r.json(); }).then(function (d) {
+    if (!d.ok && d.error) { toast(d.error, false); }
+    return d;
+  }).catch(function (e) { toast(e.message, false); return {ok: false, error: e.message}; });
+}
+
+var DISKS = [];
+
+function fsOptions(sel) {
+  var fs = ['ext4','vfat','ntfs','exfat','ext3','ext2','btrfs','xfs'];
+  return fs.map(function (f) {
+    return '<option value="' + f + '"' + (f === sel ? ' selected' : '') + '>' + f + '</option>';
+  }).join('');
+}
+
+function renderDisks(disks) {
+  DISKS = disks || [];
+  var html = DISKS.map(function (d, idx) {
+    var badge = d.system ? '<span class="badge badge-red">СИСТЕМА</span>'
+      : d.mounted ? '<span class="badge badge-yellow">СМОНТИРОВАН</span>'
+      : d.operable ? '<span class="badge badge-green">СВОБОДЕН</span>'
+      : '<span class="badge badge-gray">' + esc(d.reason || '') + '</span>';
+    var parts = (d.partitions || []).map(function (p) {
+      return '<div class="part-row">' +
+        '<span class="mono">' + esc(p.name) + '</span>' +
+        '<span>' + esc(p.fstype || '—') + '</span>' +
+        '<span class="muted">' + hsize(p.size) + '</span>' +
+        (p.mountpoint ? '<span class="badge badge-yellow">' + esc(p.mountpoint) + '</span>' : '<span class="badge badge-gray">не смонтирован</span>') +
+        (p.label ? '<span class="muted">метка: ' + esc(p.label) + '</span>' : '') +
+        (d.operable ? (
+          '<button class="btn" onclick="showFormatForm(\'' + esc(p.name) + '\')">Формат</button>' +
+          '<button class="btn" onclick="fsckPart(\'' + esc(p.name) + '\')">Проверить ФС</button>'
+        ) : '') +
+        '</div><div id="fmt-' + esc(p.name) + '"></div>';
+    }).join('') || '<div class="part-row muted">Разделов нет</div>';
+    var actions = d.operable ? (
+      '<div class="actions">' +
+      '<button class="btn" onclick="loadParts(\'' + esc(d.name) + '\')">Разделы (parted)</button>' +
+      '<button class="btn" onclick="loadSmart(\'' + esc(d.name) + '\')">SMART</button>' +
+      '<button class="btn btn-danger" onclick="wipeDisk(\'' + esc(d.name) + '\')">Очистить (wipefs)</button>' +
+      '</div><div id="parts-' + esc(d.name) + '"></div>'
+    ) : '<div class="actions"><button class="btn" onclick="loadSmart(\'' + esc(d.name) + '\')">SMART</button></div>';
+    return '<div class="disk">' +
+      '<div class="disk-head">' +
+      '<span class="disk-name">💽 /dev/' + esc(d.name) + '</span>' + badge +
+      '<span class="disk-meta">' + hsize(d.size) +
+      (d.model ? ' · ' + esc(d.model) : '') +
+      (d.tran ? ' · ' + esc(d.tran) : '') +
+      (d.rm ? ' · съёмный' : '') + '</span>' +
+      '</div>' + parts + actions + '</div>';
+  }).join('') || '<span class="muted">Диски не найдены</span>';
+  document.getElementById('disks').innerHTML = html;
+
+  var op = DISKS.filter(function (d) { return d.operable; });
+  var opts = op.map(function (d) {
+    return '<option value="' + esc(d.name) + '">/dev/' + esc(d.name) + ' (' + hsize(d.size) + ')</option>';
+  }).join('') || '<option value="">— нет свободных дисков —</option>';
+  ['clone-src','clone-dst','write-dst'].forEach(function (id) {
+    document.getElementById(id).innerHTML = opts;
+  });
+}
+
+function loadDisks() {
+  return fetch('/api/disktool/disks').then(function (r) { return r.json(); })
+    .then(function (d) { if (d.ok) renderDisks(d.disks); else toast(d.error, false); });
+}
+
+function loadTech() {
+  fetch('/api/disks').then(function (r) { return r.json(); }).then(function (d) {
+    document.getElementById('lsblk').textContent = d.lsblk || d.error || 'нет данных';
+    document.getElementById('df').textContent = d.df || '';
+  });
+}
+
+function loadAll() { loadDisks(); loadTech(); loadImages(); }
+
+/* --- parted --- */
+function loadParts(dev) {
+  var box = document.getElementById('parts-' + dev);
+  box.innerHTML = '<span class="muted">Чтение таблицы разделов…</span>';
+  fetch('/api/disktool/partitions?dev=' + encodeURIComponent(dev))
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d.ok) { box.innerHTML = '<span class="muted">Ошибка: ' + esc(d.error) + '</span>'; return; }
+      var rows = (d.partitions || []).map(function (p) {
+        return '<tr><td>' + p.num + '</td><td>' + esc(p.fs || '—') + '</td>' +
+          '<td>' + hsize(p.size) + '</td><td>' + hsize(p.start) + ' → ' + hsize(p.end) + '</td>' +
+          '<td><button class="btn btn-danger" onclick="delPart(\'' + esc(dev) + '\',' + p.num + ')">Удалить</button></td></tr>';
+      }).join('');
+      box.innerHTML =
+        '<table class="mini"><thead><tr><th>№</th><th>ФС</th><th>Размер</th><th>Смещение</th><th></th></tr></thead>' +
+        '<tbody>' + (rows || '<tr><td colspan="5" class="muted">Пусто</td></tr>') + '</tbody></table>' +
+        '<div class="row-form">' +
+        '<span class="muted">Новый раздел: ФС</span><select id="np-fs-' + esc(dev) + '">' + fsOptions('ext4') + '</select>' +
+        '<span class="muted">старт, байт</span><input type="number" id="np-s-' + esc(dev) + '" value="1048576" style="width:120px">' +
+        '<span class="muted">конец, байт</span><input type="number" id="np-e-' + esc(dev) + '" style="width:140px">' +
+        '<button class="btn btn-primary" onclick="addPart(\'' + esc(dev) + '\')">Создать</button>' +
+        '</div>';
     });
-    html += '</tbody></table>';
-    return html;
-  }
+}
+function addPart(dev) {
+  var fs = document.getElementById('np-fs-' + dev).value;
+  var s = document.getElementById('np-s-' + dev).value;
+  var e = document.getElementById('np-e-' + dev).value;
+  apiPost('/api/disktool/part', {dev: dev, fs: fs, start: s, end: e})
+    .then(function (d) { if (d.ok) { toast('Раздел создан', true); loadAll(); } });
+}
+function delPart(dev, num) {
+  if (!confirm('Удалить раздел №' + num + ' на /dev/' + dev + '? Данные будут потеряны!')) return;
+  apiPost('/api/disktool/part-del', {dev: dev, num: num})
+    .then(function (d) { if (d.ok) { toast('Раздел удалён', true); loadAll(); } });
+}
+function wipeDisk(dev) {
+  if (!confirm('Полностью ОЧИСТИТЬ /dev/' + dev + '? Таблица разделов и все данные будут стёрты!')) return;
+  apiPost('/api/disktool/wipe', {dev: dev})
+    .then(function (d) { if (d.ok) { toast('Диск очищен', true); loadAll(); } });
+}
 
-  function parseDf(text) {
-    const lines = text.trim().split('\n');
-    if (lines.length === 0) return '';
-    const header = lines[0];
-    const rows = lines.slice(1);
-    let html = '<table><thead><tr>';
-    const cols = header.split(/\s{2,}/);
-    cols.forEach(c => { html += '<th>' + c.trim() + '</th>'; });
-    html += '<th>Прогресс</th></tr></thead><tbody>';
-    rows.forEach(row => {
-      const cells = row.split(/\s{2,}/);
-      html += '<tr>';
-      cells.forEach((cell, i) => {
-        const val = cell ? cell.trim() : '';
-        if (i === 4) {
-          const pct = parseInt(val) || 0;
-          let barClass = 'usage-low';
-          if (pct >= 90) barClass = 'usage-high';
-          else if (pct >= 70) barClass = 'usage-medium';
-          html += '<td>' + val + '</td>';
-        } else {
-          html += '<td>' + val + '</td>';
-        }
-      });
-      const pctStr = cells[4] ? cells[4].trim() : '0';
-      const pct = parseInt(pctStr) || 0;
-      let barClass = 'usage-low';
-      if (pct >= 90) barClass = 'usage-high';
-      else if (pct >= 70) barClass = 'usage-medium';
-      html += '<td><div class="usage-bar"><div class="usage-bar-fill ' + barClass + '" style="width:' + pct + '%"></div></div></td>';
-      html += '</tr>';
+/* --- формат / fsck --- */
+function showFormatForm(part) {
+  var box = document.getElementById('fmt-' + part);
+  if (box.innerHTML) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="row-form">' +
+    '<span class="muted">Формат ' + esc(part) + ' в</span><select id="fm-fs-' + esc(part) + '">' + fsOptions('ext4') + '</select>' +
+    '<span class="muted">метка</span><input type="text" id="fm-l-' + esc(part) + '" maxlength="32" style="width:140px">' +
+    '<button class="btn btn-danger" onclick="doFormat(\'' + esc(part) + '\')">Форматировать</button>' +
+    '</div>';
+}
+function doFormat(part) {
+  var fs = document.getElementById('fm-fs-' + part).value;
+  var label = document.getElementById('fm-l-' + part).value;
+  if (!confirm('Отформатировать ' + part + ' в ' + fs + '? ВСЕ ДАННЫЕ на разделе будут потеряны!')) return;
+  toast('Форматирование идёт…', true);
+  apiPost('/api/disktool/format', {dev: part, fs: fs, label: label})
+    .then(function (d) { if (d.ok) { toast('Готово', true); loadAll(); } });
+}
+function fsckPart(part) {
+  toast('Проверка ФС (e2fsck -n)…', true);
+  apiPost('/api/disktool/fsck', {dev: part}).then(function (d) {
+    document.getElementById('smart').innerHTML =
+      '<div class="health-pre">e2fsck ' + esc(part) + ' (код ' + d.code + '):\n' + esc(d.raw || d.error || '') + '</div>';
+  });
+}
+
+/* --- SMART --- */
+function loadSmart(dev) {
+  var box = document.getElementById('smart');
+  box.innerHTML = '<span class="muted">Опрос smartctl /dev/' + esc(dev) + '…</span>';
+  fetch('/api/disktool/smart?dev=' + encodeURIComponent(dev))
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d.ok) { box.innerHTML = '<span class="muted">' + esc(d.error || 'нет данных') + '</span>'; return; }
+      var head = '<b>/dev/' + esc(dev) + '</b> — ' +
+        (d.health && d.health.passed === true ? '<span class="badge badge-green">ЗДОРОВ</span>' :
+         d.health && d.health.passed === false ? '<span class="badge badge-red">ЕСТЬ ОШИБКИ</span>' :
+         '<span class="badge badge-gray">статус неизвестен</span>') +
+        (d.temp ? ' · температура ' + d.temp + '°C' : '');
+      var rows = (d.attrs || []).map(function (a) {
+        return '<tr><td>' + a.id + '</td><td>' + esc(a.name || '') + '</td><td>' + esc(a.raw) + '</td>' +
+          '<td>' + esc(a.worst) + '</td><td>' + esc(a.thresh) + '</td>' +
+          '<td>' + (a.failed ? '<span class="badge badge-red">FAIL</span>' : 'ok') + '</td></tr>';
+      }).join('');
+      box.innerHTML = head +
+        (rows ? '<table class="mini"><thead><tr><th>ID</th><th>Атрибут</th><th>Значение</th><th>Худ.</th><th>Порог</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>' : '') +
+        '<details style="margin-top:8px"><summary class="muted" style="cursor:pointer">сырой вывод smartctl</summary>' +
+        '<div class="health-pre">' + esc(d.raw || '') + '</div></details>';
     });
-    html += '</tbody></table>';
-    return html;
-  }
+}
 
-  function loadData() {
-    document.getElementById('lsblk-container').innerHTML = '<span class="loading">Загрузка...</span>';
-    document.getElementById('df-container').innerHTML = '<span class="loading">Загрузка...</span>';
-    document.getElementById('smart-container').innerHTML = '<span class="loading">Загрузка...</span>';
+/* --- клон / запись --- */
+function startClone() {
+  var src = document.getElementById('clone-src').value;
+  var dst = document.getElementById('clone-dst').value;
+  if (!src || !dst) { toast('Выберите оба диска', false); return; }
+  if (src === dst) { toast('Источник и приёмник совпадают', false); return; }
+  if (!confirm('КЛОНИРОВАТЬ /dev/' + src + ' → /dev/' + dst + '?\nВсе данные на приёмнике будут уничтожены!')) return;
+  apiPost('/api/disktool/clone', {src: src, dst: dst})
+    .then(function (d) { if (d.ok) { toast('Клонирование запущено', true); pollOp(); } });
+}
+function startWrite() {
+  var img = document.getElementById('write-img').value;
+  var dst = document.getElementById('write-dst').value;
+  if (!img || !dst) { toast('Выберите образ и диск', false); return; }
+  if (!confirm('ЗАПИСАТЬ образ на /dev/' + dst + '?\nВсе данные на диске будут уничтожены!')) return;
+  apiPost('/api/disktool/write', {image: img, dev: dst})
+    .then(function (d) { if (d.ok) { toast('Запись запущена', true); pollOp(); } });
+}
 
-    fetch('/api/disks')
-      .then(r => r.json())
-      .then(data => {
-        if (data.ok) {
-          document.getElementById('lsblk-container').innerHTML = parseLsblk(data.lsblk || '');
-          document.getElementById('df-container').innerHTML = parseDf(data.df || '');
-          const smartText = data.smart || 'Нет данных';
-          document.getElementById('smart-container').innerHTML = '<pre class="health-pre">' + smartText + '</pre>';
-        } else {
-          document.getElementById('lsblk-container').innerHTML = '<span class="loading">Ошибка загрузки данных</span>';
-          document.getElementById('df-container').innerHTML = '<span class="loading">Ошибка загрузки данных</span>';
-          document.getElementById('smart-container').innerHTML = '<span class="loading">Ошибка загрузки данных</span>';
-        }
-      })
-      .catch(err => {
-        document.getElementById('lsblk-container').innerHTML = '<span class="loading">Ошибка: ' + err.message + '</span>';
-        document.getElementById('df-container').innerHTML = '<span class="loading">Ошибка: ' + err.message + '</span>';
-        document.getElementById('smart-container').innerHTML = '<span class="loading">Ошибка: ' + err.message + '</span>';
-      });
-  }
+/* --- образы --- */
+function loadImages() {
+  fetch('/api/disktool/images').then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d.ok) { return; }
+      var ready = d.images.filter(function (i) { return i.ready; });
+      var html = d.images.map(function (im) {
+        var btn = im.source === 'freedos'
+          ? (im.ready ? '<span class="badge badge-green">скачан</span>'
+                      : '<button class="btn" onclick="dlFreedos(\'' + esc(im.key) + '\')">Скачать</button>')
+          : '<span class="badge badge-gray">загружен</span>';
+        return '<div class="img-row">' +
+          '<span>' + (im.kind === 'floppy' ? '🥾' : im.kind === 'usb' ? '💾' : '📄') + ' ' + esc(im.title) + '</span>' +
+          '<span class="muted">' + hsize(im.size) + '</span>' + btn + '</div>';
+      }).join('') || '<span class="muted">Нет образов</span>';
+      document.getElementById('images').innerHTML = html;
+      document.getElementById('write-img').innerHTML = ready.map(function (im) {
+        return '<option value="' + esc(im.key) + '">' + esc(im.title) + '</option>';
+      }).join('') || '<option value="">— сначала скачайте/загрузите образ —</option>';
+    });
+}
+function dlFreedos(key) {
+  toast('Скачивание FreeDOS (однократно)…', true);
+  apiPost('/api/disktool/images/freedos', {key: key})
+    .then(function (d) { if (d.ok) { pollOp(); } });
+}
+function uploadImage() {
+  var f = document.getElementById('upload-file').files[0];
+  if (!f) { toast('Выберите файл', false); return; }
+  var fd = new FormData();
+  fd.append('file', f);
+  toast('Загрузка…', true);
+  fetch('/api/disktool/images/upload', {method: 'POST', body: fd})
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      toast(d.ok ? 'Файл сохранён' : (d.error || 'ошибка'), !!d.ok);
+      if (d.ok) loadImages();
+    });
+}
 
-  loadData();
+/* --- поллинг операций --- */
+var opTimer = null;
+function pollOp() {
+  clearTimeout(opTimer);
+  fetch('/api/disktool/status').then(function (r) { return r.json(); })
+    .then(function (st) {
+      var box = document.getElementById('op-box');
+      if (!st.running) {
+        box.innerHTML = st.op
+          ? 'Последняя операция: <b>' + esc(st.op) + '</b> ' + esc(st.target || '') + ' — ' +
+            (st.ok ? '<span class="badge badge-green">успешно</span>'
+                   : '<span class="badge badge-red">' + esc(st.error || 'ошибка') + '</span>')
+          : '<span class="muted">Нет активных операций</span>';
+        return;
+      }
+      var pct = (st.percent === null || st.percent === undefined) ? 0 : st.percent;
+      box.innerHTML = '<b>' + esc(st.op || 'операция') + '</b> ' + esc(st.target || '') +
+        ' — ' + esc(st.text || '') +
+        '<div class="progress"><span style="width:' + pct + '%"></span></div>' +
+        '<button class="btn btn-danger" onclick="stopOp()">⏹ Остановить</button>';
+      opTimer = setTimeout(pollOp, 2000);
+    });
+}
+function stopOp() {
+  apiPost('/api/disktool/op/stop', {}).then(function () { pollOp(); loadAll(); });
+}
+
+loadAll();
+pollOp();
+setInterval(pollOp, 15000);
 </script>
 {% endblock %}

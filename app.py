@@ -547,6 +547,11 @@ register_rescue_routes(app, ctx)
 from modules.tv_routes import register_routes as register_tv_routes
 register_tv_routes(app, ctx)
 
+# ==================== Disk Manager (расширение «Диски») ====================
+
+from modules.disktool_routes import register_routes as register_disktool_routes
+register_disktool_routes(app, ctx)
+
 # ==================== Core routes ====================
 
 from modules.core_routes import register_routes as register_core_routes
