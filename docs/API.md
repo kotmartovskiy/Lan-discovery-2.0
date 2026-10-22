@@ -328,6 +328,27 @@ MCU/чипы — списки, порты — из детекта ttyUSB/ttyACM)
 
 ---
 
+## Внешний вид (темы/фон/акцент)
+
+Настройки вида панели — без отдельных роутов:
+
+- **Персонально** (каждый браузер): кнопка 🎨 в шапке / меню → модалка
+  «Внешний вид» → `localStorage`-ключ `ld_ui` (JSON: `theme`, `bg`,
+  `accent`). Тема `auto` следует за `prefers-color-scheme`.
+  Ранний скрипт в `<head>` (`templates/base.html`) применяет выбор до
+  отрисовки — без «мигания» стартовой темы.
+- **Глобальный дефолт** (для всех): секция `ui` в
+  `/etc/lan-discovery/settings.json` (`{"ui": {"theme": "dark",
+  "bg": "mono", "accent": "blue"}}`), пишется обычным
+  `POST /api/settings` (admin, deep-merge). Приоритет: localStorage →
+  `ui` из settings → дефолт `dark/mono/blue`.
+- Реализация: `data-theme` / `data-bg` / `data-accent` на `<html>`;
+  блоки тем в `static/style.css` (секции 8–9): `light` (светлая
+  тема), фоны `mono/aurora/sunset/forest`, акценты
+  `blue/violet/green/orange/rose/teal`.
+
+---
+
 Итого таблиц: 2, 7, 30, 29, 21, 64, 2, 2, 4, 8, 4, 17, 12, 7, 11 = 218
 
 Роуты без `def`-декоратора `login_required`/`admin_required`
